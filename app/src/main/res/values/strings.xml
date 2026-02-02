@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">沟通牌</string>
+
+    <!-- 主界面 -->
+    <string name="title_main">沟通牌</string>
+    <string name="subtitle">团队对抗型扑克牌游戏</string>
+    <string name="btn_start_game">开始游戏</string>
+    <string name="btn_rules">游戏规则</string>
+    <string name="btn_settings">设置</string>
+
+    <!-- 游戏界面 -->
+    <string name="btn_play">出牌</string>
+    <string name="btn_pass">过牌</string>
+    <string name="btn_hint">提示</string>
+    <string name="btn_sort">排序</string>
+
+    <!-- 队伍 -->
+    <string name="team_a">红队</string>
+    <string name="team_b">蓝队</string>
+    <string name="team_score">%s: %d分</string>
+
+    <!-- 游戏状态 -->
+    <string name="dealing">发牌中...</string>
+    <string name="your_turn">轮到你出牌</string>
+    <string name="waiting">等待 %s 出牌</string>
+    <string name="passed">%s 过牌</string>
+    <string name="played">%s 出了 %s</string>
+    <string name="round_won">%s 赢得此轮，获得 %d 分</string>
+    <string name="player_finished">%s 已走完（第%d个）</string>
+
+    <!-- 游戏结果 -->
+    <string name="game_over">游戏结束</string>
+    <string name="you_win">你的队伍获胜！</string>
+    <string name="you_lose">你的队伍失败</string>
+    <string name="draw">平局</string>
+    <string name="final_score">最终得分：红队 %d 分，蓝队 %d 分</string>
+    <string name="btn_play_again">再来一局</string>
+    <string name="btn_back_menu">返回主界面</string>
+
+    <!-- 难度 -->
+    <string name="difficulty">AI难度</string>
+    <string name="difficulty_easy">简单</string>
+    <string name="difficulty_medium">中等</string>
+    <string name="difficulty_hard">困难</string>
+
+    <!-- 玩家数量 -->
+    <string name="player_count">玩家数量</string>
+    <string name="players_6">6人（3v3）</string>
+    <string name="players_8">8人（4v4）</string>
+
+    <!-- 规则 -->
+    <string name="rules_title">游戏规则</string>
+    <string name="rules_content">
+【游戏目标】
+通过赢取牌局获得分值牌，使本队得分达到或超过200分。
+
+【牌面大小】
+大王 > 小王 > 2 > A > K > Q > J > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 3
+
+【分值牌】
+K = 10分
+10 = 10分
+5 = 5分
+总计 = 400分
+
+【允许牌型】
+- 单张
+- 对子（两张相同）
+- 三张（三张相同）
+- 顺子（5张或以上连续）
+- 炸弹（4张或以上相同）
+
+【出牌规则】
+- 跟牌必须出相同牌型且更大
+- 炸弹可以压制任何非炸弹牌型
+- 炸弹之间比张数，张数相同比点数
+
+【结算规则】
+1. 全队走完触发结算
+2. 已走完玩家已收分≥200分提前结算
+
+【胜负判定】
+得分≥200分的队伍获胜
+    </string>
+</resources>

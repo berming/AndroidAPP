@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题色 -->
+    <color name="primary">#1B5E20</color>
+    <color name="primary_dark">#0D3D12</color>
+    <color name="primary_light">#4CAF50</color>
+    <color name="accent">#FFC107</color>
+
+    <!-- 背景色 -->
+    <color name="background_dark">#1A1A2E</color>
+    <color name="background_game">#0F3D0F</color>
+    <color name="card_table">#2D5A27</color>
+
+    <!-- 文字色 -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B0B0B0</color>
+
+    <!-- 队伍色 -->
+    <color name="team_a">#E53935</color>
+    <color name="team_a_light">#FF6F60</color>
+    <color name="team_b">#1E88E5</color>
+    <color name="team_b_light">#6AB7FF</color>
+
+    <!-- 牌面色 -->
+    <color name="card_background">#FFFEF0</color>
+    <color name="card_border">#333333</color>
+    <color name="card_red">#D32F2F</color>
+    <color name="card_black">#212121</color>
+    <color name="card_selected">#FFD54F</color>
+    <color name="card_disabled">#666666</color>
+
+    <!-- 按钮色 -->
+    <color name="button_play">#4CAF50</color>
+    <color name="button_pass">#757575</color>
+    <color name="button_disabled">#424242</color>
+
+    <!-- 分值色 -->
+    <color name="score_positive">#FFD700</color>
+    <color name="score_negative">#F44336</color>
+</resources>
