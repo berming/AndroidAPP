@@ -14,5 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CommunicationCard"
-include(":app")
+rootProject.name = "AndroidApps"
+
+// Communication Card Game (沟通牌)
+include(":apps:communication-card")
