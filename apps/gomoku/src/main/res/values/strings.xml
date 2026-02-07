@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">五子棋</string>
+    <string name="subtitle">人机对战</string>
+
+    <string name="select_difficulty">选择难度</string>
+    <string name="easy">简单</string>
+    <string name="medium">中等</string>
+    <string name="hard">困难</string>
+
+    <string name="start_game">开始游戏</string>
+    <string name="back">返回</string>
+    <string name="undo">悔棋</string>
+    <string name="restart">重新开始</string>
+    <string name="show_numbers">显示序号</string>
+    <string name="hide_numbers">隐藏序号</string>
+
+    <string name="your_turn">轮到你落子（黑棋）</string>
+    <string name="ai_thinking">AI思考中…</string>
+    <string name="game_over">游戏结束</string>
+
+    <string name="you_win">你赢了！</string>
+    <string name="you_lose">你输了</string>
+    <string name="draw">平局</string>
+
+    <string name="play_again">再来一局</string>
+    <string name="back_menu">返回菜单</string>
+
+    <string name="difficulty_easy">难度：简单</string>
+    <string name="difficulty_medium">难度：中等</string>
+    <string name="difficulty_hard">难度：困难</string>
+</resources>

@@ -18,3 +18,6 @@ rootProject.name = "AndroidApps"
 
 // Communication Card Game (沟通牌)
 include(":apps:communication-card")
+
+// Gomoku (五子棋)
+include(":apps:gomoku")
