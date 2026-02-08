@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/player_card_background"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <!-- 玩家信息行 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- 队伍颜色标识 -->
+        <View
+            android:id="@+id/teamIndicator"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="4dp"
+            android:background="@color/team_b" />
+
+        <!-- 玩家名称 -->
+        <TextView
+            android:id="@+id/tvPlayerName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:text="玩家2" />
+
+        <!-- 牌数 -->
+        <TextView
+            android:id="@+id/tvCardCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            tools:text="36张" />
+
+    </LinearLayout>
+
+    <!-- 已收分 -->
+    <TextView
+        android:id="@+id/tvScore"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/score_positive"
+        android:textSize="10sp"
+        tools:text="已收:25分" />
+
+    <!-- 当轮出牌区域 -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="2dp"
+        android:layout_weight="1"
+        android:background="#20FFFFFF">
+
+        <!-- 出的牌 -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/playedCardsContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="2dp" />
+
+        </HorizontalScrollView>
+
+        <!-- PASS 或 等待状态 -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="PASS" />
+
+    </FrameLayout>
+
+</LinearLayout>
