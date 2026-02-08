@@ -391,9 +391,30 @@ class GameActivity : AppCompatActivity() {
         selectedCards.clear()
 
         val humanPlayer = gameEngine.humanPlayer ?: return
+        val cardCount = humanPlayer.hand.size
+
+        // Calculate card overlap based on screen width and card count
+        // More cards = more overlap
+        val screenWidth = resources.displayMetrics.widthPixels
+        val cardWidth = 44.dpToPx()
+        val cardHeight = 64.dpToPx()
+
+        // Calculate overlap to fit all cards with some scrolling allowed
+        // Aim to show most cards with minimal scrolling
+        val availableWidth = screenWidth - 32.dpToPx() // Padding
+        val minOverlap = -12.dpToPx() // Minimum overlap for readability
+        val maxOverlap = -30.dpToPx() // Maximum overlap
+
+        val neededOverlap = if (cardCount > 1) {
+            val totalCardWidth = cardCount * cardWidth
+            val overlapNeeded = (totalCardWidth - availableWidth) / (cardCount - 1)
+            -overlapNeeded.coerceIn(-minOverlap, -maxOverlap)
+        } else {
+            0
+        }
 
         humanPlayer.hand.forEach { card ->
-            val cardView = createCardView(card)
+            val cardView = createCardView(card, cardWidth, cardHeight, neededOverlap)
             cardView.setOnClickListener {
                 toggleCardSelection(card, cardView)
             }
@@ -404,7 +425,7 @@ class GameActivity : AppCompatActivity() {
         updateButtonStates()
     }
 
-    private fun createCardView(card: Card, isSmall: Boolean = false): View {
+    private fun createCardView(card: Card, width: Int, height: Int, marginEnd: Int): View {
         val view = LayoutInflater.from(this).inflate(R.layout.view_card, null)
 
         val tvRank = view.findViewById<TextView>(R.id.tvRank)
@@ -423,11 +444,9 @@ class GameActivity : AppCompatActivity() {
         tvRank.setTextColor(ContextCompat.getColor(this, color))
         tvSuit.setTextColor(ContextCompat.getColor(this, color))
 
-        if (isSmall) {
-            val params = LinearLayout.LayoutParams(48.dpToPx(), 68.dpToPx())
-            params.marginEnd = (-8).dpToPx()
-            view.layoutParams = params
-        }
+        val params = LinearLayout.LayoutParams(width, height)
+        params.marginEnd = marginEnd
+        view.layoutParams = params
 
         return view
     }
