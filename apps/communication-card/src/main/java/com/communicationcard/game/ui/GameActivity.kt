@@ -35,7 +35,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var tvTeamAScore: TextView
     private lateinit var tvTeamBScore: TextView
     private lateinit var tvGameStatus: TextView
-    private lateinit var playerHandContainer: LinearLayout
+    private lateinit var playerHandRow1: LinearLayout
+    private lateinit var playerHandRow2: LinearLayout
     private lateinit var tvMessage: TextView
     private lateinit var btnPlay: Button
     private lateinit var btnPass: Button
@@ -82,7 +83,8 @@ class GameActivity : AppCompatActivity() {
         tvTeamAScore = findViewById(R.id.tvTeamAScore)
         tvTeamBScore = findViewById(R.id.tvTeamBScore)
         tvGameStatus = findViewById(R.id.tvGameStatus)
-        playerHandContainer = findViewById(R.id.playerHandContainer)
+        playerHandRow1 = findViewById(R.id.playerHandRow1)
+        playerHandRow2 = findViewById(R.id.playerHandRow2)
         tvMessage = findViewById(R.id.tvMessage)
         btnPlay = findViewById(R.id.btnPlay)
         btnPass = findViewById(R.id.btnPass)
@@ -101,9 +103,8 @@ class GameActivity : AppCompatActivity() {
         currentWinningCards = findViewById(R.id.currentWinningCards)
         tvRoundScore = findViewById(R.id.tvRoundScore)
 
-        // Initialize player views (players 2-6)
-        // Player 2, 4, 6 are in top row (opponents - Team B)
-        // Player 3, 5 are in middle row (teammates - Team A)
+        // Initialize player views (players 2-6) - horizontal layout with alternating teams
+        // Order: 2(B), 3(A), 4(B), 5(A), 6(B)
         playerViews[2] = findViewById(R.id.player2)
         playerViews[3] = findViewById(R.id.player3)
         playerViews[4] = findViewById(R.id.player4)
@@ -386,39 +387,42 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun updatePlayerHand() {
-        playerHandContainer.removeAllViews()
+        playerHandRow1.removeAllViews()
+        playerHandRow2.removeAllViews()
         cardViewMap.clear()
         selectedCards.clear()
 
         val humanPlayer = gameEngine.humanPlayer ?: return
-        val cardCount = humanPlayer.hand.size
+        val cards = humanPlayer.hand
+        val cardCount = cards.size
 
-        // Calculate card overlap based on screen width and card count
-        // More cards = more overlap
-        val screenWidth = resources.displayMetrics.widthPixels
-        val cardWidth = 44.dpToPx()
-        val cardHeight = 64.dpToPx()
+        // Card size for two-row display (no overlap)
+        val cardWidth = 48.dpToPx()
+        val cardHeight = 68.dpToPx()
+        val cardMargin = 2.dpToPx()
 
-        // Calculate overlap to fit all cards with some scrolling allowed
-        // Aim to show most cards with minimal scrolling
-        val availableWidth = screenWidth - 32.dpToPx() // Padding
-        val minOverlap = -12.dpToPx() // Minimum overlap for readability
-        val maxOverlap = -30.dpToPx() // Maximum overlap
+        // Split cards into two rows
+        val halfCount = (cardCount + 1) / 2 // First row gets more if odd number
+        val row1Cards = cards.take(halfCount)
+        val row2Cards = cards.drop(halfCount)
 
-        val neededOverlap = if (cardCount > 1) {
-            val totalCardWidth = cardCount * cardWidth
-            val overlapNeeded = (totalCardWidth - availableWidth) / (cardCount - 1)
-            -overlapNeeded.coerceIn(-minOverlap, -maxOverlap)
-        } else {
-            0
-        }
-
-        humanPlayer.hand.forEach { card ->
-            val cardView = createCardView(card, cardWidth, cardHeight, neededOverlap)
+        // Add cards to first row
+        row1Cards.forEach { card ->
+            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
             cardView.setOnClickListener {
                 toggleCardSelection(card, cardView)
             }
-            playerHandContainer.addView(cardView)
+            playerHandRow1.addView(cardView)
+            cardViewMap[card] = cardView
+        }
+
+        // Add cards to second row
+        row2Cards.forEach { card ->
+            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
+            cardView.setOnClickListener {
+                toggleCardSelection(card, cardView)
+            }
+            playerHandRow2.addView(cardView)
             cardViewMap[card] = cardView
         }
 
@@ -528,8 +532,8 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun updateScores() {
-        tvTeamAScore.text = "${gameEngine.teamA.team.displayName}: ${gameEngine.teamA.finishedPlayersScore}分"
-        tvTeamBScore.text = "${gameEngine.teamB.team.displayName}: ${gameEngine.teamB.finishedPlayersScore}分"
+        tvTeamAScore.text = "${gameEngine.teamA.team.displayName}:${gameEngine.teamA.finishedPlayersScore}分"
+        tvTeamBScore.text = "${gameEngine.teamB.team.displayName}:${gameEngine.teamB.finishedPlayersScore}分"
 
         // Update human player score display
         val humanPlayer = gameEngine.humanPlayer
