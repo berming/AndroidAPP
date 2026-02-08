@@ -99,7 +99,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/team_a"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="红队:0分" />
 
@@ -116,7 +116,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/accent"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 tools:text="玩家2:" />
 
             <!-- 当前最大牌 -->
@@ -142,7 +142,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/score_positive"
-                android:textSize="12sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="本轮:15分" />
 
@@ -159,7 +159,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/team_b"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textStyle="bold"
                 tools:text="蓝队:0分" />
 
