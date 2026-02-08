@@ -35,7 +35,6 @@ class GameActivity : AppCompatActivity() {
     private lateinit var tvTeamAScore: TextView
     private lateinit var tvTeamBScore: TextView
     private lateinit var tvGameStatus: TextView
-    private lateinit var playedCardsContainer: LinearLayout
     private lateinit var playerHandContainer: LinearLayout
     private lateinit var tvMessage: TextView
     private lateinit var btnPlay: Button
@@ -47,11 +46,19 @@ class GameActivity : AppCompatActivity() {
     private lateinit var tvFinalScore: TextView
     private lateinit var btnPlayAgain: Button
     private lateinit var btnBackMenu: Button
+    private lateinit var tvPlayerCardCount: TextView
+    private lateinit var tvPlayerScore: TextView
 
-    // Opponent views
-    private val opponentViews = mutableListOf<View>()
-    // Teammate views
-    private val teammateViews = mutableListOf<View>()
+    // Current round display
+    private lateinit var tvCurrentLeader: TextView
+    private lateinit var currentWinningCards: LinearLayout
+    private lateinit var tvRoundScore: TextView
+
+    // Player views map: playerId -> View
+    private val playerViews = mutableMapOf<Int, View>()
+
+    // Track played cards in current round for each player
+    private val currentRoundPlayedCards = mutableMapOf<Int, CardGroup?>()
 
     // Selected cards for playing
     private val selectedCards = mutableListOf<Card>()
@@ -75,7 +82,6 @@ class GameActivity : AppCompatActivity() {
         tvTeamAScore = findViewById(R.id.tvTeamAScore)
         tvTeamBScore = findViewById(R.id.tvTeamBScore)
         tvGameStatus = findViewById(R.id.tvGameStatus)
-        playedCardsContainer = findViewById(R.id.playedCardsContainer)
         playerHandContainer = findViewById(R.id.playerHandContainer)
         tvMessage = findViewById(R.id.tvMessage)
         btnPlay = findViewById(R.id.btnPlay)
@@ -87,15 +93,22 @@ class GameActivity : AppCompatActivity() {
         tvFinalScore = findViewById(R.id.tvFinalScore)
         btnPlayAgain = findViewById(R.id.btnPlayAgain)
         btnBackMenu = findViewById(R.id.btnBackMenu)
+        tvPlayerCardCount = findViewById(R.id.tvPlayerCardCount)
+        tvPlayerScore = findViewById(R.id.tvPlayerScore)
 
-        // Initialize opponent views
-        opponentViews.add(findViewById(R.id.opponent1))
-        opponentViews.add(findViewById(R.id.opponent2))
-        opponentViews.add(findViewById(R.id.opponent3))
+        // Current round display
+        tvCurrentLeader = findViewById(R.id.tvCurrentLeader)
+        currentWinningCards = findViewById(R.id.currentWinningCards)
+        tvRoundScore = findViewById(R.id.tvRoundScore)
 
-        // Initialize teammate views
-        teammateViews.add(findViewById(R.id.teammate1))
-        teammateViews.add(findViewById(R.id.teammate2))
+        // Initialize player views (players 2-6)
+        // Player 2, 4, 6 are in top row (opponents - Team B)
+        // Player 3, 5 are in middle row (teammates - Team A)
+        playerViews[2] = findViewById(R.id.player2)
+        playerViews[3] = findViewById(R.id.player3)
+        playerViews[4] = findViewById(R.id.player4)
+        playerViews[5] = findViewById(R.id.player5)
+        playerViews[6] = findViewById(R.id.player6)
     }
 
     private fun initGame(playerCount: Int, difficulty: AIDifficulty) {
@@ -147,9 +160,11 @@ class GameActivity : AppCompatActivity() {
     private fun handleGameEvent(event: GameEvent) {
         when (event) {
             is GameEvent.CardsDealt -> {
+                currentRoundPlayedCards.clear()
                 updateAllPlayerViews()
                 updatePlayerHand()
                 updateScores()
+                updateCurrentRoundDisplay()
             }
 
             is GameEvent.TurnStart -> {
@@ -162,24 +177,28 @@ class GameActivity : AppCompatActivity() {
             }
 
             is GameEvent.CardsPlayed -> {
-                showPlayedCards(event.cardGroup)
+                // Track played cards for this player in current round
+                currentRoundPlayedCards[event.player.id] = event.cardGroup
+                showPlayerPlayedCards(event.player, event.cardGroup)
                 updatePlayerView(event.player)
+                updateCurrentRoundDisplay()
                 if (event.player.type == PlayerType.HUMAN) {
                     updatePlayerHand()
                 }
-                showMessage("${event.player.name} 出了 ${event.cardGroup}")
             }
 
             is GameEvent.PlayerPassed -> {
-                showMessage("${event.player.name} 过牌")
-                updatePlayerStatus(event.player, "过牌")
+                currentRoundPlayedCards[event.player.id] = null // Mark as passed
+                showPlayerPassedStatus(event.player)
             }
 
             is GameEvent.RoundWon -> {
                 showMessage("${event.player.name} 赢得此轮，获得 ${event.score} 分")
                 handler.postDelayed({
-                    playedCardsContainer.removeAllViews()
-                    clearAllPlayerStatus()
+                    // Clear all played cards for new round
+                    currentRoundPlayedCards.clear()
+                    clearAllPlayedCards()
+                    updateCurrentRoundDisplay()
                 }, MESSAGE_DISPLAY_MS)
             }
 
@@ -197,7 +216,7 @@ class GameActivity : AppCompatActivity() {
             }
 
             is GameEvent.AICommunication -> {
-                updatePlayerStatus(event.player, event.message)
+                // AI communication now shown via played cards
             }
         }
     }
@@ -215,68 +234,38 @@ class GameActivity : AppCompatActivity() {
 
     private fun highlightCurrentPlayer(player: Player) {
         // Reset all highlights
-        opponentViews.forEach { it.alpha = 0.7f }
-        teammateViews.forEach { it.alpha = 0.7f }
+        playerViews.values.forEach { it.alpha = 0.7f }
 
-        // Find and highlight current player
-        val playerIndex = player.id
+        // Highlight current player
         if (player.type == PlayerType.HUMAN) {
-            // Human player area is always visible
+            // Human player area is always highlighted
             return
         }
 
-        // Find the view for this player
-        val opponents = gameEngine.players.filter { it.team != gameEngine.humanPlayer?.team }
-        val teammates = gameEngine.players.filter {
-            it.team == gameEngine.humanPlayer?.team && it.type == PlayerType.AI
-        }
-
-        val opponentIndex = opponents.indexOfFirst { it.id == player.id }
-        if (opponentIndex >= 0 && opponentIndex < opponentViews.size) {
-            opponentViews[opponentIndex].alpha = 1.0f
-        }
-
-        val teammateIndex = teammates.indexOfFirst { it.id == player.id }
-        if (teammateIndex >= 0 && teammateIndex < teammateViews.size) {
-            teammateViews[teammateIndex].alpha = 1.0f
-        }
+        playerViews[player.id]?.alpha = 1.0f
     }
 
     private fun updateAllPlayerViews() {
-        val humanTeam = gameEngine.humanPlayer?.team ?: Team.TEAM_A
-        val opponents = gameEngine.players.filter { it.team != humanTeam }
-        val teammates = gameEngine.players.filter { it.team == humanTeam && it.type == PlayerType.AI }
-
-        // Update opponent views
-        opponents.forEachIndexed { index, player ->
-            if (index < opponentViews.size) {
-                updateOpponentView(opponentViews[index], player)
-            }
+        // Update all AI player views (players 2-6)
+        gameEngine.players.filter { it.type == PlayerType.AI }.forEach { player ->
+            updatePlayerView(player)
         }
 
-        // Hide unused opponent views
-        for (i in opponents.size until opponentViews.size) {
-            opponentViews[i].visibility = View.GONE
-        }
-
-        // Update teammate views
-        teammates.forEachIndexed { index, player ->
-            if (index < teammateViews.size) {
-                updateTeammateView(teammateViews[index], player)
-            }
-        }
-
-        // Hide unused teammate views
-        for (i in teammates.size until teammateViews.size) {
-            teammateViews[i].visibility = View.GONE
+        // Update human player info
+        val humanPlayer = gameEngine.humanPlayer
+        if (humanPlayer != null) {
+            tvPlayerCardCount.text = getString(R.string.cards_count, humanPlayer.handSize)
+            tvPlayerScore.text = getString(R.string.collected_score, humanPlayer.collectedScore)
         }
     }
 
-    private fun updateOpponentView(view: View, player: Player) {
+    private fun updatePlayerView(player: Player) {
+        val view = playerViews[player.id] ?: return
+
         view.visibility = View.VISIBLE
         view.findViewById<TextView>(R.id.tvPlayerName).text = player.name
-        view.findViewById<TextView>(R.id.tvCardCount).text = "${player.handSize}张牌"
-        view.findViewById<TextView>(R.id.tvScore).text = "已收: ${player.collectedScore}分"
+        view.findViewById<TextView>(R.id.tvCardCount).text = "${player.handSize}张"
+        view.findViewById<TextView>(R.id.tvScore).text = "已收:${player.collectedScore}分"
 
         val indicator = view.findViewById<View>(R.id.teamIndicator)
         indicator.setBackgroundColor(
@@ -286,79 +275,114 @@ class GameActivity : AppCompatActivity() {
             )
         )
 
+        val statusView = view.findViewById<TextView>(R.id.tvStatus)
         if (player.hasFinished) {
-            view.findViewById<TextView>(R.id.tvStatus).apply {
-                visibility = View.VISIBLE
-                text = "已走完"
-            }
+            statusView.visibility = View.VISIBLE
+            statusView.text = "已走完"
+            // Hide played cards container
+            view.findViewById<View>(R.id.playedCardsContainer).visibility = View.GONE
         }
     }
 
-    private fun updateTeammateView(view: View, player: Player) {
-        view.visibility = View.VISIBLE
-        view.findViewById<TextView>(R.id.tvPlayerName).text = player.name
-        view.findViewById<TextView>(R.id.tvCardCount).text = "${player.handSize}张"
-        view.findViewById<TextView>(R.id.tvScore).text = "已收: ${player.collectedScore}分"
+    private fun showPlayerPlayedCards(player: Player, cardGroup: CardGroup) {
+        if (player.type == PlayerType.HUMAN) {
+            // Human player's cards shown in center area
+            return
+        }
 
-        if (player.hasFinished) {
-            view.findViewById<TextView>(R.id.tvStatus).apply {
-                visibility = View.VISIBLE
-                text = "已走完"
-            }
+        val view = playerViews[player.id] ?: return
+        val container = view.findViewById<LinearLayout>(R.id.playedCardsContainer)
+        val statusView = view.findViewById<TextView>(R.id.tvStatus)
+
+        container.removeAllViews()
+        container.visibility = View.VISIBLE
+        statusView.visibility = View.GONE
+
+        cardGroup.cards.forEach { card ->
+            val cardView = createMiniCardView(card)
+            container.addView(cardView)
         }
     }
 
-    private fun updatePlayerView(player: Player) {
-        val humanTeam = gameEngine.humanPlayer?.team ?: Team.TEAM_A
-        val opponents = gameEngine.players.filter { it.team != humanTeam }
-        val teammates = gameEngine.players.filter { it.team == humanTeam && it.type == PlayerType.AI }
-
-        val opponentIndex = opponents.indexOfFirst { it.id == player.id }
-        if (opponentIndex >= 0 && opponentIndex < opponentViews.size) {
-            updateOpponentView(opponentViews[opponentIndex], player)
+    private fun showPlayerPassedStatus(player: Player) {
+        if (player.type == PlayerType.HUMAN) {
+            return
         }
 
-        val teammateIndex = teammates.indexOfFirst { it.id == player.id }
-        if (teammateIndex >= 0 && teammateIndex < teammateViews.size) {
-            updateTeammateView(teammateViews[teammateIndex], player)
-        }
+        val view = playerViews[player.id] ?: return
+        val container = view.findViewById<LinearLayout>(R.id.playedCardsContainer)
+        val statusView = view.findViewById<TextView>(R.id.tvStatus)
+
+        container.visibility = View.GONE
+        statusView.visibility = View.VISIBLE
+        statusView.text = getString(R.string.status_pass)
     }
 
-    private fun updatePlayerStatus(player: Player, status: String) {
-        val humanTeam = gameEngine.humanPlayer?.team ?: Team.TEAM_A
-        val opponents = gameEngine.players.filter { it.team != humanTeam }
-        val teammates = gameEngine.players.filter { it.team == humanTeam && it.type == PlayerType.AI }
-
-        val opponentIndex = opponents.indexOfFirst { it.id == player.id }
-        if (opponentIndex >= 0 && opponentIndex < opponentViews.size) {
-            opponentViews[opponentIndex].findViewById<TextView>(R.id.tvStatus).apply {
-                visibility = View.VISIBLE
-                text = status
-            }
-        }
-
-        val teammateIndex = teammates.indexOfFirst { it.id == player.id }
-        if (teammateIndex >= 0 && teammateIndex < teammateViews.size) {
-            teammateViews[teammateIndex].findViewById<TextView>(R.id.tvStatus).apply {
-                visibility = View.VISIBLE
-                text = status
-            }
-        }
-    }
-
-    private fun clearAllPlayerStatus() {
-        opponentViews.forEach { view ->
+    private fun clearAllPlayedCards() {
+        playerViews.values.forEach { view ->
+            val container = view.findViewById<LinearLayout>(R.id.playedCardsContainer)
             val statusView = view.findViewById<TextView>(R.id.tvStatus)
+
+            container.removeAllViews()
+            container.visibility = View.VISIBLE
+
             if (statusView.text != "已走完") {
                 statusView.visibility = View.GONE
             }
         }
-        teammateViews.forEach { view ->
-            val statusView = view.findViewById<TextView>(R.id.tvStatus)
-            if (statusView.text != "已走完") {
-                statusView.visibility = View.GONE
+    }
+
+    private fun updateCurrentRoundDisplay() {
+        // Find current winning play
+        val winningPlay = gameEngine.getCurrentWinningPlay()
+        val roundScore = gameEngine.getCurrentRoundScore()
+
+        if (winningPlay != null) {
+            val winningPlayer = gameEngine.players.find { it.id == winningPlay.first }
+            tvCurrentLeader.text = "${winningPlayer?.name}:"
+            tvCurrentLeader.visibility = View.VISIBLE
+
+            currentWinningCards.removeAllViews()
+            winningPlay.second.cards.forEach { card ->
+                val cardView = createMiniCardView(card)
+                currentWinningCards.addView(cardView)
             }
+
+            tvRoundScore.text = getString(R.string.round_score, roundScore)
+            tvRoundScore.visibility = View.VISIBLE
+        } else {
+            tvCurrentLeader.visibility = View.GONE
+            currentWinningCards.removeAllViews()
+            tvRoundScore.text = getString(R.string.round_score, 0)
         }
+    }
+
+    private fun createMiniCardView(card: Card): View {
+        val view = LayoutInflater.from(this).inflate(R.layout.view_card, null)
+
+        val tvRank = view.findViewById<TextView>(R.id.tvRank)
+        val tvSuit = view.findViewById<TextView>(R.id.tvSuit)
+
+        tvRank.text = card.rank.displayName
+        tvRank.textSize = 10f
+        tvSuit.text = if (card.isJoker) "★" else card.suit.symbol
+        tvSuit.textSize = 8f
+
+        val color = when {
+            card.isJoker && card.rank == CardRank.BIG_JOKER -> R.color.card_red
+            card.isJoker -> R.color.card_black
+            card.suit == CardSuit.HEART || card.suit == CardSuit.DIAMOND -> R.color.card_red
+            else -> R.color.card_black
+        }
+
+        tvRank.setTextColor(ContextCompat.getColor(this, color))
+        tvSuit.setTextColor(ContextCompat.getColor(this, color))
+
+        val params = LinearLayout.LayoutParams(28.dpToPx(), 40.dpToPx())
+        params.marginEnd = (-6).dpToPx()
+        view.layoutParams = params
+
+        return view
     }
 
     private fun updatePlayerHand() {
@@ -434,15 +458,6 @@ class GameActivity : AppCompatActivity() {
         btnHint.isEnabled = isHumanTurn
     }
 
-    private fun showPlayedCards(cardGroup: CardGroup) {
-        playedCardsContainer.removeAllViews()
-
-        cardGroup.cards.forEach { card ->
-            val cardView = createCardView(card, isSmall = true)
-            playedCardsContainer.addView(cardView)
-        }
-    }
-
     private fun showMessage(message: String) {
         tvMessage.text = message
         tvMessage.visibility = View.VISIBLE
@@ -496,6 +511,12 @@ class GameActivity : AppCompatActivity() {
     private fun updateScores() {
         tvTeamAScore.text = "${gameEngine.teamA.team.displayName}: ${gameEngine.teamA.finishedPlayersScore}分"
         tvTeamBScore.text = "${gameEngine.teamB.team.displayName}: ${gameEngine.teamB.finishedPlayersScore}分"
+
+        // Update human player score display
+        val humanPlayer = gameEngine.humanPlayer
+        if (humanPlayer != null) {
+            tvPlayerScore.text = getString(R.string.collected_score, humanPlayer.collectedScore)
+        }
     }
 
     private fun showGameOver(result: GameResult) {
@@ -532,17 +553,19 @@ class GameActivity : AppCompatActivity() {
 
     private fun restartGame() {
         gameOverOverlay.visibility = View.GONE
-        playedCardsContainer.removeAllViews()
+        currentRoundPlayedCards.clear()
         selectedCards.clear()
         cardViewMap.clear()
 
-        // Reset all status views
-        opponentViews.forEach { view ->
+        // Reset all player views
+        playerViews.values.forEach { view ->
             view.findViewById<TextView>(R.id.tvStatus).visibility = View.GONE
+            view.findViewById<LinearLayout>(R.id.playedCardsContainer).removeAllViews()
         }
-        teammateViews.forEach { view ->
-            view.findViewById<TextView>(R.id.tvStatus).visibility = View.GONE
-        }
+
+        // Reset current round display
+        currentWinningCards.removeAllViews()
+        tvCurrentLeader.visibility = View.GONE
 
         gameEngine.startGame()
     }

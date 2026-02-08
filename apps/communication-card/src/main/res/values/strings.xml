@@ -14,6 +14,12 @@
     <string name="btn_pass">过牌</string>
     <string name="btn_hint">提示</string>
     <string name="btn_sort">排序</string>
+    <string name="you">你</string>
+    <string name="cards_count">%d张</string>
+    <string name="collected_score">已收:%d分</string>
+    <string name="round_score">本轮:%d分</string>
+    <string name="status_pass">PASS</string>
+    <string name="status_waiting">等待中</string>
 
     <!-- 队伍 -->
     <string name="team_a">红队</string>

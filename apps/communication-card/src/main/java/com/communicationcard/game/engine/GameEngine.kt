@@ -507,4 +507,20 @@ class GameEngine(
      * 获取玩家信息
      */
     fun getPlayerInfo(playerId: Int): Player? = _players.find { it.id == playerId }
+
+    /**
+     * 获取当前轮次的最大牌（领先玩家ID和牌组）
+     */
+    fun getCurrentWinningPlay(): Pair<Int, CardGroup>? {
+        val winnerId = roundWinnerId ?: return null
+        val winningCards = lastPlayedGroup ?: return null
+        return Pair(winnerId, winningCards)
+    }
+
+    /**
+     * 获取当前轮次的总分
+     */
+    fun getCurrentRoundScore(): Int {
+        return CardRules.calculateScore(currentRoundCards)
+    }
 }
