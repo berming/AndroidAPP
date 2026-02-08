@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:background="@drawable/player_card_background"
     android:orientation="vertical"
-    android:padding="4dp">
+    android:padding="3dp">
 
-    <!-- 玩家信息行 -->
+    <!-- 玩家信息行 - 所有信息在一行 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,21 +17,20 @@
         <!-- 队伍颜色标识 -->
         <View
             android:id="@+id/teamIndicator"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:layout_marginEnd="4dp"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginEnd="3dp"
             android:background="@color/team_b" />
 
         <!-- 玩家名称 -->
         <TextView
             android:id="@+id/tvPlayerName"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_primary"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             tools:text="玩家2" />
 
@@ -40,20 +39,22 @@
             android:id="@+id/tvCardCount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
             android:textColor="@color/text_secondary"
-            android:textSize="10sp"
+            android:textSize="9sp"
             tools:text="36张" />
 
-    </LinearLayout>
+        <!-- 已收分 -->
+        <TextView
+            android:id="@+id/tvScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:textColor="@color/score_positive"
+            android:textSize="9sp"
+            tools:text="已收:25分" />
 
-    <!-- 已收分 -->
-    <TextView
-        android:id="@+id/tvScore"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textColor="@color/score_positive"
-        android:textSize="10sp"
-        tools:text="已收:25分" />
+    </LinearLayout>
 
     <!-- 当轮出牌区域 -->
     <FrameLayout
@@ -87,7 +88,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:textColor="@color/text_secondary"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:visibility="gone"
             tools:text="PASS" />
 

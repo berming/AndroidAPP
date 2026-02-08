@@ -13,16 +13,12 @@
         android:strokeColor="#FFFFFF"
         android:strokeWidth="1"
         android:pathData="M12,12 L12,36 M24,12 L24,36 M36,12 L36,36 M12,12 L36,12 M12,24 L36,24 M12,36 L36,36" />
-    <!-- Black stone -->
-    <circle
+    <!-- Black stone (circle as path) -->
+    <path
         android:fillColor="#000000"
-        android:cx="18"
-        android:cy="18"
-        android:r="4" />
-    <!-- White stone -->
-    <circle
+        android:pathData="M18,14 A4,4 0 1,1 18,22 A4,4 0 1,1 18,14 Z" />
+    <!-- White stone (circle as path) -->
+    <path
         android:fillColor="#FFFFFF"
-        android:cx="30"
-        android:cy="30"
-        android:r="4" />
+        android:pathData="M30,26 A4,4 0 1,1 30,34 A4,4 0 1,1 30,26 Z" />
 </vector>

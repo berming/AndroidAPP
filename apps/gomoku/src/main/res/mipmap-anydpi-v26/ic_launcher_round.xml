@@ -1,31 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/primary"/>
-    <foreground>
-        <inset android:inset="25%">
-            <vector
-                android:width="108dp"
-                android:height="108dp"
-                android:viewportWidth="108"
-                android:viewportHeight="108">
-                <!-- Grid lines -->
-                <path
-                    android:strokeColor="#FFFFFF"
-                    android:strokeWidth="2"
-                    android:pathData="M30,30 L30,78 M54,30 L54,78 M78,30 L78,78 M30,30 L78,30 M30,54 L78,54 M30,78 L78,78" />
-                <!-- Black stone -->
-                <circle
-                    android:fillColor="#000000"
-                    android:cx="42"
-                    android:cy="42"
-                    android:r="8" />
-                <!-- White stone -->
-                <circle
-                    android:fillColor="#FFFFFF"
-                    android:cx="66"
-                    android:cy="66"
-                    android:r="8" />
-            </vector>
-        </inset>
-    </foreground>
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
 </adaptive-icon>
