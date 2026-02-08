@@ -1,0 +1,56 @@
+name: Android Build CI
+
+# 触发条件：当代码推送到main分支，或针对main分支发起pull_request时触发
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# 定义工作流中的任务
+jobs:
+  build:
+    # 在GitHub托管的Linux最新版虚拟环境中运行
+    runs-on: ubuntu-latest
+
+    # 定义步骤
+    steps:
+      # 1. 拉取代码到虚拟环境
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. 设置Java环境（Android开发需要JDK 11或17）
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. 设置Gradle包装器（wrapper）可执行权限（Linux环境需要）
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. 【关键优化】设置Gradle依赖缓存，大幅加快后续构建速度
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # 5. 构建Debug版本APK
+      - name: Build Debug APK with Gradle
+        run: ./gradlew assembleDebug
+
+      # 6. 上传构建产物（APK文件）到工作流运行记录，可供下载
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            # 如果你的项目有多个module，请按需调整路径，例如：
+            # your-module-name/build/outputs/apk/debug/*.apk
