@@ -103,13 +103,14 @@ class GameActivity : AppCompatActivity() {
         currentWinningCards = findViewById(R.id.currentWinningCards)
         tvRoundScore = findViewById(R.id.tvRoundScore)
 
-        // Initialize player views (players 2-6) - horizontal layout with alternating teams
-        // Order: 2(B), 3(A), 4(B), 5(A), 6(B)
-        playerViews[2] = findViewById(R.id.player2)
-        playerViews[3] = findViewById(R.id.player3)
-        playerViews[4] = findViewById(R.id.player4)
-        playerViews[5] = findViewById(R.id.player5)
-        playerViews[6] = findViewById(R.id.player6)
+        // Initialize player views - map player ID to view
+        // Player IDs: 0=Human, 1=玩家2, 2=玩家3, 3=玩家4, 4=玩家5, 5=玩家6
+        // Layout order: player2, player3, player4, player5, player6
+        playerViews[1] = findViewById(R.id.player2)  // 玩家2, id=1
+        playerViews[2] = findViewById(R.id.player3)  // 玩家3, id=2
+        playerViews[3] = findViewById(R.id.player4)  // 玩家4, id=3
+        playerViews[4] = findViewById(R.id.player5)  // 玩家5, id=4
+        playerViews[5] = findViewById(R.id.player6)  // 玩家6, id=5
     }
 
     private fun initGame(playerCount: Int, difficulty: AIDifficulty) {

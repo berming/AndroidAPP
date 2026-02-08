@@ -17,8 +17,8 @@
         <!-- 队伍颜色标识 -->
         <View
             android:id="@+id/teamIndicator"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
             android:layout_marginEnd="3dp"
             android:background="@color/team_b" />
 
@@ -30,7 +30,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_primary"
-            android:textSize="10sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             tools:text="玩家2" />
 
@@ -41,7 +41,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:textColor="@color/text_secondary"
-            android:textSize="9sp"
+            android:textSize="14sp"
             tools:text="36张" />
 
         <!-- 已收分 -->
@@ -51,7 +51,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:textColor="@color/score_positive"
-            android:textSize="9sp"
+            android:textSize="14sp"
             tools:text="已收:25分" />
 
     </LinearLayout>
@@ -88,7 +88,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp"
+            android:textSize="14sp"
             android:visibility="gone"
             tools:text="PASS" />
 
