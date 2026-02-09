@@ -62,6 +62,9 @@ class GameActivity : AppCompatActivity() {
     private lateinit var currentWinningCards: LinearLayout
     private lateinit var tvRoundScore: TextView
 
+    // Hand cards area for click to deselect
+    private lateinit var handCardsArea: LinearLayout
+
     // Player views map: playerId -> View
     private val playerViews = mutableMapOf<Int, View>()
 
@@ -120,6 +123,9 @@ class GameActivity : AppCompatActivity() {
         tvCurrentLeader = findViewById(R.id.tvCurrentLeader)
         currentWinningCards = findViewById(R.id.currentWinningCards)
         tvRoundScore = findViewById(R.id.tvRoundScore)
+
+        // Hand cards area for click to deselect
+        handCardsArea = findViewById(R.id.handCardsArea)
 
         // Initialize player views - map player ID to view
         // Player IDs: 0=Human, 1=玩家2, 2=玩家3, 3=玩家4, 4=玩家5, 5=玩家6
@@ -186,6 +192,23 @@ class GameActivity : AppCompatActivity() {
 
         btnBackMenu.setOnClickListener {
             finish()
+        }
+
+        // Click on empty space in hand area to deselect all cards
+        handCardsArea.setOnClickListener {
+            deselectAllCards()
+        }
+    }
+
+    private fun deselectAllCards() {
+        if (selectedCards.isNotEmpty()) {
+            selectedCards.clear()
+            cardViewMap.values.forEach { view ->
+                view.findViewById<View>(R.id.cardContainer)
+                    .setBackgroundResource(R.drawable.card_background)
+                view.translationY = 0f
+            }
+            updateButtonStates()
         }
     }
 
@@ -355,8 +378,11 @@ class GameActivity : AppCompatActivity() {
         container.visibility = View.VISIBLE
         statusView.visibility = View.GONE
 
-        cardGroup.cards.forEach { card ->
-            val cardView = createMiniCardView(card)
+        // Check if it's a bomb (4+ same rank cards) for compact layout
+        val isBomb = cardGroup.type == CardGroupType.BOMB
+
+        cardGroup.cards.forEachIndexed { index, card ->
+            val cardView = createMiniCardView(card, isBomb && index > 0)
             container.addView(cardView)
         }
     }
@@ -400,8 +426,9 @@ class GameActivity : AppCompatActivity() {
             tvCurrentLeader.visibility = View.VISIBLE
 
             currentWinningCards.removeAllViews()
-            winningPlay.second.cards.forEach { card ->
-                val cardView = createMiniCardView(card)
+            val isBomb = winningPlay.second.type == CardGroupType.BOMB
+            winningPlay.second.cards.forEachIndexed { index, card ->
+                val cardView = createMiniCardView(card, isBomb && index > 0)
                 currentWinningCards.addView(cardView)
             }
 
@@ -414,7 +441,7 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-    private fun createMiniCardView(card: Card): View {
+    private fun createMiniCardView(card: Card, bombOverlap: Boolean = false): View {
         val view = LayoutInflater.from(this).inflate(R.layout.view_card, null)
 
         val tvRank = view.findViewById<TextView>(R.id.tvRank)
@@ -435,8 +462,12 @@ class GameActivity : AppCompatActivity() {
         tvRank.setTextColor(ContextCompat.getColor(this, color))
         tvSuit.setTextColor(ContextCompat.getColor(this, color))
 
-        val params = LinearLayout.LayoutParams(28.dpToPx(), 40.dpToPx())
-        params.marginEnd = (-6).dpToPx()
+        val cardWidth = 28.dpToPx()
+        val params = LinearLayout.LayoutParams(cardWidth, 40.dpToPx())
+        // For bomb cards, use 20% overlap (80% visible = -20% width as negative margin)
+        // Normal cards use standard small overlap
+        params.marginStart = if (bombOverlap) (-cardWidth * 0.2).toInt() else 0
+        params.marginEnd = if (!bombOverlap) (-6).dpToPx() else 0
         view.layoutParams = params
 
         return view
@@ -565,7 +596,25 @@ class GameActivity : AppCompatActivity() {
             return
         }
 
-        // Select the first valid play as hint
+        // Separate bombs from non-bombs
+        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+        val bombs = validPlays.filter { it.type == CardGroupType.BOMB }
+
+        // Select the smallest playable hand (prefer non-bombs)
+        // Sort by: 1) card count (fewer is better), 2) primary rank (lower is better)
+        val sortedNonBombs = nonBombs.sortedWith(
+            compareBy({ it.size }, { it.primaryRank.value })
+        )
+
+        // Use smallest non-bomb if available, otherwise use smallest bomb
+        val hint = if (sortedNonBombs.isNotEmpty()) {
+            sortedNonBombs.first()
+        } else {
+            // Sort bombs: prefer smaller bombs with lower rank
+            bombs.sortedWith(compareBy({ it.size }, { it.primaryRank.value })).first()
+        }
+
+        // Clear previous selection
         selectedCards.clear()
         cardViewMap.values.forEach { view ->
             view.findViewById<View>(R.id.cardContainer)
@@ -573,7 +622,7 @@ class GameActivity : AppCompatActivity() {
             view.translationY = 0f
         }
 
-        val hint = validPlays.first()
+        // Select hint cards
         hint.cards.forEach { card ->
             selectedCards.add(card)
             cardViewMap[card]?.let { view ->

@@ -91,6 +91,34 @@
                 android:textStyle="bold"
                 tools:text="红队:0分" />
 
+            <!-- 蓝队得分 - 紧跟红队 -->
+            <TextView
+                android:id="@+id/tvTeamBScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:textColor="@color/team_b"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="蓝队:0分" />
+
+            <!-- 分隔 -->
+            <View
+                android:layout_width="1dp"
+                android:layout_height="20dp"
+                android:layout_marginHorizontal="8dp"
+                android:background="#40FFFFFF" />
+
+            <!-- 本轮总分 -->
+            <TextView
+                android:id="@+id/tvRoundScore"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/score_positive"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="本轮:15分" />
+
             <!-- 分隔 -->
             <View
                 android:layout_width="1dp"
@@ -123,33 +151,6 @@
                     android:paddingHorizontal="4dp" />
 
             </HorizontalScrollView>
-
-            <!-- 本轮总分 -->
-            <TextView
-                android:id="@+id/tvRoundScore"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/score_positive"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                tools:text="本轮:15分" />
-
-            <!-- 分隔 -->
-            <View
-                android:layout_width="1dp"
-                android:layout_height="20dp"
-                android:layout_marginHorizontal="8dp"
-                android:background="#40FFFFFF" />
-
-            <!-- 蓝队得分 -->
-            <TextView
-                android:id="@+id/tvTeamBScore"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/team_b"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                tools:text="蓝队:0分" />
 
         </LinearLayout>
 
@@ -285,13 +286,16 @@
 
         </LinearLayout>
 
-        <!-- 手牌 - 两行显示 -->
+        <!-- 手牌 - 两行显示 (点击空白处取消选牌) -->
         <LinearLayout
+            android:id="@+id/handCardsArea"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_marginTop="4dp"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <!-- 第一行手牌 -->
             <HorizontalScrollView
