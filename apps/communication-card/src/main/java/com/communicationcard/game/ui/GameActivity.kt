@@ -41,14 +41,21 @@ class GameActivity : AppCompatActivity() {
     private lateinit var btnPlay: Button
     private lateinit var btnPass: Button
     private lateinit var btnHint: Button
+    private lateinit var btnHistory: Button
     private lateinit var gameOverOverlay: FrameLayout
     private lateinit var tvGameOverTitle: TextView
     private lateinit var tvGameOverResult: TextView
     private lateinit var tvFinalScore: TextView
     private lateinit var btnPlayAgain: Button
     private lateinit var btnBackMenu: Button
+    private lateinit var btnShowHistory: Button
     private lateinit var tvPlayerCardCount: TextView
     private lateinit var tvPlayerScore: TextView
+
+    // History overlay
+    private lateinit var historyOverlay: FrameLayout
+    private lateinit var tvHistoryContent: TextView
+    private lateinit var btnCloseHistory: Button
 
     // Current round display
     private lateinit var tvCurrentLeader: TextView
@@ -64,6 +71,10 @@ class GameActivity : AppCompatActivity() {
     // Selected cards for playing
     private val selectedCards = mutableListOf<Card>()
     private val cardViewMap = mutableMapOf<Card, View>()
+
+    // Game history
+    private val gameHistory = mutableListOf<String>()
+    private var roundNumber = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,14 +100,21 @@ class GameActivity : AppCompatActivity() {
         btnPlay = findViewById(R.id.btnPlay)
         btnPass = findViewById(R.id.btnPass)
         btnHint = findViewById(R.id.btnHint)
+        btnHistory = findViewById(R.id.btnHistory)
         gameOverOverlay = findViewById(R.id.gameOverOverlay)
         tvGameOverTitle = findViewById(R.id.tvGameOverTitle)
         tvGameOverResult = findViewById(R.id.tvGameOverResult)
         tvFinalScore = findViewById(R.id.tvFinalScore)
         btnPlayAgain = findViewById(R.id.btnPlayAgain)
         btnBackMenu = findViewById(R.id.btnBackMenu)
+        btnShowHistory = findViewById(R.id.btnShowHistory)
         tvPlayerCardCount = findViewById(R.id.tvPlayerCardCount)
         tvPlayerScore = findViewById(R.id.tvPlayerScore)
+
+        // History overlay
+        historyOverlay = findViewById(R.id.historyOverlay)
+        tvHistoryContent = findViewById(R.id.tvHistoryContent)
+        btnCloseHistory = findViewById(R.id.btnCloseHistory)
 
         // Current round display
         tvCurrentLeader = findViewById(R.id.tvCurrentLeader)
@@ -150,6 +168,18 @@ class GameActivity : AppCompatActivity() {
             showHint()
         }
 
+        btnHistory.setOnClickListener {
+            showHistory()
+        }
+
+        btnShowHistory.setOnClickListener {
+            showHistory()
+        }
+
+        btnCloseHistory.setOnClickListener {
+            historyOverlay.visibility = View.GONE
+        }
+
         btnPlayAgain.setOnClickListener {
             restartGame()
         }
@@ -163,6 +193,10 @@ class GameActivity : AppCompatActivity() {
         when (event) {
             is GameEvent.CardsDealt -> {
                 currentRoundPlayedCards.clear()
+                gameHistory.clear()
+                roundNumber = 1
+                gameHistory.add("=== 游戏开始 ===")
+                gameHistory.add("第${roundNumber}轮:")
                 updateAllPlayerViews()
                 updatePlayerHand()
                 updateScores()
@@ -179,22 +213,37 @@ class GameActivity : AppCompatActivity() {
             }
 
             is GameEvent.CardsPlayed -> {
+                // Record history
+                val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
+                gameHistory.add("  [$teamName]${event.player.name} 出: ${event.cardGroup}")
+
                 // Track played cards for this player in current round
                 currentRoundPlayedCards[event.player.id] = event.cardGroup
                 showPlayerPlayedCards(event.player, event.cardGroup)
                 updatePlayerView(event.player)
                 updateCurrentRoundDisplay()
+                updateScores() // Update scores after each play
                 if (event.player.type == PlayerType.HUMAN) {
                     updatePlayerHand()
                 }
             }
 
             is GameEvent.PlayerPassed -> {
+                // Record history
+                val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
+                gameHistory.add("  [$teamName]${event.player.name} 过牌")
+
                 currentRoundPlayedCards[event.player.id] = null // Mark as passed
                 showPlayerPassedStatus(event.player)
             }
 
             is GameEvent.RoundWon -> {
+                // Record history
+                val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
+                gameHistory.add("  → [$teamName]${event.player.name} 赢得本轮, +${event.score}分")
+                roundNumber++
+                gameHistory.add("第${roundNumber}轮:")
+
                 showMessage("${event.player.name} 赢得此轮，获得 ${event.score} 分")
                 handler.postDelayed({
                     // Clear all played cards for new round
@@ -205,6 +254,10 @@ class GameActivity : AppCompatActivity() {
             }
 
             is GameEvent.PlayerFinished -> {
+                // Record history
+                val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
+                gameHistory.add("  ★ [$teamName]${event.player.name} 走完（第${event.order}个）")
+
                 showMessage("${event.player.name} 已走完（第${event.order}个）")
                 updatePlayerView(event.player)
             }
@@ -214,6 +267,8 @@ class GameActivity : AppCompatActivity() {
             }
 
             is GameEvent.GameEnded -> {
+                // Record final score calculation
+                recordFinalScore(event.result)
                 showGameOver(event.result)
             }
 
@@ -533,14 +588,54 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun updateScores() {
-        tvTeamAScore.text = "${gameEngine.teamA.team.displayName}:${gameEngine.teamA.finishedPlayersScore}分"
-        tvTeamBScore.text = "${gameEngine.teamB.team.displayName}:${gameEngine.teamB.finishedPlayersScore}分"
+        // Show sum of all team members' collected scores (not just finished players)
+        tvTeamAScore.text = "${gameEngine.teamA.team.displayName}:${gameEngine.teamA.totalCollectedScore}分"
+        tvTeamBScore.text = "${gameEngine.teamB.team.displayName}:${gameEngine.teamB.totalCollectedScore}分"
 
         // Update human player score display
         val humanPlayer = gameEngine.humanPlayer
         if (humanPlayer != null) {
             tvPlayerScore.text = getString(R.string.collected_score, humanPlayer.collectedScore)
         }
+    }
+
+    private fun showHistory() {
+        tvHistoryContent.text = gameHistory.joinToString("\n")
+        historyOverlay.visibility = View.VISIBLE
+    }
+
+    private fun recordFinalScore(result: GameResult) {
+        gameHistory.add("")
+        gameHistory.add("=== 游戏结束 ===")
+        gameHistory.add("触发方式: ${if (result.trigger.name == "TEAM_ALL_FINISHED") "全队走完" else "得分达标"}")
+        gameHistory.add("")
+        gameHistory.add("--- 结算计算 ---")
+
+        // Show each player's collected score
+        gameHistory.add("红队玩家已收分:")
+        gameEngine.teamA.players.forEach { player ->
+            val status = if (player.hasFinished) "已走完" else "未走完(手牌${player.handScore}分)"
+            gameHistory.add("  ${player.name}: ${player.collectedScore}分 $status")
+        }
+
+        gameHistory.add("蓝队玩家已收分:")
+        gameEngine.teamB.players.forEach { player ->
+            val status = if (player.hasFinished) "已走完" else "未走完(手牌${player.handScore}分)"
+            gameHistory.add("  ${player.name}: ${player.collectedScore}分 $status")
+        }
+
+        gameHistory.add("")
+        gameHistory.add("--- 最终得分 ---")
+        gameHistory.add("红队: ${result.teamAScore}分")
+        gameHistory.add("蓝队: ${result.teamBScore}分")
+        gameHistory.add("")
+
+        val winnerText = when {
+            result.winner == null -> "平局"
+            result.winner == Team.TEAM_A -> "红队获胜!"
+            else -> "蓝队获胜!"
+        }
+        gameHistory.add("结果: $winnerText")
     }
 
     private fun showGameOver(result: GameResult) {
@@ -577,9 +672,12 @@ class GameActivity : AppCompatActivity() {
 
     private fun restartGame() {
         gameOverOverlay.visibility = View.GONE
+        historyOverlay.visibility = View.GONE
         currentRoundPlayedCards.clear()
         selectedCards.clear()
         cardViewMap.clear()
+        gameHistory.clear()
+        roundNumber = 0
 
         // Reset all player views
         playerViews.values.forEach { view ->
