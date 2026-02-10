@@ -79,6 +79,10 @@ class GameActivity : AppCompatActivity() {
     private val gameHistory = mutableListOf<String>()
     private var roundNumber = 0
 
+    // Hint toggle state: tracks if hint cards are currently shown
+    private var isHintShowing = false
+    private var lastHintCards: List<Card> = emptyList()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_game)
@@ -203,6 +207,7 @@ class GameActivity : AppCompatActivity() {
     private fun deselectAllCards() {
         if (selectedCards.isNotEmpty()) {
             selectedCards.clear()
+            isHintShowing = false
             cardViewMap.values.forEach { view ->
                 view.findViewById<View>(R.id.cardContainer)
                     .setBackgroundResource(R.drawable.card_background)
@@ -487,6 +492,10 @@ class GameActivity : AppCompatActivity() {
         cardViewMap.clear()
         selectedCards.clear()
 
+        // Reset hint state when hand updates
+        isHintShowing = false
+        lastHintCards = emptyList()
+
         val humanPlayer = gameEngine.humanPlayer ?: return
         val cards = humanPlayer.hand
 
@@ -495,18 +504,24 @@ class GameActivity : AppCompatActivity() {
         val cardHeight = 68.dpToPx()
         val cardMargin = 2.dpToPx()
 
-        // Group cards by rank (cards are already sorted, so same rank cards are consecutive)
-        val cardGroups = mutableListOf<List<Card>>()
-        var i = 0
-        while (i < cards.size) {
-            val currentRank = cards[i].rank
-            val group = mutableListOf<Card>()
-            while (i < cards.size && cards[i].rank == currentRank) {
-                group.add(cards[i])
-                i++
-            }
-            cardGroups.add(group)
-        }
+        // Group cards by rank
+        val cardsByRank = cards.groupBy { it.rank }
+
+        // Separate bombs (4+) and non-bombs, sort appropriately
+        // Order: bombs by size desc then rank desc, non-bombs by rank desc
+        val bombGroups = cardsByRank.filter { it.value.size >= 4 }
+            .toList()
+            .sortedWith(compareByDescending<Pair<CardRank, List<Card>>> { it.second.size }
+                .thenByDescending { it.first.value })
+            .map { it.second }
+
+        val nonBombGroups = cardsByRank.filter { it.value.size < 4 }
+            .toList()
+            .sortedByDescending { it.first.value }
+            .map { it.second }
+
+        // Combine: bombs first, then non-bombs (all sorted by desc)
+        val sortedGroups = bombGroups + nonBombGroups
 
         // Split groups into two rows, keeping same-rank cards together
         val row1Groups = mutableListOf<List<Card>>()
@@ -515,7 +530,7 @@ class GameActivity : AppCompatActivity() {
         var row2Count = 0
         val targetPerRow = (cards.size + 1) / 2
 
-        for (group in cardGroups) {
+        for (group in sortedGroups) {
             // Decide which row to add this group to
             // Try to balance rows while keeping groups intact
             if (row1Count <= row2Count && row1Count + group.size <= targetPerRow + 2) {
@@ -544,9 +559,10 @@ class GameActivity : AppCompatActivity() {
         for (group in groups) {
             val groupSize = group.size
             group.forEachIndexed { index, card ->
-                // Apply 20% overlap for 2+ same rank cards (except last in group)
+                // Apply 40% overlap for 2+ same rank cards (except last in group)
+                // 40% keeps left side (rank/suit) visible while saving space
                 val useOverlap = groupSize >= 2 && index < groupSize - 1
-                val margin = if (useOverlap) (-cardWidth * 0.2).toInt() else cardMargin
+                val margin = if (useOverlap) (-cardWidth * 0.4).toInt() else cardMargin
 
                 val cardView = createCardView(card, cardWidth, cardHeight, margin)
                 cardView.setOnClickListener {
@@ -585,6 +601,9 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun toggleCardSelection(card: Card, cardView: View) {
+        // Reset hint state when user manually selects/deselects
+        isHintShowing = false
+
         val container = cardView.findViewById<View>(R.id.cardContainer)
 
         if (selectedCards.contains(card)) {
@@ -632,6 +651,15 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showHint() {
+        // Toggle: if hint is showing, deselect and return
+        if (isHintShowing && selectedCards.isNotEmpty() &&
+            lastHintCards.isNotEmpty() && selectedCards.toSet() == lastHintCards.toSet()) {
+            deselectAllCards()
+            isHintShowing = false
+            lastHintCards = emptyList()
+            return
+        }
+
         val validPlays = gameEngine.getValidPlaysForHuman()
         if (validPlays.isEmpty()) {
             showMessage("没有能出的牌，请过牌")
@@ -689,6 +717,10 @@ class GameActivity : AppCompatActivity() {
                 view.translationY = -16f
             }
         }
+
+        // Track hint state for toggle
+        isHintShowing = true
+        lastHintCards = hint.cards.toList()
 
         showMessage("提示: ${hint.type.displayName}")
         updateButtonStates()
