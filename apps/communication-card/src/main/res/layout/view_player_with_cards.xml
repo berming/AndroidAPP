@@ -62,12 +62,16 @@
         android:layout_height="0dp"
         android:layout_marginTop="2dp"
         android:layout_weight="1"
-        android:background="#20FFFFFF">
+        android:background="#20FFFFFF"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <!-- 出的牌 -->
         <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:fillViewport="true"
             android:scrollbars="none">
 
@@ -75,6 +79,8 @@
                 android:id="@+id/playedCardsContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="2dp" />

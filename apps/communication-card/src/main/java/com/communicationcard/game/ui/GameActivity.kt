@@ -380,9 +380,12 @@ class GameActivity : AppCompatActivity() {
 
         // Check if it's a bomb (4+ same rank cards) for compact layout
         val isBomb = cardGroup.type == CardGroupType.BOMB
+        val cardCount = cardGroup.cards.size
 
         cardGroup.cards.forEachIndexed { index, card ->
-            val cardView = createMiniCardView(card, isBomb && index > 0)
+            // For bomb: all cards except last get 20% overlap (negative marginEnd)
+            val useBombOverlap = isBomb && index < cardCount - 1
+            val cardView = createMiniCardView(card, useBombOverlap)
             container.addView(cardView)
         }
     }
@@ -427,8 +430,11 @@ class GameActivity : AppCompatActivity() {
 
             currentWinningCards.removeAllViews()
             val isBomb = winningPlay.second.type == CardGroupType.BOMB
+            val cardCount = winningPlay.second.cards.size
             winningPlay.second.cards.forEachIndexed { index, card ->
-                val cardView = createMiniCardView(card, isBomb && index > 0)
+                // For bomb: all cards except last get 20% overlap
+                val useBombOverlap = isBomb && index < cardCount - 1
+                val cardView = createMiniCardView(card, useBombOverlap)
                 currentWinningCards.addView(cardView)
             }
 
@@ -464,10 +470,9 @@ class GameActivity : AppCompatActivity() {
 
         val cardWidth = 28.dpToPx()
         val params = LinearLayout.LayoutParams(cardWidth, 40.dpToPx())
-        // For bomb cards, use 20% overlap (80% visible = -20% width as negative margin)
-        // Normal cards use standard small overlap
-        params.marginStart = if (bombOverlap) (-cardWidth * 0.2).toInt() else 0
-        params.marginEnd = if (!bombOverlap) (-6).dpToPx() else 0
+        // For bomb cards, use 20% overlap - negative marginEnd makes next card overlap this one's right side
+        // This keeps the left side (rank/suit info) visible
+        params.marginEnd = if (bombOverlap) (-cardWidth * 0.2).toInt() else (-6).dpToPx()
         view.layoutParams = params
 
         return view
