@@ -508,7 +508,8 @@ class GameActivity : AppCompatActivity() {
         val cardsByRank = cards.groupBy { it.rank }
 
         // Separate bombs (4+) and non-bombs, sort appropriately
-        // Order: bombs by size desc then rank desc, non-bombs by rank desc
+        // Bombs: by count desc, then rank desc
+        // Non-bombs: by count desc, then rank desc
         val bombGroups = cardsByRank.filter { it.value.size >= 4 }
             .toList()
             .sortedWith(compareByDescending<Pair<CardRank, List<Card>>> { it.second.size }
@@ -517,7 +518,8 @@ class GameActivity : AppCompatActivity() {
 
         val nonBombGroups = cardsByRank.filter { it.value.size < 4 }
             .toList()
-            .sortedByDescending { it.first.value }
+            .sortedWith(compareByDescending<Pair<CardRank, List<Card>>> { it.second.size }
+                .thenByDescending { it.first.value })
             .map { it.second }
 
         // Combine: bombs first, then non-bombs (all sorted by desc)
@@ -559,10 +561,10 @@ class GameActivity : AppCompatActivity() {
         for (group in groups) {
             val groupSize = group.size
             group.forEachIndexed { index, card ->
-                // Apply 40% overlap for 2+ same rank cards (except last in group)
-                // 40% keeps left side (rank/suit) visible while saving space
+                // Apply 30% overlap for 2+ same rank cards (except last in group)
+                // 30% keeps left side (rank/suit) visible while saving space
                 val useOverlap = groupSize >= 2 && index < groupSize - 1
-                val margin = if (useOverlap) (-cardWidth * 0.4).toInt() else cardMargin
+                val margin = if (useOverlap) (-cardWidth * 0.3).toInt() else cardMargin
 
                 val cardView = createCardView(card, cardWidth, cardHeight, margin)
                 cardView.setOnClickListener {
