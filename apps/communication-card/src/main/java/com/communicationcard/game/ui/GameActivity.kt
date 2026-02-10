@@ -489,69 +489,72 @@ class GameActivity : AppCompatActivity() {
 
         val humanPlayer = gameEngine.humanPlayer ?: return
         val cards = humanPlayer.hand
-        val cardCount = cards.size
 
         // Card size for two-row display
         val cardWidth = 48.dpToPx()
         val cardHeight = 68.dpToPx()
         val cardMargin = 2.dpToPx()
 
-        // Detect bomb groups (4+ same rank)
-        val bombRanks = cards.groupBy { it.rank }
-            .filter { it.value.size >= 4 }
-            .keys
+        // Group cards by rank (cards are already sorted, so same rank cards are consecutive)
+        val cardGroups = mutableListOf<List<Card>>()
+        var i = 0
+        while (i < cards.size) {
+            val currentRank = cards[i].rank
+            val group = mutableListOf<Card>()
+            while (i < cards.size && cards[i].rank == currentRank) {
+                group.add(cards[i])
+                i++
+            }
+            cardGroups.add(group)
+        }
 
-        // Split cards into two rows
-        val halfCount = (cardCount + 1) / 2 // First row gets more if odd number
-        val row1Cards = cards.take(halfCount)
-        val row2Cards = cards.drop(halfCount)
+        // Split groups into two rows, keeping same-rank cards together
+        val row1Groups = mutableListOf<List<Card>>()
+        val row2Groups = mutableListOf<List<Card>>()
+        var row1Count = 0
+        var row2Count = 0
+        val targetPerRow = (cards.size + 1) / 2
 
-        // Add cards to first row with bomb overlap
-        addCardsToRow(row1Cards, playerHandRow1, cardWidth, cardHeight, cardMargin, bombRanks)
+        for (group in cardGroups) {
+            // Decide which row to add this group to
+            // Try to balance rows while keeping groups intact
+            if (row1Count <= row2Count && row1Count + group.size <= targetPerRow + 2) {
+                row1Groups.add(group)
+                row1Count += group.size
+            } else {
+                row2Groups.add(group)
+                row2Count += group.size
+            }
+        }
 
-        // Add cards to second row with bomb overlap
-        addCardsToRow(row2Cards, playerHandRow2, cardWidth, cardHeight, cardMargin, bombRanks)
+        // Add card groups to rows with overlap for 2+ same rank
+        addCardGroupsToRow(row1Groups, playerHandRow1, cardWidth, cardHeight, cardMargin)
+        addCardGroupsToRow(row2Groups, playerHandRow2, cardWidth, cardHeight, cardMargin)
 
         updateButtonStates()
     }
 
-    private fun addCardsToRow(
-        cards: List<Card>,
+    private fun addCardGroupsToRow(
+        groups: List<List<Card>>,
         row: LinearLayout,
         cardWidth: Int,
         cardHeight: Int,
-        cardMargin: Int,
-        bombRanks: Set<CardRank>
+        cardMargin: Int
     ) {
-        var i = 0
-        while (i < cards.size) {
-            val card = cards[i]
-            val isBombRank = bombRanks.contains(card.rank)
+        for (group in groups) {
+            val groupSize = group.size
+            group.forEachIndexed { index, card ->
+                // Apply 20% overlap for 2+ same rank cards (except last in group)
+                val useOverlap = groupSize >= 2 && index < groupSize - 1
+                val margin = if (useOverlap) (-cardWidth * 0.2).toInt() else cardMargin
 
-            // Count consecutive cards with same rank in this row
-            var sameRankCount = 1
-            if (isBombRank) {
-                while (i + sameRankCount < cards.size && cards[i + sameRankCount].rank == card.rank) {
-                    sameRankCount++
-                }
-            }
-
-            // Add cards, applying overlap for bomb groups
-            for (j in 0 until sameRankCount) {
-                val currentCard = cards[i + j]
-                // Apply 20% overlap for bomb cards (except last in group)
-                val useBombOverlap = isBombRank && sameRankCount >= 2 && j < sameRankCount - 1
-                val margin = if (useBombOverlap) (-cardWidth * 0.2).toInt() else cardMargin
-
-                val cardView = createCardView(currentCard, cardWidth, cardHeight, margin)
+                val cardView = createCardView(card, cardWidth, cardHeight, margin)
                 cardView.setOnClickListener {
-                    toggleCardSelection(currentCard, cardView)
+                    toggleCardSelection(card, cardView)
                 }
                 row.addView(cardView)
-                cardViewMap[currentCard] = cardView
+                cardViewMap[card] = cardView
             }
-
-            i += sameRankCount
         }
     }
 
