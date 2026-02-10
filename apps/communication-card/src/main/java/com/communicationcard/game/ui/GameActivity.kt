@@ -601,22 +601,38 @@ class GameActivity : AppCompatActivity() {
             return
         }
 
-        // Separate bombs from non-bombs
+        // 获取手牌中的炸弹点数（这些点数的牌不应该拆开）
+        val humanHand = gameEngine.humanPlayer?.hand ?: emptyList()
+        val bombRanks = humanHand.groupBy { it.rank }
+            .filter { it.value.size >= 4 }
+            .keys
+
+        // 分类：炸弹 vs 非炸弹
         val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
         val bombs = validPlays.filter { it.type == CardGroupType.BOMB }
 
-        // Select the smallest playable hand (prefer non-bombs)
-        // Sort by: 1) card count (fewer is better), 2) primary rank (lower is better)
-        val sortedNonBombs = nonBombs.sortedWith(
-            compareBy({ it.size }, { it.primaryRank.value })
-        )
+        // 过滤掉会拆炸弹的出牌选择
+        val safeNonBombs = nonBombs.filter { cardGroup ->
+            // 如果这个牌型的点数是炸弹点数，且不是使用全部（会拆炸弹），则过滤掉
+            val rank = cardGroup.primaryRank
+            if (bombRanks.contains(rank)) {
+                // 检查是否使用了该点数的所有牌
+                val bombSize = humanHand.count { it.rank == rank }
+                cardGroup.cards.count { it.rank == rank } >= bombSize
+            } else {
+                true
+            }
+        }
 
-        // Use smallest non-bomb if available, otherwise use smallest bomb
-        val hint = if (sortedNonBombs.isNotEmpty()) {
-            sortedNonBombs.first()
+        // 判断是自由出牌还是压牌
+        val isFirstPlay = gameEngine.getLastPlay() == null
+
+        val hint = if (isFirstPlay) {
+            // 自由出牌策略：优先出小牌，保留大牌和炸弹
+            findBestFreePlay(safeNonBombs, bombs)
         } else {
-            // Sort bombs: prefer smaller bombs with lower rank
-            bombs.sortedWith(compareBy({ it.size }, { it.primaryRank.value })).first()
+            // 压牌策略：用刚好能压住的最小牌
+            findBestBeatPlay(safeNonBombs, bombs)
         }
 
         // Clear previous selection
@@ -639,6 +655,76 @@ class GameActivity : AppCompatActivity() {
 
         showMessage("提示: ${hint.type.displayName}")
         updateButtonStates()
+    }
+
+    /**
+     * 自由出牌策略：优先出小牌，保留大牌
+     * 优先级：小单张 > 小对子 > 小三张 > 顺子 > 炸弹
+     * 避免出2、A、王等大牌（value >= 12）
+     */
+    private fun findBestFreePlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup {
+        // 按牌型分类
+        val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
+        val pairs = nonBombs.filter { it.type == CardGroupType.PAIR }
+        val triples = nonBombs.filter { it.type == CardGroupType.TRIPLE }
+        val straights = nonBombs.filter { it.type == CardGroupType.STRAIGHT }
+
+        // 定义"小牌"阈值：value < 12 (即小于A的牌)
+        val smallThreshold = 12
+
+        // 优先出小单张
+        val smallSingles = singles.filter { it.primaryRank.value < smallThreshold }
+        if (smallSingles.isNotEmpty()) {
+            return smallSingles.minByOrNull { it.primaryRank.value }!!
+        }
+
+        // 其次出小对子
+        val smallPairs = pairs.filter { it.primaryRank.value < smallThreshold }
+        if (smallPairs.isNotEmpty()) {
+            return smallPairs.minByOrNull { it.primaryRank.value }!!
+        }
+
+        // 然后出小三张
+        val smallTriples = triples.filter { it.primaryRank.value < smallThreshold }
+        if (smallTriples.isNotEmpty()) {
+            return smallTriples.minByOrNull { it.primaryRank.value }!!
+        }
+
+        // 顺子可以出（一次走5张以上，有优势）
+        if (straights.isNotEmpty()) {
+            return straights.minByOrNull { it.primaryRank.value }!!
+        }
+
+        // 如果没有小牌，出最小的非炸弹牌（可能是A、2、王）
+        if (nonBombs.isNotEmpty()) {
+            return nonBombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
+        }
+
+        // 最后才出炸弹
+        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
+    }
+
+    /**
+     * 压牌策略：用刚好能压住的最小牌
+     * 尽量保留大牌（2、王），除非没有其他选择
+     */
+    private fun findBestBeatPlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup {
+        if (nonBombs.isNotEmpty()) {
+            // 定义"大牌"阈值：value >= 13 (2和王)
+            val bigThreshold = 13
+
+            // 优先用普通牌压（非2、非王）
+            val regularPlays = nonBombs.filter { it.primaryRank.value < bigThreshold }
+            if (regularPlays.isNotEmpty()) {
+                return regularPlays.minByOrNull { it.primaryRank.value }!!
+            }
+
+            // 没有普通牌，只能用大牌（2或王）
+            return nonBombs.minByOrNull { it.primaryRank.value }!!
+        }
+
+        // 没有非炸弹牌能压，用最小的炸弹
+        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
     }
 
     private fun updateScores() {
