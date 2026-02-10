@@ -427,6 +427,9 @@ class GameActivity : AppCompatActivity() {
             val winningPlayer = gameEngine.players.find { it.id == winningPlay.first }
             tvCurrentLeader.text = "${winningPlayer?.name}:"
             tvCurrentLeader.visibility = View.VISIBLE
+            // Set text color based on team
+            val teamColor = if (winningPlayer?.team == Team.TEAM_A) R.color.team_a else R.color.team_b
+            tvCurrentLeader.setTextColor(ContextCompat.getColor(this, teamColor))
 
             currentWinningCards.removeAllViews()
             val isBomb = winningPlay.second.type == CardGroupType.BOMB
@@ -488,37 +491,68 @@ class GameActivity : AppCompatActivity() {
         val cards = humanPlayer.hand
         val cardCount = cards.size
 
-        // Card size for two-row display (no overlap)
+        // Card size for two-row display
         val cardWidth = 48.dpToPx()
         val cardHeight = 68.dpToPx()
         val cardMargin = 2.dpToPx()
+
+        // Detect bomb groups (4+ same rank)
+        val bombRanks = cards.groupBy { it.rank }
+            .filter { it.value.size >= 4 }
+            .keys
 
         // Split cards into two rows
         val halfCount = (cardCount + 1) / 2 // First row gets more if odd number
         val row1Cards = cards.take(halfCount)
         val row2Cards = cards.drop(halfCount)
 
-        // Add cards to first row
-        row1Cards.forEach { card ->
-            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
-            cardView.setOnClickListener {
-                toggleCardSelection(card, cardView)
-            }
-            playerHandRow1.addView(cardView)
-            cardViewMap[card] = cardView
-        }
+        // Add cards to first row with bomb overlap
+        addCardsToRow(row1Cards, playerHandRow1, cardWidth, cardHeight, cardMargin, bombRanks)
 
-        // Add cards to second row
-        row2Cards.forEach { card ->
-            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
-            cardView.setOnClickListener {
-                toggleCardSelection(card, cardView)
-            }
-            playerHandRow2.addView(cardView)
-            cardViewMap[card] = cardView
-        }
+        // Add cards to second row with bomb overlap
+        addCardsToRow(row2Cards, playerHandRow2, cardWidth, cardHeight, cardMargin, bombRanks)
 
         updateButtonStates()
+    }
+
+    private fun addCardsToRow(
+        cards: List<Card>,
+        row: LinearLayout,
+        cardWidth: Int,
+        cardHeight: Int,
+        cardMargin: Int,
+        bombRanks: Set<CardRank>
+    ) {
+        var i = 0
+        while (i < cards.size) {
+            val card = cards[i]
+            val isBombRank = bombRanks.contains(card.rank)
+
+            // Count consecutive cards with same rank in this row
+            var sameRankCount = 1
+            if (isBombRank) {
+                while (i + sameRankCount < cards.size && cards[i + sameRankCount].rank == card.rank) {
+                    sameRankCount++
+                }
+            }
+
+            // Add cards, applying overlap for bomb groups
+            for (j in 0 until sameRankCount) {
+                val currentCard = cards[i + j]
+                // Apply 20% overlap for bomb cards (except last in group)
+                val useBombOverlap = isBombRank && sameRankCount >= 2 && j < sameRankCount - 1
+                val margin = if (useBombOverlap) (-cardWidth * 0.2).toInt() else cardMargin
+
+                val cardView = createCardView(currentCard, cardWidth, cardHeight, margin)
+                cardView.setOnClickListener {
+                    toggleCardSelection(currentCard, cardView)
+                }
+                row.addView(cardView)
+                cardViewMap[currentCard] = cardView
+            }
+
+            i += sameRankCount
+        }
     }
 
     private fun createCardView(card: Card, width: Int, height: Int, marginEnd: Int): View {
