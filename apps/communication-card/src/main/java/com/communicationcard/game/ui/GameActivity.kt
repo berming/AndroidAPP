@@ -79,6 +79,10 @@ class GameActivity : AppCompatActivity() {
     private val gameHistory = mutableListOf<String>()
     private var roundNumber = 0
 
+    // Hint toggle state: tracks if hint cards are currently shown
+    private var isHintShowing = false
+    private var lastHintCards: List<Card> = emptyList()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_game)
@@ -203,6 +207,7 @@ class GameActivity : AppCompatActivity() {
     private fun deselectAllCards() {
         if (selectedCards.isNotEmpty()) {
             selectedCards.clear()
+            isHintShowing = false
             cardViewMap.values.forEach { view ->
                 view.findViewById<View>(R.id.cardContainer)
                     .setBackgroundResource(R.drawable.card_background)
@@ -427,6 +432,9 @@ class GameActivity : AppCompatActivity() {
             val winningPlayer = gameEngine.players.find { it.id == winningPlay.first }
             tvCurrentLeader.text = "${winningPlayer?.name}:"
             tvCurrentLeader.visibility = View.VISIBLE
+            // Set text color based on team
+            val teamColor = if (winningPlayer?.team == Team.TEAM_A) R.color.team_a else R.color.team_b
+            tvCurrentLeader.setTextColor(ContextCompat.getColor(this, teamColor))
 
             currentWinningCards.removeAllViews()
             val isBomb = winningPlay.second.type == CardGroupType.BOMB
@@ -484,41 +492,86 @@ class GameActivity : AppCompatActivity() {
         cardViewMap.clear()
         selectedCards.clear()
 
+        // Reset hint state when hand updates
+        isHintShowing = false
+        lastHintCards = emptyList()
+
         val humanPlayer = gameEngine.humanPlayer ?: return
         val cards = humanPlayer.hand
-        val cardCount = cards.size
 
-        // Card size for two-row display (no overlap)
+        // Card size for two-row display
         val cardWidth = 48.dpToPx()
         val cardHeight = 68.dpToPx()
         val cardMargin = 2.dpToPx()
 
-        // Split cards into two rows
-        val halfCount = (cardCount + 1) / 2 // First row gets more if odd number
-        val row1Cards = cards.take(halfCount)
-        val row2Cards = cards.drop(halfCount)
+        // Group cards by rank
+        val cardsByRank = cards.groupBy { it.rank }
 
-        // Add cards to first row
-        row1Cards.forEach { card ->
-            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
-            cardView.setOnClickListener {
-                toggleCardSelection(card, cardView)
+        // Separate bombs (4+) and non-bombs, sort appropriately
+        // Order: bombs by size desc then rank desc, non-bombs by rank desc
+        val bombGroups = cardsByRank.filter { it.value.size >= 4 }
+            .toList()
+            .sortedWith(compareByDescending<Pair<CardRank, List<Card>>> { it.second.size }
+                .thenByDescending { it.first.value })
+            .map { it.second }
+
+        val nonBombGroups = cardsByRank.filter { it.value.size < 4 }
+            .toList()
+            .sortedByDescending { it.first.value }
+            .map { it.second }
+
+        // Combine: bombs first, then non-bombs (all sorted by desc)
+        val sortedGroups = bombGroups + nonBombGroups
+
+        // Split groups into two rows, keeping same-rank cards together
+        val row1Groups = mutableListOf<List<Card>>()
+        val row2Groups = mutableListOf<List<Card>>()
+        var row1Count = 0
+        var row2Count = 0
+        val targetPerRow = (cards.size + 1) / 2
+
+        for (group in sortedGroups) {
+            // Decide which row to add this group to
+            // Try to balance rows while keeping groups intact
+            if (row1Count <= row2Count && row1Count + group.size <= targetPerRow + 2) {
+                row1Groups.add(group)
+                row1Count += group.size
+            } else {
+                row2Groups.add(group)
+                row2Count += group.size
             }
-            playerHandRow1.addView(cardView)
-            cardViewMap[card] = cardView
         }
 
-        // Add cards to second row
-        row2Cards.forEach { card ->
-            val cardView = createCardView(card, cardWidth, cardHeight, cardMargin)
-            cardView.setOnClickListener {
-                toggleCardSelection(card, cardView)
-            }
-            playerHandRow2.addView(cardView)
-            cardViewMap[card] = cardView
-        }
+        // Add card groups to rows with overlap for 2+ same rank
+        addCardGroupsToRow(row1Groups, playerHandRow1, cardWidth, cardHeight, cardMargin)
+        addCardGroupsToRow(row2Groups, playerHandRow2, cardWidth, cardHeight, cardMargin)
 
         updateButtonStates()
+    }
+
+    private fun addCardGroupsToRow(
+        groups: List<List<Card>>,
+        row: LinearLayout,
+        cardWidth: Int,
+        cardHeight: Int,
+        cardMargin: Int
+    ) {
+        for (group in groups) {
+            val groupSize = group.size
+            group.forEachIndexed { index, card ->
+                // Apply 40% overlap for 2+ same rank cards (except last in group)
+                // 40% keeps left side (rank/suit) visible while saving space
+                val useOverlap = groupSize >= 2 && index < groupSize - 1
+                val margin = if (useOverlap) (-cardWidth * 0.4).toInt() else cardMargin
+
+                val cardView = createCardView(card, cardWidth, cardHeight, margin)
+                cardView.setOnClickListener {
+                    toggleCardSelection(card, cardView)
+                }
+                row.addView(cardView)
+                cardViewMap[card] = cardView
+            }
+        }
     }
 
     private fun createCardView(card: Card, width: Int, height: Int, marginEnd: Int): View {
@@ -548,6 +601,9 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun toggleCardSelection(card: Card, cardView: View) {
+        // Reset hint state when user manually selects/deselects
+        isHintShowing = false
+
         val container = cardView.findViewById<View>(R.id.cardContainer)
 
         if (selectedCards.contains(card)) {
@@ -595,6 +651,15 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showHint() {
+        // Toggle: if hint is showing, deselect and return
+        if (isHintShowing && selectedCards.isNotEmpty() &&
+            lastHintCards.isNotEmpty() && selectedCards.toSet() == lastHintCards.toSet()) {
+            deselectAllCards()
+            isHintShowing = false
+            lastHintCards = emptyList()
+            return
+        }
+
         val validPlays = gameEngine.getValidPlaysForHuman()
         if (validPlays.isEmpty()) {
             showMessage("没有能出的牌，请过牌")
@@ -652,6 +717,10 @@ class GameActivity : AppCompatActivity() {
                 view.translationY = -16f
             }
         }
+
+        // Track hint state for toggle
+        isHintShowing = true
+        lastHintCards = hint.cards.toList()
 
         showMessage("提示: ${hint.type.displayName}")
         updateButtonStates()

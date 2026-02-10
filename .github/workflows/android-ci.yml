@@ -41,30 +41,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # 5. 构建Debug版本APK
+      # 5. 构建Debug版本APK (只构建communication-card，忽略gomoku)
       - name: Build Debug APK with Gradle
-        run: ./gradlew assembleDebug
+        run: ./gradlew :apps:communication-card:assembleDebug
 
-      # 6. 上传所有模块的Debug APK
-      - name: Upload All Debug APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: all-debug-apks
-          path: |
-            **/build/outputs/apk/debug/*.apk
-            **/build/outputs/apk/**/debug/*.apk
-          if-no-files-found: warn  # 如果没有找到文件则警告而不是失败
-          retention-days: 7
-
-      # 7. （可选）上传特定模块的APK
-      - name: Upload Specific Module APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: gomoku-app
-          path: apps/gomoku/build/outputs/apk/debug/*.apk
-
-      - name: Upload Communication Card APKs
+      # 6. 上传Communication Card APK
+      - name: Upload Communication Card APK
         uses: actions/upload-artifact@v4
         with:
           name: communication-card-app
           path: apps/communication-card/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 7
