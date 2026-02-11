@@ -210,7 +210,7 @@ class GameActivity : AppCompatActivity() {
             isHintShowing = false
             cardViewMap.values.forEach { view ->
                 view.findViewById<View>(R.id.cardContainer)
-                    .setBackgroundResource(R.drawable.card_background)
+                    .setBackgroundResource(R.drawable.card_background_large)
                 view.translationY = 0f
             }
             updateButtonStates()
@@ -591,6 +591,10 @@ class GameActivity : AppCompatActivity() {
 
         val tvRank = view.findViewById<TextView>(R.id.tvRank)
         val tvSuit = view.findViewById<TextView>(R.id.tvSuit)
+        val cardContainer = view.findViewById<View>(R.id.cardContainer)
+
+        // Use large rounded corner background for hand cards (10dp radius)
+        cardContainer.setBackgroundResource(R.drawable.card_background_large)
 
         tvRank.text = card.rank.displayName
         tvSuit.text = if (card.isJoker) "★" else card.suit.symbol
@@ -620,11 +624,11 @@ class GameActivity : AppCompatActivity() {
 
         if (selectedCards.contains(card)) {
             selectedCards.remove(card)
-            container.setBackgroundResource(R.drawable.card_background)
+            container.setBackgroundResource(R.drawable.card_background_large)
             cardView.translationY = 0f
         } else {
             selectedCards.add(card)
-            container.setBackgroundResource(R.drawable.card_selected)
+            container.setBackgroundResource(R.drawable.card_selected_large)
             cardView.translationY = -16f
         }
 
@@ -716,7 +720,7 @@ class GameActivity : AppCompatActivity() {
         selectedCards.clear()
         cardViewMap.values.forEach { view ->
             view.findViewById<View>(R.id.cardContainer)
-                .setBackgroundResource(R.drawable.card_background)
+                .setBackgroundResource(R.drawable.card_background_large)
             view.translationY = 0f
         }
 
@@ -725,7 +729,7 @@ class GameActivity : AppCompatActivity() {
             selectedCards.add(card)
             cardViewMap[card]?.let { view ->
                 view.findViewById<View>(R.id.cardContainer)
-                    .setBackgroundResource(R.drawable.card_selected)
+                    .setBackgroundResource(R.drawable.card_selected_large)
                 view.translationY = -16f
             }
         }
