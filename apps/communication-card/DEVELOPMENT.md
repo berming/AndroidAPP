@@ -117,6 +117,7 @@ apps/communication-card/
 | v1.17 | 0c87be2 | feat | 多项 UI 修复：手牌顺序、按钮文字、圆角、顶部空间 |
 | v1.18 | 2fe704e | fix | 恢复卡牌圆角 6dp，按钮文字完整显示 |
 | v1.19 | 9bfe427 | feat | 手牌使用更大圆角（10dp） |
+| v1.20 | be153c0 | feat | AI团队合作策略优化（送人、顶人、让牌） |
 
 ---
 
@@ -173,6 +174,44 @@ val nonBombGroups = cardsByRank.filter { it.value.size < 4 }
 **解决**: 为手牌创建独立的 10dp 圆角样式
 - `card_background_large.xml` (10dp)
 - `card_selected_large.xml` (10dp)
+
+### 5. AI团队合作策略
+**问题**: AI玩家各自为战，没有团队配合意识
+
+**解决**: 实现完整的团队合作策略
+
+1. **送人策略（帮队友走牌）**:
+   - 队友手牌≤3张时，出小牌让队友能接
+   - 自由出牌时考虑下家是谁
+
+2. **顶人策略（阻止对手）**:
+   - 对手手牌≤3张时，必须压牌阻止
+   - 必要时使用炸弹
+
+3. **让牌策略**:
+   - 队友正在赢且有分时，过牌让队友收分
+   - 下家是队友时，考虑过牌
+
+4. **得分意识**:
+   - 队伍得分≥150时，加速走牌
+   - 高分轮次（≥20分）积极争取
+
+```kotlin
+// 判断是否需要帮队友
+val teammateInfo = gameState.getTeammateWithFewestCards(player.team, player.id)
+if (teammateInfo != null && teammateInfo.second <= 3) {
+    return choosePlayToHelpTeammate(validPlays, player, gameState)
+}
+
+// 判断是否需要顶对手
+val nextPlayerId = gameState.getNextActivePlayerId()
+if (nextPlayerId != null && gameState.getPlayerTeam(nextPlayerId) != player.team) {
+    val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+    if (nextHandSize <= 3) {
+        return choosePlayToBlockOpponent(validPlays, player)
+    }
+}
+```
 
 ---
 
