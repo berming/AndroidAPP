@@ -252,7 +252,7 @@
             <!-- 记录按钮 -->
             <Button
                 android:id="@+id/btnHistory"
-                android:layout_width="56dp"
+                android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
@@ -260,12 +260,25 @@
                 android:background="@drawable/button_secondary"
                 android:text="记录"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
+
+            <!-- 托管按钮 (AI代打) -->
+            <Button
+                android:id="@+id/btnAutoPlay"
+                android:layout_width="48dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:padding="0dp"
+                android:background="@drawable/button_secondary"
+                android:text="托管"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
 
             <!-- 操作按钮 -->
             <Button
                 android:id="@+id/btnHint"
-                android:layout_width="56dp"
+                android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
@@ -273,11 +286,11 @@
                 android:background="@drawable/button_secondary"
                 android:text="提示"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnPass"
-                android:layout_width="56dp"
+                android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
@@ -285,18 +298,18 @@
                 android:background="@drawable/button_secondary"
                 android:text="过牌"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/btnPlay"
-                android:layout_width="56dp"
+                android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:minWidth="0dp"
                 android:padding="0dp"
                 android:background="@drawable/button_primary"
                 android:text="出牌"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
         </LinearLayout>
 
@@ -419,6 +432,139 @@
 
     </FrameLayout>
 
+    <!-- 游戏回放遮罩 -->
+    <FrameLayout
+        android:id="@+id/replayOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="20dp"
+            android:background="@drawable/center_area_background"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="游戏回放"
+                    android:textColor="@color/accent"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvReplayProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    tools:text="1/50" />
+
+            </LinearLayout>
+
+            <!-- 回放内容显示区 -->
+            <ScrollView
+                android:id="@+id/replayScrollView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:id="@+id/tvReplayContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="6dp" />
+
+            </ScrollView>
+
+            <!-- 回放控制按钮 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnReplayFirst"
+                    android:layout_width="60dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/button_secondary"
+                    android:text="首步"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnReplayPrev"
+                    android:layout_width="60dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/button_secondary"
+                    android:text="上步"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnReplayAutoPlay"
+                    android:layout_width="80dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/button_primary"
+                    android:text="自动播放"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnReplayNext"
+                    android:layout_width="60dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/button_secondary"
+                    android:text="下步"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnReplayLast"
+                    android:layout_width="60dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/button_secondary"
+                    android:text="末步"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnCloseReplay"
+                android:layout_width="120dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/button_primary"
+                android:text="关闭"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
     <!-- 游戏结束遮罩 -->
     <FrameLayout
         android:id="@+id/gameOverOverlay"
@@ -471,32 +617,42 @@
 
                 <Button
                     android:id="@+id/btnPlayAgain"
-                    android:layout_width="100dp"
+                    android:layout_width="80dp"
                     android:layout_height="44dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="6dp"
                     android:background="@drawable/button_primary"
                     android:text="@string/btn_play_again"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <Button
                     android:id="@+id/btnShowHistory"
-                    android:layout_width="100dp"
+                    android:layout_width="80dp"
                     android:layout_height="44dp"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="6dp"
                     android:background="@drawable/button_secondary"
-                    android:text="查看记录"
+                    android:text="记录"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btnShowReplay"
+                    android:layout_width="80dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/button_secondary"
+                    android:text="回放"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
 
                 <Button
                     android:id="@+id/btnBackMenu"
-                    android:layout_width="100dp"
+                    android:layout_width="80dp"
                     android:layout_height="44dp"
                     android:background="@drawable/button_secondary"
                     android:text="@string/btn_back_menu"
                     android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
             </LinearLayout>
 
