@@ -474,6 +474,14 @@ class GameEngine(
      * 构建游戏状态信息（供AI使用）
      */
     private fun buildGameStateInfo(): GameStateInfo {
+        // 构建从当前玩家开始的出牌顺序
+        val playerOrder = mutableListOf<Int>()
+        var idx = currentPlayerIndex
+        for (i in 0 until playerCount) {
+            playerOrder.add(_players[idx].id)
+            idx = (idx + 1) % playerCount
+        }
+
         return GameStateInfo(
             currentPlayerId = currentPlayerIndex,
             lastPlayerId = lastPlayerId,
@@ -484,7 +492,10 @@ class GameEngine(
             teamAAllFinished = teamA.allFinished,
             teamBAllFinished = teamB.allFinished,
             playerTeams = _players.associate { it.id to it.team },
-            playerHandSizes = _players.associate { it.id to it.handSize }
+            playerHandSizes = _players.associate { it.id to it.handSize },
+            playerOrder = playerOrder,
+            teamATotalScore = teamA.totalCollectedScore,
+            teamBTotalScore = teamB.totalCollectedScore
         )
     }
 
