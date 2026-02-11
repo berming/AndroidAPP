@@ -252,51 +252,51 @@
             <!-- 记录按钮 -->
             <Button
                 android:id="@+id/btnHistory"
-                android:layout_width="wrap_content"
+                android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
-                android:paddingHorizontal="10dp"
+                android:padding="0dp"
                 android:background="@drawable/button_secondary"
-                android:text="记"
+                android:text="记录"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
             <!-- 操作按钮 -->
             <Button
                 android:id="@+id/btnHint"
-                android:layout_width="wrap_content"
+                android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
-                android:paddingHorizontal="10dp"
+                android:padding="0dp"
                 android:background="@drawable/button_secondary"
-                android:text="提"
+                android:text="提示"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/btnPass"
-                android:layout_width="wrap_content"
+                android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
-                android:paddingHorizontal="10dp"
+                android:padding="0dp"
                 android:background="@drawable/button_secondary"
-                android:text="过"
+                android:text="过牌"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/btnPlay"
-                android:layout_width="wrap_content"
+                android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:minWidth="0dp"
-                android:paddingHorizontal="10dp"
+                android:padding="0dp"
                 android:background="@drawable/button_primary"
-                android:text="出"
+                android:text="出牌"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
         </LinearLayout>
 

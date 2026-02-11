@@ -68,7 +68,7 @@ class AIPlayer(private val difficulty: AIDifficulty = AIDifficulty.MEDIUM) {
     }
 
     /**
-     * 中等策略：基本的牌力评估
+     * 中等策略：基本的牌力评估 + 团队配合
      */
     private fun mediumStrategy(
         validPlays: List<CardGroup>,
@@ -78,15 +78,15 @@ class AIPlayer(private val difficulty: AIDifficulty = AIDifficulty.MEDIUM) {
     ): CardGroup? {
         // 自由出牌时的策略
         if (lastPlay == null) {
-            return chooseFreePlay(validPlays, player, gameState)
+            return chooseFreePlayWithTeamAwareness(validPlays, player, gameState)
         }
 
         // 跟牌策略
-        return chooseFollowPlay(validPlays, lastPlay, player, gameState)
+        return chooseFollowPlayWithTeamAwareness(validPlays, lastPlay, player, gameState)
     }
 
     /**
-     * 困难策略：考虑团队配合和得分
+     * 困难策略：考虑团队配合和得分（最优策略）
      */
     private fun hardStrategy(
         validPlays: List<CardGroup>,
@@ -96,174 +96,123 @@ class AIPlayer(private val difficulty: AIDifficulty = AIDifficulty.MEDIUM) {
     ): CardGroup? {
         // 分析当前局势
         val myTeamScore = if (player.team == Team.TEAM_A) {
-            gameState.teamAFinishedScore
+            gameState.teamATotalScore
         } else {
-            gameState.teamBFinishedScore
+            gameState.teamBTotalScore
         }
 
         val opponentTeamScore = if (player.team == Team.TEAM_A) {
-            gameState.teamBFinishedScore
+            gameState.teamBTotalScore
         } else {
-            gameState.teamAFinishedScore
-        }
-
-        // 如果我方接近200分，积极出牌争取走完
-        if (myTeamScore >= 150) {
-            return validPlays.minByOrNull { it.primaryRank.value }
-        }
-
-        // 如果对方接近200分，尽量阻止
-        if (opponentTeamScore >= 150) {
-            // 优先出能获得高分的牌
-            val highScorePlays = validPlays.filter { it.totalScore > 0 }
-            if (highScorePlays.isNotEmpty()) {
-                return highScorePlays.maxByOrNull { it.totalScore }
-            }
+            gameState.teamATotalScore
         }
 
         // 自由出牌
         if (lastPlay == null) {
-            return chooseFreePlayHard(validPlays, player, gameState)
+            return chooseFreePlayOptimal(validPlays, player, gameState, myTeamScore, opponentTeamScore)
         }
 
         // 跟牌
-        return chooseFollowPlayHard(validPlays, lastPlay, player, gameState)
+        return chooseFollowPlayOptimal(validPlays, lastPlay, player, gameState, myTeamScore, opponentTeamScore)
     }
 
     /**
-     * 选择自由出牌（中等难度）
+     * 自由出牌（最优策略）
      */
-    private fun chooseFreePlay(
+    private fun chooseFreePlayOptimal(
         validPlays: List<CardGroup>,
         player: Player,
-        gameState: GameStateInfo
+        gameState: GameStateInfo,
+        myTeamScore: Int,
+        opponentTeamScore: Int
     ): CardGroup? {
-        // 优先出小牌
-        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
-
-        if (nonBombs.isNotEmpty()) {
-            // 按牌力排序，出最小的
-            return nonBombs.minByOrNull { it.primaryRank.value }
+        // 1. 如果我方接近200分，尽快走完
+        if (myTeamScore >= 150) {
+            return chooseFastFinishPlay(validPlays, player)
         }
 
-        // 只有炸弹时，出最小的炸弹
-        return validPlays.minByOrNull {
-            it.size * 100 + it.primaryRank.value
+        // 2. 检查是否需要送队友走
+        val teammateInfo = gameState.getTeammateWithFewestCards(player.team, player.id)
+        if (teammateInfo != null && teammateInfo.second <= 3) {
+            // 队友快走完了，出小牌让队友能接
+            return choosePlayToHelpTeammate(validPlays, player, gameState)
         }
-    }
 
-    /**
-     * 选择跟牌（中等难度）
-     */
-    private fun chooseFollowPlay(
-        validPlays: List<CardGroup>,
-        lastPlay: CardGroup,
-        player: Player,
-        gameState: GameStateInfo
-    ): CardGroup? {
-        // 如果上家是队友且牌里有高分，考虑过牌
-        if (isTeammatePlay(lastPlay, player, gameState)) {
-            if (lastPlay.totalScore > 0 && Random.nextFloat() > 0.3f) {
-                return null  // 70%概率过牌让队友收分
+        // 3. 检查下家是否是对手且快走完
+        val nextPlayerId = gameState.getNextActivePlayerId()
+        if (nextPlayerId != null) {
+            val nextTeam = gameState.getPlayerTeam(nextPlayerId)
+            val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+            if (nextTeam != player.team && nextHandSize <= 3) {
+                // 下家是对手且快走完，出大牌压制
+                return choosePlayToBlockOpponent(validPlays, player)
             }
         }
 
-        // 如果这轮牌有高分，积极跟牌
-        if (gameState.currentRoundScore >= 15) {
+        // 4. 正常情况：送队友策略
+        return chooseFreePlayWithTeamAwareness(validPlays, player, gameState)
+    }
+
+    /**
+     * 跟牌（最优策略）
+     */
+    private fun chooseFollowPlayOptimal(
+        validPlays: List<CardGroup>,
+        lastPlay: CardGroup,
+        player: Player,
+        gameState: GameStateInfo,
+        myTeamScore: Int,
+        opponentTeamScore: Int
+    ): CardGroup? {
+        val lastPlayerId = gameState.lastPlayerId ?: return null
+        val lastPlayerTeam = gameState.getPlayerTeam(lastPlayerId)
+        val isTeammate = lastPlayerTeam == player.team
+        val roundScore = gameState.currentRoundScore
+
+        // 1. 队友正在赢，让队友收分
+        if (isTeammate) {
+            // 队友有分的牌，让给队友
+            if (roundScore > 0) {
+                return null  // 过牌
+            }
+
+            // 队友快走完了（手牌<=3），让队友继续出
+            val lastPlayerHandSize = gameState.playerHandSizes[lastPlayerId] ?: 0
+            if (lastPlayerHandSize <= 3) {
+                return null  // 过牌让队友继续
+            }
+
+            // 队友出的牌没分，可以考虑接手
+            val nextPlayerId = gameState.getNextActivePlayerId()
+            if (nextPlayerId != null) {
+                val nextTeam = gameState.getPlayerTeam(nextPlayerId)
+                // 如果下家是对手且快走完，我来压住
+                val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+                if (nextTeam != player.team && nextHandSize <= 3) {
+                    val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+                    if (nonBombs.isNotEmpty()) {
+                        return nonBombs.minByOrNull { it.primaryRank.value }
+                    }
+                }
+            }
+
+            return null  // 让队友继续
+        }
+
+        // 2. 对手正在赢
+        // 检查对手是否快走完
+        val lastPlayerHandSize = gameState.playerHandSizes[lastPlayerId] ?: 0
+        if (lastPlayerHandSize <= 3) {
+            // 对手快走完了，必须压住！
             val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
             if (nonBombs.isNotEmpty()) {
                 return nonBombs.minByOrNull { it.primaryRank.value }
             }
-            // 分值很高时可以考虑用炸弹
-            if (gameState.currentRoundScore >= 30) {
-                return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
-            }
+            // 用炸弹也要压
+            return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
         }
 
-        // 普通情况：出最小的能压过的牌
-        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
-        if (nonBombs.isNotEmpty()) {
-            // 30%概率过牌
-            if (Random.nextFloat() < 0.3f) return null
-            return nonBombs.minByOrNull { it.primaryRank.value }
-        }
-
-        // 只有炸弹，大多数情况过牌
-        if (Random.nextFloat() < 0.7f) return null
-        return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
-    }
-
-    /**
-     * 选择自由出牌（困难难度）
-     */
-    private fun chooseFreePlayHard(
-        validPlays: List<CardGroup>,
-        player: Player,
-        gameState: GameStateInfo
-    ): CardGroup? {
-        // 分析手牌结构
-        val singles = validPlays.filter { it.type == CardGroupType.SINGLE }
-        val pairs = validPlays.filter { it.type == CardGroupType.PAIR }
-        val triples = validPlays.filter { it.type == CardGroupType.TRIPLE }
-        val straights = validPlays.filter { it.type == CardGroupType.STRAIGHT }
-
-        // 如果手牌很少，优先出能走完的牌型
-        if (player.handSize <= 5) {
-            // 尝试一次性走完
-            val finishingPlay = validPlays.find { it.size == player.handSize }
-            if (finishingPlay != null) return finishingPlay
-        }
-
-        // 有顺子优先出顺子
-        if (straights.isNotEmpty()) {
-            return straights.minByOrNull { it.primaryRank.value }
-        }
-
-        // 出单张或对子，保留三张和炸弹
-        val smallPlays = (singles + pairs).filter { it.type != CardGroupType.BOMB }
-        if (smallPlays.isNotEmpty()) {
-            return smallPlays.minByOrNull { it.primaryRank.value }
-        }
-
-        // 出三张
-        if (triples.isNotEmpty()) {
-            return triples.minByOrNull { it.primaryRank.value }
-        }
-
-        // 最后才出炸弹
-        return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
-    }
-
-    /**
-     * 选择跟牌（困难难度）
-     */
-    private fun chooseFollowPlayHard(
-        validPlays: List<CardGroup>,
-        lastPlay: CardGroup,
-        player: Player,
-        gameState: GameStateInfo
-    ): CardGroup? {
-        val isTeammate = isTeammatePlay(lastPlay, player, gameState)
-
-        // 队友出的牌且有分，让队友收
-        if (isTeammate && lastPlay.totalScore > 0) {
-            return null
-        }
-
-        // 队友出的牌且分值很低，可以考虑接手
-        if (isTeammate && lastPlay.totalScore == 0) {
-            // 如果自己有更大的牌且队友手牌少，帮队友出牌
-            val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
-            if (nonBombs.isNotEmpty() && gameState.lastPlayerHandSize <= 3) {
-                return nonBombs.minByOrNull { it.primaryRank.value }
-            }
-            return null
-        }
-
-        // 对手出的牌
-        val roundScore = gameState.currentRoundScore
-
-        // 高分轮次，积极争取
+        // 3. 高分轮次，积极争取
         if (roundScore >= 20) {
             val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
             if (nonBombs.isNotEmpty()) {
@@ -275,17 +224,226 @@ class AIPlayer(private val difficulty: AIDifficulty = AIDifficulty.MEDIUM) {
             }
         }
 
-        // 低分轮次
+        // 4. 检查下家是否是队友
+        val nextPlayerId = gameState.getNextActivePlayerId()
+        if (nextPlayerId != null && gameState.getPlayerTeam(nextPlayerId) == player.team) {
+            // 下家是队友，可以过牌让队友来处理
+            val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+            if (nextHandSize > 3 && Random.nextFloat() < 0.5f) {
+                return null  // 让队友处理
+            }
+        }
+
+        // 5. 正常跟牌
         val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
         if (nonBombs.isNotEmpty()) {
-            // 如果能用小牌压过，就出
             val smallPlay = nonBombs.minByOrNull { it.primaryRank.value }
             if (smallPlay != null && smallPlay.primaryRank.value <= CardRank.TEN.value) {
                 return smallPlay
             }
-            // 否则50%概率过牌
-            if (Random.nextBoolean()) return null
+            // 大牌时考虑过牌
+            if (Random.nextFloat() < 0.4f) return null
             return smallPlay
+        }
+
+        // 只有炸弹，过牌
+        return null
+    }
+
+    /**
+     * 选择快速走完的出牌
+     */
+    private fun chooseFastFinishPlay(validPlays: List<CardGroup>, player: Player): CardGroup? {
+        // 能一次走完就走完
+        val finishingPlay = validPlays.find { it.size == player.handSize }
+        if (finishingPlay != null) return finishingPlay
+
+        // 出最大的牌来确保能赢
+        return validPlays.maxByOrNull { it.primaryRank.value }
+    }
+
+    /**
+     * 选择帮助队友的出牌（出小牌让队友能接）
+     */
+    private fun choosePlayToHelpTeammate(
+        validPlays: List<CardGroup>,
+        player: Player,
+        gameState: GameStateInfo
+    ): CardGroup? {
+        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+        if (nonBombs.isEmpty()) {
+            // 只有炸弹，出最小的
+            return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
+        }
+
+        // 优先出单张小牌，方便队友接
+        val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
+        if (singles.isNotEmpty()) {
+            // 出中等大小的单张（不是最小的3，给队友留机会压）
+            val sorted = singles.sortedBy { it.primaryRank.value }
+            return if (sorted.size > 2) sorted[1] else sorted.first()
+        }
+
+        // 出对子
+        val pairs = nonBombs.filter { it.type == CardGroupType.PAIR }
+        if (pairs.isNotEmpty()) {
+            return pairs.minByOrNull { it.primaryRank.value }
+        }
+
+        return nonBombs.minByOrNull { it.primaryRank.value }
+    }
+
+    /**
+     * 选择压制对手的出牌
+     */
+    private fun choosePlayToBlockOpponent(validPlays: List<CardGroup>, player: Player): CardGroup? {
+        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+
+        // 出大牌压制
+        if (nonBombs.isNotEmpty()) {
+            // 出比较大的单张（让对手不容易压过）
+            val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
+            if (singles.isNotEmpty()) {
+                val bigSingles = singles.filter { it.primaryRank.value >= CardRank.JACK.value }
+                if (bigSingles.isNotEmpty()) {
+                    return bigSingles.minByOrNull { it.primaryRank.value }
+                }
+            }
+            return nonBombs.maxByOrNull { it.primaryRank.value }
+        }
+
+        // 用炸弹
+        return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
+    }
+
+    /**
+     * 选择自由出牌（带团队意识）
+     */
+    private fun chooseFreePlayWithTeamAwareness(
+        validPlays: List<CardGroup>,
+        player: Player,
+        gameState: GameStateInfo
+    ): CardGroup? {
+        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+
+        // 检查下家是谁
+        val nextPlayerId = gameState.getNextActivePlayerId()
+
+        if (nextPlayerId != null) {
+            val nextTeam = gameState.getPlayerTeam(nextPlayerId)
+            val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+
+            // 下家是队友
+            if (nextTeam == player.team) {
+                // 队友快走完了，出小牌让队友能接
+                if (nextHandSize <= 3 && nonBombs.isNotEmpty()) {
+                    val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
+                    if (singles.isNotEmpty()) {
+                        // 出中小单张
+                        return singles.filter { it.primaryRank.value <= CardRank.TEN.value }
+                            .minByOrNull { it.primaryRank.value }
+                            ?: singles.minByOrNull { it.primaryRank.value }
+                    }
+                }
+            } else {
+                // 下家是对手且快走完，出大牌不让对手轻易接
+                if (nextHandSize <= 3 && nonBombs.isNotEmpty()) {
+                    return nonBombs.maxByOrNull { it.primaryRank.value }
+                }
+            }
+        }
+
+        // 正常情况：优先出小牌
+        if (nonBombs.isNotEmpty()) {
+            return nonBombs.minByOrNull { it.primaryRank.value }
+        }
+
+        // 只有炸弹时，出最小的炸弹
+        return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
+    }
+
+    /**
+     * 选择跟牌（带团队意识）
+     */
+    private fun chooseFollowPlayWithTeamAwareness(
+        validPlays: List<CardGroup>,
+        lastPlay: CardGroup,
+        player: Player,
+        gameState: GameStateInfo
+    ): CardGroup? {
+        val lastPlayerId = gameState.lastPlayerId
+        val isTeammate = isTeammatePlay(lastPlay, player, gameState)
+        val roundScore = gameState.currentRoundScore
+
+        // 队友正在赢
+        if (isTeammate) {
+            // 有分的牌让给队友
+            if (roundScore > 0) {
+                return null
+            }
+
+            // 检查队友手牌数
+            val lastPlayerHandSize = lastPlayerId?.let { gameState.playerHandSizes[it] } ?: 0
+            if (lastPlayerHandSize <= 3) {
+                // 队友快走完了，让队友继续
+                return null
+            }
+
+            // 检查下家
+            val nextPlayerId = gameState.getNextActivePlayerId()
+            if (nextPlayerId != null) {
+                val nextTeam = gameState.getPlayerTeam(nextPlayerId)
+                val nextHandSize = gameState.playerHandSizes[nextPlayerId] ?: 0
+                // 下家是对手且快走完，接手防止对手压
+                if (nextTeam != player.team && nextHandSize <= 3) {
+                    val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+                    if (nonBombs.isNotEmpty()) {
+                        return nonBombs.minByOrNull { it.primaryRank.value }
+                    }
+                }
+            }
+
+            return null  // 让队友继续出
+        }
+
+        // 对手正在赢
+        val lastPlayerHandSize = lastPlayerId?.let { gameState.playerHandSizes[it] } ?: 0
+
+        // 对手快走完了，必须压住
+        if (lastPlayerHandSize <= 3) {
+            val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+            if (nonBombs.isNotEmpty()) {
+                return nonBombs.minByOrNull { it.primaryRank.value }
+            }
+            // 用炸弹也要压
+            return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
+        }
+
+        // 高分轮次，积极跟牌
+        if (roundScore >= 15) {
+            val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+            if (nonBombs.isNotEmpty()) {
+                return nonBombs.minByOrNull { it.primaryRank.value }
+            }
+            if (roundScore >= 30) {
+                return validPlays.minByOrNull { it.size * 100 + it.primaryRank.value }
+            }
+        }
+
+        // 检查下家是否是队友
+        val nextPlayerId = gameState.getNextActivePlayerId()
+        if (nextPlayerId != null && gameState.getPlayerTeam(nextPlayerId) == player.team) {
+            // 下家是队友，可以过牌让队友处理
+            if (Random.nextFloat() < 0.4f) {
+                return null
+            }
+        }
+
+        // 普通情况
+        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
+        if (nonBombs.isNotEmpty()) {
+            if (Random.nextFloat() < 0.2f) return null
+            return nonBombs.minByOrNull { it.primaryRank.value }
         }
 
         // 只有炸弹，过牌
@@ -387,7 +545,69 @@ data class GameStateInfo(
     val teamAAllFinished: Boolean,   // A队是否全员走完
     val teamBAllFinished: Boolean,   // B队是否全员走完
     val playerTeams: Map<Int, Team>, // 玩家ID到队伍的映射
-    val playerHandSizes: Map<Int, Int> // 玩家ID到手牌数量的映射
+    val playerHandSizes: Map<Int, Int>, // 玩家ID到手牌数量的映射
+    val playerOrder: List<Int> = emptyList(),  // 玩家出牌顺序（从当前玩家开始）
+    val teamATotalScore: Int = 0,    // A队总已收分（包括未走完玩家）
+    val teamBTotalScore: Int = 0     // B队总已收分（包括未走完玩家）
 ) {
     fun getPlayerTeam(playerId: Int): Team? = playerTeams[playerId]
+
+    /**
+     * 获取下一个玩家ID
+     */
+    fun getNextPlayerId(): Int? {
+        if (playerOrder.size < 2) return null
+        return playerOrder[1]
+    }
+
+    /**
+     * 获取下一个未走完的玩家ID
+     */
+    fun getNextActivePlayerId(): Int? {
+        for (i in 1 until playerOrder.size) {
+            val playerId = playerOrder[i]
+            if ((playerHandSizes[playerId] ?: 0) > 0) {
+                return playerId
+            }
+        }
+        return null
+    }
+
+    /**
+     * 判断下一个玩家是否是队友
+     */
+    fun isNextPlayerTeammate(currentTeam: Team): Boolean {
+        val nextId = getNextActivePlayerId() ?: return false
+        return playerTeams[nextId] == currentTeam
+    }
+
+    /**
+     * 获取队友中手牌最少的玩家
+     */
+    fun getTeammateWithFewestCards(currentTeam: Team, excludePlayerId: Int): Pair<Int, Int>? {
+        return playerHandSizes
+            .filter { (id, size) ->
+                id != excludePlayerId &&
+                playerTeams[id] == currentTeam &&
+                size > 0
+            }
+            .minByOrNull { it.value }
+            ?.toPair()
+    }
+
+    /**
+     * 获取对手中手牌最少的玩家
+     */
+    fun getOpponentWithFewestCards(currentTeam: Team): Pair<Int, Int>? {
+        val opponentTeam = if (currentTeam == Team.TEAM_A) Team.TEAM_B else Team.TEAM_A
+        return playerHandSizes
+            .filter { (id, size) ->
+                playerTeams[id] == opponentTeam &&
+                size > 0
+            }
+            .minByOrNull { it.value }
+            ?.toPair()
+    }
+
+    private fun Map.Entry<Int, Int>.toPair() = Pair(key, value)
 }
