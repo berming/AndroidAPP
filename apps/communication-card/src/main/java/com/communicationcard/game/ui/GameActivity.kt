@@ -273,12 +273,10 @@ class GameActivity : AppCompatActivity() {
                 gameHistory.add("第${roundNumber}轮:")
 
                 showMessage("${event.player.name} 赢得此轮，获得 ${event.score} 分")
-                handler.postDelayed({
-                    // Clear all played cards for new round
-                    currentRoundPlayedCards.clear()
-                    clearAllPlayedCards()
-                    updateCurrentRoundDisplay()
-                }, MESSAGE_DISPLAY_MS)
+                // Clear played cards for new round (but keep current round display)
+                currentRoundPlayedCards.clear()
+                clearAllPlayedCards()
+                // Note: Don't clear currentRoundDisplay here - it will be updated when next player plays
             }
 
             is GameEvent.PlayerFinished -> {
@@ -507,8 +505,9 @@ class GameActivity : AppCompatActivity() {
         // Group cards by rank
         val cardsByRank = cards.groupBy { it.rank }
 
-        // Separate bombs (4+) and non-bombs, sort appropriately
-        // Order: bombs by size desc then rank desc, non-bombs by rank desc
+        // Separate bombs (4+) and non-bombs
+        // Bombs: by count desc, then rank desc
+        // Non-bombs: by rank desc only
         val bombGroups = cardsByRank.filter { it.value.size >= 4 }
             .toList()
             .sortedWith(compareByDescending<Pair<CardRank, List<Card>>> { it.second.size }
@@ -520,57 +519,70 @@ class GameActivity : AppCompatActivity() {
             .sortedByDescending { it.first.value }
             .map { it.second }
 
-        // Combine: bombs first, then non-bombs (all sorted by desc)
+        // Combine: bombs first, then non-bombs
         val sortedGroups = bombGroups + nonBombGroups
 
-        // Split groups into two rows, keeping same-rank cards together
-        val row1Groups = mutableListOf<List<Card>>()
-        val row2Groups = mutableListOf<List<Card>>()
-        var row1Count = 0
-        var row2Count = 0
-        val targetPerRow = (cards.size + 1) / 2
+        // Flatten all cards in order
+        val allCards = sortedGroups.flatten()
 
+        // Fill row 1 first, then row 2
+        val targetPerRow = (allCards.size + 1) / 2
+        val row1Cards = mutableListOf<Card>()
+        val row2Cards = mutableListOf<Card>()
+
+        // Track which cards belong to same rank groups for overlap
+        var currentIdx = 0
         for (group in sortedGroups) {
-            // Decide which row to add this group to
-            // Try to balance rows while keeping groups intact
-            if (row1Count <= row2Count && row1Count + group.size <= targetPerRow + 2) {
-                row1Groups.add(group)
-                row1Count += group.size
-            } else {
-                row2Groups.add(group)
-                row2Count += group.size
+            for (card in group) {
+                if (row1Cards.size < targetPerRow) {
+                    row1Cards.add(card)
+                } else {
+                    row2Cards.add(card)
+                }
             }
         }
 
-        // Add card groups to rows with overlap for 2+ same rank
-        addCardGroupsToRow(row1Groups, playerHandRow1, cardWidth, cardHeight, cardMargin)
-        addCardGroupsToRow(row2Groups, playerHandRow2, cardWidth, cardHeight, cardMargin)
+        // Add cards to rows with overlap for same rank cards
+        addCardsToRowWithOverlap(row1Cards, playerHandRow1, cardWidth, cardHeight, cardMargin)
+        addCardsToRowWithOverlap(row2Cards, playerHandRow2, cardWidth, cardHeight, cardMargin)
 
         updateButtonStates()
     }
 
-    private fun addCardGroupsToRow(
-        groups: List<List<Card>>,
+    private fun addCardsToRowWithOverlap(
+        cards: List<Card>,
         row: LinearLayout,
         cardWidth: Int,
         cardHeight: Int,
         cardMargin: Int
     ) {
-        for (group in groups) {
-            val groupSize = group.size
-            group.forEachIndexed { index, card ->
-                // Apply 40% overlap for 2+ same rank cards (except last in group)
-                // 40% keeps left side (rank/suit) visible while saving space
-                val useOverlap = groupSize >= 2 && index < groupSize - 1
-                val margin = if (useOverlap) (-cardWidth * 0.4).toInt() else cardMargin
+        var i = 0
+        while (i < cards.size) {
+            val card = cards[i]
+            val currentRank = card.rank
 
-                val cardView = createCardView(card, cardWidth, cardHeight, margin)
+            // Count consecutive same-rank cards in this row
+            var sameRankCount = 1
+            while (i + sameRankCount < cards.size && cards[i + sameRankCount].rank == currentRank) {
+                sameRankCount++
+            }
+
+            // Add all same-rank cards with overlap
+            for (j in 0 until sameRankCount) {
+                val currentCard = cards[i + j]
+                // Apply 30% overlap for 2+ same rank cards (except last in group)
+                val useOverlap = sameRankCount >= 2 && j < sameRankCount - 1
+                val margin = if (useOverlap) (-cardWidth * 0.3).toInt() else cardMargin
+
+                val cardView = createCardView(currentCard, cardWidth, cardHeight, margin)
                 cardView.setOnClickListener {
-                    toggleCardSelection(card, cardView)
+                    toggleCardSelection(currentCard, cardView)
                 }
                 row.addView(cardView)
-                cardViewMap[card] = cardView
+                cardViewMap[currentCard] = cardView
             }
+
+            i += sameRankCount
         }
     }
 
