@@ -534,4 +534,16 @@ class GameEngine(
     fun getCurrentRoundScore(): Int {
         return CardRules.calculateScore(currentRoundCards)
     }
+
+    /**
+     * 获取AI推荐的出牌（供托管模式使用）
+     * 使用与AI玩家相同的策略
+     */
+    fun getAIRecommendedPlay(): CardGroup? {
+        val player = humanPlayer ?: return null
+        if (player.hasFinished) return null
+
+        val gameStateInfo = buildGameStateInfo()
+        return aiPlayer.makeDecision(player, lastPlayedGroup, gameStateInfo)
+    }
 }

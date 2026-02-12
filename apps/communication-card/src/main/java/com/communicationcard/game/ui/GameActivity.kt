@@ -5,6 +5,12 @@ import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+import android.view.animation.AnimationSet
+import android.view.animation.ScaleAnimation
+import android.view.animation.TranslateAnimation
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -24,12 +30,14 @@ class GameActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_DIFFICULTY = "difficulty"
         const val EXTRA_PLAYER_COUNT = "player_count"
-        private const val AI_DELAY_MS = 1000L
-        private const val MESSAGE_DISPLAY_MS = 1500L
+        private const val AI_DELAY_MS = 500L      // Reduced from 1000ms
+        private const val MESSAGE_DISPLAY_MS = 800L  // Reduced from 1500ms
+        private const val REPLAY_STEP_MS = 600L   // Replay auto-play speed
     }
 
     private lateinit var gameEngine: GameEngine
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var soundManager: SoundManager
 
     // UI Elements
     private lateinit var tvTeamAScore: TextView
@@ -99,6 +107,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var btnCloseReplay: Button
     private lateinit var btnShowReplay: Button
     private lateinit var replayScrollView: android.widget.ScrollView
+    private lateinit var replayCardsContainer: LinearLayout
+    private lateinit var tvReplayStepInfo: TextView
 
     // Replay data
     data class ReplayStep(
@@ -123,6 +133,7 @@ class GameActivity : AppCompatActivity() {
         )
         val playerCount = intent.getIntExtra(EXTRA_PLAYER_COUNT, 6)
 
+        soundManager = SoundManager(this)
         initViews()
         initGame(playerCount, difficulty)
         setupListeners()
@@ -177,6 +188,8 @@ class GameActivity : AppCompatActivity() {
         btnCloseReplay = findViewById(R.id.btnCloseReplay)
         btnShowReplay = findViewById(R.id.btnShowReplay)
         replayScrollView = findViewById(R.id.replayScrollView)
+        replayCardsContainer = findViewById(R.id.replayCardsContainer)
+        tvReplayStepInfo = findViewById(R.id.tvReplayStepInfo)
 
         // Initialize player views - map player ID to view
         // Player IDs: 0=Human, 1=玩家2, 2=玩家3, 3=玩家4, 4=玩家5, 5=玩家6
@@ -352,9 +365,16 @@ class GameActivity : AppCompatActivity() {
                     score = event.cardGroup.totalScore
                 ))
 
+                // Play sound effect
+                if (event.cardGroup.type == CardGroupType.BOMB) {
+                    soundManager.playBombSound()
+                } else {
+                    soundManager.playCardSound()
+                }
+
                 // Track played cards for this player in current round
                 currentRoundPlayedCards[event.player.id] = event.cardGroup
-                showPlayerPlayedCards(event.player, event.cardGroup)
+                showPlayerPlayedCardsWithAnimation(event.player, event.cardGroup)
                 updatePlayerView(event.player)
                 updateCurrentRoundDisplay()
                 updateScores() // Update scores after each play
@@ -376,6 +396,9 @@ class GameActivity : AppCompatActivity() {
                     action = "pass"
                 ))
 
+                // Play sound effect
+                soundManager.playPassSound()
+
                 currentRoundPlayedCards[event.player.id] = null // Mark as passed
                 showPlayerPassedStatus(event.player)
             }
@@ -395,6 +418,9 @@ class GameActivity : AppCompatActivity() {
                     action = "round_win",
                     score = event.score
                 ))
+
+                // Play sound effect
+                soundManager.playWinRoundSound()
 
                 showMessage("${event.player.name} 赢得此轮，获得 ${event.score} 分")
                 // Clear played cards for new round (but keep current round display)
@@ -441,6 +467,14 @@ class GameActivity : AppCompatActivity() {
                     action = "game_end",
                     score = event.result.teamAScore
                 ))
+
+                // Play sound effect based on result
+                val humanTeam = gameEngine.humanPlayer?.team
+                if (event.result.winner == humanTeam) {
+                    soundManager.playGameWinSound()
+                } else if (event.result.winner != null) {
+                    soundManager.playGameLoseSound()
+                }
 
                 // Disable auto-play when game ends
                 if (isAutoPlayEnabled) {
@@ -545,6 +579,91 @@ class GameActivity : AppCompatActivity() {
             val cardView = createMiniCardView(card, useBombOverlap)
             container.addView(cardView)
         }
+    }
+
+    private fun showPlayerPlayedCardsWithAnimation(player: Player, cardGroup: CardGroup) {
+        if (player.type == PlayerType.HUMAN) {
+            // Human player's cards shown in center area with animation
+            animateCurrentRoundDisplay()
+            return
+        }
+
+        val view = playerViews[player.id] ?: return
+        val container = view.findViewById<LinearLayout>(R.id.playedCardsContainer)
+        val statusView = view.findViewById<TextView>(R.id.tvStatus)
+
+        container.removeAllViews()
+        container.visibility = View.VISIBLE
+        statusView.visibility = View.GONE
+
+        // Check if it's a bomb for compact layout and special animation
+        val isBomb = cardGroup.type == CardGroupType.BOMB
+        val cardCount = cardGroup.cards.size
+
+        cardGroup.cards.forEachIndexed { index, card ->
+            val useBombOverlap = isBomb && index < cardCount - 1
+            val cardView = createMiniCardView(card, useBombOverlap)
+            container.addView(cardView)
+
+            // Add animation to each card
+            val animation = if (isBomb) {
+                createBombAnimation(index)
+            } else {
+                createCardPlayAnimation(index)
+            }
+            cardView.startAnimation(animation)
+        }
+    }
+
+    private fun createCardPlayAnimation(index: Int): Animation {
+        val animSet = AnimationSet(true)
+        animSet.interpolator = AccelerateDecelerateInterpolator()
+
+        // Scale from small to normal
+        val scale = ScaleAnimation(
+            0.5f, 1f, 0.5f, 1f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        )
+        scale.duration = 150
+
+        // Fade in
+        val alpha = AlphaAnimation(0f, 1f)
+        alpha.duration = 150
+
+        animSet.addAnimation(scale)
+        animSet.addAnimation(alpha)
+        animSet.startOffset = (index * 30).toLong()  // Stagger animation
+
+        return animSet
+    }
+
+    private fun createBombAnimation(index: Int): Animation {
+        val animSet = AnimationSet(true)
+        animSet.interpolator = AccelerateDecelerateInterpolator()
+
+        // Scale from large to normal (explosion effect)
+        val scale = ScaleAnimation(
+            1.5f, 1f, 1.5f, 1f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        )
+        scale.duration = 200
+
+        // Fade in
+        val alpha = AlphaAnimation(0.3f, 1f)
+        alpha.duration = 200
+
+        animSet.addAnimation(scale)
+        animSet.addAnimation(alpha)
+        animSet.startOffset = (index * 50).toLong()
+
+        return animSet
+    }
+
+    private fun animateCurrentRoundDisplay() {
+        // Animate the current winning cards display
+        currentWinningCards.startAnimation(createCardPlayAnimation(0))
     }
 
     private fun showPlayerPassedStatus(player: Player) {
@@ -1124,49 +1243,25 @@ class GameActivity : AppCompatActivity() {
         val player = gameEngine.humanPlayer ?: return
         if (player.hasFinished) return
 
-        val lastPlay = gameEngine.getLastPlay()
-        val validPlays = gameEngine.getValidPlaysForHuman()
+        // Use AI strategy (same as AI players, with team cooperation)
+        val aiDecision = gameEngine.getAIRecommendedPlay()
 
-        if (validPlays.isEmpty()) {
-            // No valid plays, must pass (but only if not free play)
+        if (aiDecision != null) {
+            gameEngine.humanPlay(aiDecision.cards)
+        } else {
+            // AI decided to pass
+            val lastPlay = gameEngine.getLastPlay()
             if (lastPlay != null) {
                 gameEngine.humanPass()
-            }
-            return
-        }
-
-        // Use hint logic to find best play
-        val humanHand = player.hand
-        val bombRanks = humanHand.groupBy { it.rank }
-            .filter { it.value.size >= 4 }
-            .keys
-
-        val nonBombs = validPlays.filter { it.type != CardGroupType.BOMB }
-        val bombs = validPlays.filter { it.type == CardGroupType.BOMB }
-
-        val safeNonBombs = nonBombs.filter { cardGroup ->
-            val rank = cardGroup.primaryRank
-            if (bombRanks.contains(rank)) {
-                val bombSize = humanHand.count { it.rank == rank }
-                cardGroup.cards.count { it.rank == rank } >= bombSize
             } else {
-                true
+                // Free play - must play something
+                val validPlays = gameEngine.getValidPlaysForHuman()
+                val smallestPlay = validPlays.minByOrNull { it.primaryRank.value }
+                if (smallestPlay != null) {
+                    gameEngine.humanPlay(smallestPlay.cards)
+                }
             }
         }
-
-        val bestPlay = if (lastPlay == null) {
-            findBestFreePlay(safeNonBombs, bombs)
-        } else {
-            if (safeNonBombs.isEmpty() && bombs.isEmpty()) {
-                // Can't beat, pass
-                gameEngine.humanPass()
-                return
-            }
-            findBestBeatPlay(safeNonBombs, bombs)
-        }
-
-        // Execute the play
-        gameEngine.humanPlay(bestPlay.cards)
     }
 
     // ========== Replay Functions ==========
@@ -1198,13 +1293,44 @@ class GameActivity : AppCompatActivity() {
 
         tvReplayProgress.text = "${replayIndex + 1}/${replaySteps.size}"
 
-        // Build content showing steps up to current index
+        // Get current step
+        val currentStep = replaySteps[replayIndex]
+
+        // Show cards for current step
+        replayCardsContainer.removeAllViews()
+        if (currentStep.cardGroup != null && currentStep.action == "play") {
+            val teamPrefix = if (currentStep.teamName.isNotEmpty()) "[${currentStep.teamName}]" else ""
+            tvReplayStepInfo.text = "$teamPrefix ${currentStep.playerName} 出牌:"
+            tvReplayStepInfo.visibility = View.VISIBLE
+
+            // Display the cards
+            val isBomb = currentStep.cardGroup.type == CardGroupType.BOMB
+            val cardCount = currentStep.cardGroup.cards.size
+            currentStep.cardGroup.cards.forEachIndexed { index, card ->
+                val useBombOverlap = isBomb && index < cardCount - 1
+                val cardView = createMiniCardView(card, useBombOverlap)
+                replayCardsContainer.addView(cardView)
+            }
+        } else {
+            // No cards to show
+            tvReplayStepInfo.text = when (currentStep.action) {
+                "pass" -> "[${currentStep.teamName}] ${currentStep.playerName} 过牌"
+                "round_win" -> "★ [${currentStep.teamName}] ${currentStep.playerName} 赢得本轮 +${currentStep.score}分"
+                "finish" -> "★ [${currentStep.teamName}] ${currentStep.playerName} 走完!"
+                "game_start" -> "游戏开始"
+                "game_end" -> "游戏结束"
+                else -> currentStep.description
+            }
+            tvReplayStepInfo.visibility = View.VISIBLE
+        }
+
+        // Build content showing recent steps (last 10)
         val content = StringBuilder()
-        for (i in 0..replayIndex) {
+        val startIdx = maxOf(0, replayIndex - 9)
+        for (i in startIdx..replayIndex) {
             val step = replaySteps[i]
             val prefix = if (i == replayIndex) "▶ " else "  "
             val teamPrefix = if (step.teamName.isNotEmpty()) "[${step.teamName}] " else ""
-
             content.append("$prefix$teamPrefix${step.description}\n")
         }
         tvReplayContent.text = content.toString()
@@ -1252,12 +1378,13 @@ class GameActivity : AppCompatActivity() {
             } else {
                 stopReplayAutoPlay()
             }
-        }, 800)  // 0.8 second per step
+        }, REPLAY_STEP_MS)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
         replayAutoPlayHandler.removeCallbacksAndMessages(null)
+        soundManager.release()
     }
 }
