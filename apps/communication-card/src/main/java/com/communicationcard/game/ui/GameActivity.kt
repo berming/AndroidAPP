@@ -5,6 +5,12 @@ import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
+import android.view.animation.AnimationSet
+import android.view.animation.ScaleAnimation
+import android.view.animation.TranslateAnimation
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -24,12 +30,14 @@ class GameActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_DIFFICULTY = "difficulty"
         const val EXTRA_PLAYER_COUNT = "player_count"
-        private const val AI_DELAY_MS = 1000L
-        private const val MESSAGE_DISPLAY_MS = 1500L
+        private const val AI_DELAY_MS = 500L      // Reduced from 1000ms
+        private const val MESSAGE_DISPLAY_MS = 800L  // Reduced from 1500ms
+        private const val REPLAY_STEP_MS = 600L   // Replay auto-play speed
     }
 
     private lateinit var gameEngine: GameEngine
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var soundManager: SoundManager
 
     // UI Elements
     private lateinit var tvTeamAScore: TextView
@@ -83,6 +91,39 @@ class GameActivity : AppCompatActivity() {
     private var isHintShowing = false
     private var lastHintCards: List<Card> = emptyList()
 
+    // AI auto-play mode
+    private var isAutoPlayEnabled = false
+    private lateinit var btnAutoPlay: Button
+
+    // Replay feature
+    private lateinit var replayOverlay: FrameLayout
+    private lateinit var tvReplayContent: TextView
+    private lateinit var tvReplayProgress: TextView
+    private lateinit var btnReplayFirst: Button
+    private lateinit var btnReplayPrev: Button
+    private lateinit var btnReplayNext: Button
+    private lateinit var btnReplayLast: Button
+    private lateinit var btnReplayAutoPlay: Button
+    private lateinit var btnCloseReplay: Button
+    private lateinit var btnShowReplay: Button
+    private lateinit var replayScrollView: android.widget.ScrollView
+    private lateinit var replayCardsContainer: LinearLayout
+    private lateinit var tvReplayStepInfo: TextView
+
+    // Replay data
+    data class ReplayStep(
+        val description: String,
+        val playerName: String,
+        val teamName: String,
+        val action: String,  // "play", "pass", "round_win", "finish", "game_start", "game_end"
+        val cardGroup: CardGroup? = null,
+        val score: Int = 0
+    )
+    private val replaySteps = mutableListOf<ReplayStep>()
+    private var replayIndex = 0
+    private var isReplayAutoPlaying = false
+    private val replayAutoPlayHandler = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_game)
@@ -92,6 +133,7 @@ class GameActivity : AppCompatActivity() {
         )
         val playerCount = intent.getIntExtra(EXTRA_PLAYER_COUNT, 6)
 
+        soundManager = SoundManager(this)
         initViews()
         initGame(playerCount, difficulty)
         setupListeners()
@@ -130,6 +172,24 @@ class GameActivity : AppCompatActivity() {
 
         // Hand cards area for click to deselect
         handCardsArea = findViewById(R.id.handCardsArea)
+
+        // Auto-play button
+        btnAutoPlay = findViewById(R.id.btnAutoPlay)
+
+        // Replay overlay
+        replayOverlay = findViewById(R.id.replayOverlay)
+        tvReplayContent = findViewById(R.id.tvReplayContent)
+        tvReplayProgress = findViewById(R.id.tvReplayProgress)
+        btnReplayFirst = findViewById(R.id.btnReplayFirst)
+        btnReplayPrev = findViewById(R.id.btnReplayPrev)
+        btnReplayNext = findViewById(R.id.btnReplayNext)
+        btnReplayLast = findViewById(R.id.btnReplayLast)
+        btnReplayAutoPlay = findViewById(R.id.btnReplayAutoPlay)
+        btnCloseReplay = findViewById(R.id.btnCloseReplay)
+        btnShowReplay = findViewById(R.id.btnShowReplay)
+        replayScrollView = findViewById(R.id.replayScrollView)
+        replayCardsContainer = findViewById(R.id.replayCardsContainer)
+        tvReplayStepInfo = findViewById(R.id.tvReplayStepInfo)
 
         // Initialize player views - map player ID to view
         // Player IDs: 0=Human, 1=玩家2, 2=玩家3, 3=玩家4, 4=玩家5, 5=玩家6
@@ -198,6 +258,48 @@ class GameActivity : AppCompatActivity() {
             finish()
         }
 
+        // Auto-play toggle button
+        btnAutoPlay.setOnClickListener {
+            toggleAutoPlay()
+        }
+
+        // Replay buttons
+        btnShowReplay.setOnClickListener {
+            showReplay()
+        }
+
+        btnCloseReplay.setOnClickListener {
+            closeReplay()
+        }
+
+        btnReplayFirst.setOnClickListener {
+            replayIndex = 0
+            updateReplayDisplay()
+        }
+
+        btnReplayPrev.setOnClickListener {
+            if (replayIndex > 0) {
+                replayIndex--
+                updateReplayDisplay()
+            }
+        }
+
+        btnReplayNext.setOnClickListener {
+            if (replayIndex < replaySteps.size - 1) {
+                replayIndex++
+                updateReplayDisplay()
+            }
+        }
+
+        btnReplayLast.setOnClickListener {
+            replayIndex = replaySteps.size - 1
+            updateReplayDisplay()
+        }
+
+        btnReplayAutoPlay.setOnClickListener {
+            toggleReplayAutoPlay()
+        }
+
         // Click on empty space in hand area to deselect all cards
         handCardsArea.setOnClickListener {
             deselectAllCards()
@@ -222,9 +324,11 @@ class GameActivity : AppCompatActivity() {
             is GameEvent.CardsDealt -> {
                 currentRoundPlayedCards.clear()
                 gameHistory.clear()
+                replaySteps.clear()
                 roundNumber = 1
                 gameHistory.add("=== 游戏开始 ===")
                 gameHistory.add("第${roundNumber}轮:")
+                replaySteps.add(ReplayStep("游戏开始，共${gameEngine.players.size}名玩家", "", "", "game_start"))
                 updateAllPlayerViews()
                 updatePlayerHand()
                 updateScores()
@@ -236,7 +340,13 @@ class GameActivity : AppCompatActivity() {
                 if (event.player.type == PlayerType.AI) {
                     scheduleAITurn()
                 } else {
-                    updateButtonStates()
+                    // Human player's turn
+                    if (isAutoPlayEnabled) {
+                        // AI plays for human
+                        scheduleAutoPlayTurn()
+                    } else {
+                        updateButtonStates()
+                    }
                 }
             }
 
@@ -245,9 +355,26 @@ class GameActivity : AppCompatActivity() {
                 val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
                 gameHistory.add("  [$teamName]${event.player.name} 出: ${event.cardGroup}")
 
+                // Record replay step
+                replaySteps.add(ReplayStep(
+                    description = "${event.player.name} 出牌: ${event.cardGroup}",
+                    playerName = event.player.name,
+                    teamName = teamName,
+                    action = "play",
+                    cardGroup = event.cardGroup,
+                    score = event.cardGroup.totalScore
+                ))
+
+                // Play sound effect
+                if (event.cardGroup.type == CardGroupType.BOMB) {
+                    soundManager.playBombSound()
+                } else {
+                    soundManager.playCardSound()
+                }
+
                 // Track played cards for this player in current round
                 currentRoundPlayedCards[event.player.id] = event.cardGroup
-                showPlayerPlayedCards(event.player, event.cardGroup)
+                showPlayerPlayedCardsWithAnimation(event.player, event.cardGroup)
                 updatePlayerView(event.player)
                 updateCurrentRoundDisplay()
                 updateScores() // Update scores after each play
@@ -261,6 +388,17 @@ class GameActivity : AppCompatActivity() {
                 val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
                 gameHistory.add("  [$teamName]${event.player.name} 过牌")
 
+                // Record replay step
+                replaySteps.add(ReplayStep(
+                    description = "${event.player.name} 过牌",
+                    playerName = event.player.name,
+                    teamName = teamName,
+                    action = "pass"
+                ))
+
+                // Play sound effect
+                soundManager.playPassSound()
+
                 currentRoundPlayedCards[event.player.id] = null // Mark as passed
                 showPlayerPassedStatus(event.player)
             }
@@ -271,6 +409,18 @@ class GameActivity : AppCompatActivity() {
                 gameHistory.add("  → [$teamName]${event.player.name} 赢得本轮, +${event.score}分")
                 roundNumber++
                 gameHistory.add("第${roundNumber}轮:")
+
+                // Record replay step
+                replaySteps.add(ReplayStep(
+                    description = "${event.player.name} 赢得本轮，获得 ${event.score} 分",
+                    playerName = event.player.name,
+                    teamName = teamName,
+                    action = "round_win",
+                    score = event.score
+                ))
+
+                // Play sound effect
+                soundManager.playWinRoundSound()
 
                 showMessage("${event.player.name} 赢得此轮，获得 ${event.score} 分")
                 // Clear played cards for new round (but keep current round display)
@@ -284,6 +434,14 @@ class GameActivity : AppCompatActivity() {
                 val teamName = if (event.player.team == Team.TEAM_A) "红" else "蓝"
                 gameHistory.add("  ★ [$teamName]${event.player.name} 走完（第${event.order}个）")
 
+                // Record replay step
+                replaySteps.add(ReplayStep(
+                    description = "${event.player.name} 走完（第${event.order}个完成）",
+                    playerName = event.player.name,
+                    teamName = teamName,
+                    action = "finish"
+                ))
+
                 showMessage("${event.player.name} 已走完（第${event.order}个）")
                 updatePlayerView(event.player)
             }
@@ -295,6 +453,36 @@ class GameActivity : AppCompatActivity() {
             is GameEvent.GameEnded -> {
                 // Record final score calculation
                 recordFinalScore(event.result)
+
+                // Record replay step
+                val winnerText = when {
+                    event.result.winner == null -> "平局"
+                    event.result.winner == Team.TEAM_A -> "红队获胜"
+                    else -> "蓝队获胜"
+                }
+                replaySteps.add(ReplayStep(
+                    description = "游戏结束！$winnerText (红队${event.result.teamAScore}分 vs 蓝队${event.result.teamBScore}分)",
+                    playerName = "",
+                    teamName = "",
+                    action = "game_end",
+                    score = event.result.teamAScore
+                ))
+
+                // Play sound effect based on result
+                val humanTeam = gameEngine.humanPlayer?.team
+                if (event.result.winner == humanTeam) {
+                    soundManager.playGameWinSound()
+                } else if (event.result.winner != null) {
+                    soundManager.playGameLoseSound()
+                }
+
+                // Disable auto-play when game ends
+                if (isAutoPlayEnabled) {
+                    isAutoPlayEnabled = false
+                    btnAutoPlay.text = "托管"
+                    btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
+                }
+
                 showGameOver(event.result)
             }
 
@@ -391,6 +579,91 @@ class GameActivity : AppCompatActivity() {
             val cardView = createMiniCardView(card, useBombOverlap)
             container.addView(cardView)
         }
+    }
+
+    private fun showPlayerPlayedCardsWithAnimation(player: Player, cardGroup: CardGroup) {
+        if (player.type == PlayerType.HUMAN) {
+            // Human player's cards shown in center area with animation
+            animateCurrentRoundDisplay()
+            return
+        }
+
+        val view = playerViews[player.id] ?: return
+        val container = view.findViewById<LinearLayout>(R.id.playedCardsContainer)
+        val statusView = view.findViewById<TextView>(R.id.tvStatus)
+
+        container.removeAllViews()
+        container.visibility = View.VISIBLE
+        statusView.visibility = View.GONE
+
+        // Check if it's a bomb for compact layout and special animation
+        val isBomb = cardGroup.type == CardGroupType.BOMB
+        val cardCount = cardGroup.cards.size
+
+        cardGroup.cards.forEachIndexed { index, card ->
+            val useBombOverlap = isBomb && index < cardCount - 1
+            val cardView = createMiniCardView(card, useBombOverlap)
+            container.addView(cardView)
+
+            // Add animation to each card
+            val animation = if (isBomb) {
+                createBombAnimation(index)
+            } else {
+                createCardPlayAnimation(index)
+            }
+            cardView.startAnimation(animation)
+        }
+    }
+
+    private fun createCardPlayAnimation(index: Int): Animation {
+        val animSet = AnimationSet(true)
+        animSet.interpolator = AccelerateDecelerateInterpolator()
+
+        // Scale from small to normal
+        val scale = ScaleAnimation(
+            0.5f, 1f, 0.5f, 1f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        )
+        scale.duration = 150
+
+        // Fade in
+        val alpha = AlphaAnimation(0f, 1f)
+        alpha.duration = 150
+
+        animSet.addAnimation(scale)
+        animSet.addAnimation(alpha)
+        animSet.startOffset = (index * 30).toLong()  // Stagger animation
+
+        return animSet
+    }
+
+    private fun createBombAnimation(index: Int): Animation {
+        val animSet = AnimationSet(true)
+        animSet.interpolator = AccelerateDecelerateInterpolator()
+
+        // Scale from large to normal (explosion effect)
+        val scale = ScaleAnimation(
+            1.5f, 1f, 1.5f, 1f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        )
+        scale.duration = 200
+
+        // Fade in
+        val alpha = AlphaAnimation(0.3f, 1f)
+        alpha.duration = 200
+
+        animSet.addAnimation(scale)
+        animSet.addAnimation(alpha)
+        animSet.startOffset = (index * 50).toLong()
+
+        return animSet
+    }
+
+    private fun animateCurrentRoundDisplay() {
+        // Animate the current winning cards display
+        currentWinningCards.startAnimation(createCardPlayAnimation(0))
     }
 
     private fun showPlayerPassedStatus(player: Player) {
@@ -898,11 +1171,21 @@ class GameActivity : AppCompatActivity() {
     private fun restartGame() {
         gameOverOverlay.visibility = View.GONE
         historyOverlay.visibility = View.GONE
+        replayOverlay.visibility = View.GONE
         currentRoundPlayedCards.clear()
         selectedCards.clear()
         cardViewMap.clear()
         gameHistory.clear()
+        replaySteps.clear()
         roundNumber = 0
+
+        // Reset auto-play state
+        isAutoPlayEnabled = false
+        btnAutoPlay.text = "托管"
+        btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
+
+        // Reset replay auto-play
+        stopReplayAutoPlay()
 
         // Reset all player views
         playerViews.values.forEach { view ->
@@ -921,8 +1204,187 @@ class GameActivity : AppCompatActivity() {
         return (this * resources.displayMetrics.density).toInt()
     }
 
+    // ========== AI Auto-Play Functions ==========
+
+    private fun toggleAutoPlay() {
+        isAutoPlayEnabled = !isAutoPlayEnabled
+        if (isAutoPlayEnabled) {
+            btnAutoPlay.text = "取消"
+            btnAutoPlay.setBackgroundResource(R.drawable.button_primary)
+            showMessage("已开启托管模式")
+
+            // If it's human's turn, immediately start auto-play
+            val currentPlayer = gameEngine.getCurrentPlayer()
+            if (currentPlayer.type == PlayerType.HUMAN &&
+                gameEngine.gamePhase == GamePhase.PLAYING &&
+                !currentPlayer.hasFinished) {
+                scheduleAutoPlayTurn()
+            }
+        } else {
+            btnAutoPlay.text = "托管"
+            btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
+            showMessage("已关闭托管模式")
+        }
+    }
+
+    private fun scheduleAutoPlayTurn() {
+        btnPlay.isEnabled = false
+        btnPass.isEnabled = false
+        btnHint.isEnabled = false
+
+        handler.postDelayed({
+            if (gameEngine.gamePhase == GamePhase.PLAYING && isAutoPlayEnabled) {
+                executeAutoPlay()
+            }
+        }, AI_DELAY_MS)
+    }
+
+    private fun executeAutoPlay() {
+        val player = gameEngine.humanPlayer ?: return
+        if (player.hasFinished) return
+
+        // Use AI strategy (same as AI players, with team cooperation)
+        val aiDecision = gameEngine.getAIRecommendedPlay()
+
+        if (aiDecision != null) {
+            gameEngine.humanPlay(aiDecision.cards)
+        } else {
+            // AI decided to pass
+            val lastPlay = gameEngine.getLastPlay()
+            if (lastPlay != null) {
+                gameEngine.humanPass()
+            } else {
+                // Free play - must play something
+                val validPlays = gameEngine.getValidPlaysForHuman()
+                val smallestPlay = validPlays.minByOrNull { it.primaryRank.value }
+                if (smallestPlay != null) {
+                    gameEngine.humanPlay(smallestPlay.cards)
+                }
+            }
+        }
+    }
+
+    // ========== Replay Functions ==========
+
+    private fun showReplay() {
+        if (replaySteps.isEmpty()) {
+            showMessage("暂无回放数据")
+            return
+        }
+
+        replayIndex = 0
+        isReplayAutoPlaying = false
+        btnReplayAutoPlay.text = "自动播放"
+        updateReplayDisplay()
+        replayOverlay.visibility = View.VISIBLE
+        gameOverOverlay.visibility = View.GONE
+    }
+
+    private fun closeReplay() {
+        stopReplayAutoPlay()
+        replayOverlay.visibility = View.GONE
+        if (gameEngine.gamePhase == GamePhase.GAME_OVER) {
+            gameOverOverlay.visibility = View.VISIBLE
+        }
+    }
+
+    private fun updateReplayDisplay() {
+        if (replaySteps.isEmpty()) return
+
+        tvReplayProgress.text = "${replayIndex + 1}/${replaySteps.size}"
+
+        // Get current step
+        val currentStep = replaySteps[replayIndex]
+
+        // Show cards for current step
+        replayCardsContainer.removeAllViews()
+        if (currentStep.cardGroup != null && currentStep.action == "play") {
+            val teamPrefix = if (currentStep.teamName.isNotEmpty()) "[${currentStep.teamName}]" else ""
+            tvReplayStepInfo.text = "$teamPrefix ${currentStep.playerName} 出牌:"
+            tvReplayStepInfo.visibility = View.VISIBLE
+
+            // Display the cards
+            val isBomb = currentStep.cardGroup.type == CardGroupType.BOMB
+            val cardCount = currentStep.cardGroup.cards.size
+            currentStep.cardGroup.cards.forEachIndexed { index, card ->
+                val useBombOverlap = isBomb && index < cardCount - 1
+                val cardView = createMiniCardView(card, useBombOverlap)
+                replayCardsContainer.addView(cardView)
+            }
+        } else {
+            // No cards to show
+            tvReplayStepInfo.text = when (currentStep.action) {
+                "pass" -> "[${currentStep.teamName}] ${currentStep.playerName} 过牌"
+                "round_win" -> "★ [${currentStep.teamName}] ${currentStep.playerName} 赢得本轮 +${currentStep.score}分"
+                "finish" -> "★ [${currentStep.teamName}] ${currentStep.playerName} 走完!"
+                "game_start" -> "游戏开始"
+                "game_end" -> "游戏结束"
+                else -> currentStep.description
+            }
+            tvReplayStepInfo.visibility = View.VISIBLE
+        }
+
+        // Build content showing recent steps (last 10)
+        val content = StringBuilder()
+        val startIdx = maxOf(0, replayIndex - 9)
+        for (i in startIdx..replayIndex) {
+            val step = replaySteps[i]
+            val prefix = if (i == replayIndex) "▶ " else "  "
+            val teamPrefix = if (step.teamName.isNotEmpty()) "[${step.teamName}] " else ""
+            content.append("$prefix$teamPrefix${step.description}\n")
+        }
+        tvReplayContent.text = content.toString()
+
+        // Scroll to bottom
+        replayScrollView.post {
+            replayScrollView.fullScroll(View.FOCUS_DOWN)
+        }
+
+        // Update button states
+        btnReplayFirst.isEnabled = replayIndex > 0
+        btnReplayPrev.isEnabled = replayIndex > 0
+        btnReplayNext.isEnabled = replayIndex < replaySteps.size - 1
+        btnReplayLast.isEnabled = replayIndex < replaySteps.size - 1
+    }
+
+    private fun toggleReplayAutoPlay() {
+        if (isReplayAutoPlaying) {
+            stopReplayAutoPlay()
+        } else {
+            startReplayAutoPlay()
+        }
+    }
+
+    private fun startReplayAutoPlay() {
+        isReplayAutoPlaying = true
+        btnReplayAutoPlay.text = "暂停"
+        scheduleNextReplayStep()
+    }
+
+    private fun stopReplayAutoPlay() {
+        isReplayAutoPlaying = false
+        btnReplayAutoPlay.text = "自动播放"
+        replayAutoPlayHandler.removeCallbacksAndMessages(null)
+    }
+
+    private fun scheduleNextReplayStep() {
+        if (!isReplayAutoPlaying) return
+
+        replayAutoPlayHandler.postDelayed({
+            if (isReplayAutoPlaying && replayIndex < replaySteps.size - 1) {
+                replayIndex++
+                updateReplayDisplay()
+                scheduleNextReplayStep()
+            } else {
+                stopReplayAutoPlay()
+            }
+        }, REPLAY_STEP_MS)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
+        replayAutoPlayHandler.removeCallbacksAndMessages(null)
+        soundManager.release()
     }
 }

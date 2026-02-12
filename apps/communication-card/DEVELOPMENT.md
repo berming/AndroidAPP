@@ -91,6 +91,48 @@ apps/communication-card/
 3. 卡牌圆角优化（手牌10dp、已出牌6dp）
 4. 固定 APK 签名配置
 
+### 第六阶段：高级功能
+1. AI团队合作策略优化（送人、顶人、让牌）
+2. 托管模式（AI代打）
+3. 游戏回放功能
+
+---
+
+## 代码统计
+
+### Kotlin 文件
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| GameActivity.kt | 1263 | 游戏界面主逻辑 |
+| AIPlayer.kt | 613 | AI决策引擎 |
+| GameEngine.kt | 537 | 游戏流程控制 |
+| CardRules.kt | 352 | 牌型规则 |
+| Player.kt | 156 | 玩家状态 |
+| SettlementCalculator.kt | 125 | 结算计算 |
+| Card.kt | 110 | 卡牌定义 |
+| Deck.kt | 91 | 牌组管理 |
+| MainActivity.kt | 73 | 主菜单 |
+
+### 目录统计
+| 目录 | 行数 |
+|------|------|
+| engine/ | 1390 |
+| ui/ | 1336 |
+| ai/ | 613 |
+| model/ | 357 |
+
+### XML 资源
+| 目录 | 行数 |
+|------|------|
+| layout/ | 1165 |
+| values/ | 172 |
+| drawable/ | 111 |
+
+### 总计
+- **Kotlin**: 3696 行
+- **XML**: 1458 行
+- **合计**: 5154 行
+
 ---
 
 ## 修订清单
@@ -118,6 +160,7 @@ apps/communication-card/
 | v1.18 | 2fe704e | fix | 恢复卡牌圆角 6dp，按钮文字完整显示 |
 | v1.19 | 9bfe427 | feat | 手牌使用更大圆角（10dp） |
 | v1.20 | be153c0 | feat | AI团队合作策略优化（送人、顶人、让牌） |
+| v1.21 | - | feat | 托管模式（AI代打）+ 游戏回放功能 |
 
 ---
 
@@ -213,6 +256,50 @@ if (nextPlayerId != null && gameState.getPlayerTeam(nextPlayerId) != player.team
 }
 ```
 
+### 6. 托管模式（AI代打）
+**功能**: 玩家可以开启托管模式，让AI代替自己出牌
+
+**实现**:
+- 点击"托管"按钮开启/关闭
+- 开启后，轮到玩家时自动使用AI策略出牌
+- 使用与提示相同的最优出牌逻辑
+
+```kotlin
+private fun executeAutoPlay() {
+    val player = gameEngine.humanPlayer ?: return
+    val lastPlay = gameEngine.getLastPlay()
+    val validPlays = gameEngine.getValidPlaysForHuman()
+
+    // 使用提示逻辑找最佳出牌
+    val bestPlay = if (lastPlay == null) {
+        findBestFreePlay(safeNonBombs, bombs)
+    } else {
+        findBestBeatPlay(safeNonBombs, bombs)
+    }
+
+    gameEngine.humanPlay(bestPlay.cards)
+}
+```
+
+### 7. 游戏回放功能
+**功能**: 游戏结束后可以逐步回放整局游戏过程
+
+**实现**:
+- 每次出牌、过牌、赢轮、走完等事件都记录到 `replaySteps`
+- 支持首步/上步/下步/末步导航
+- 支持自动播放（每0.8秒一步）
+
+```kotlin
+data class ReplayStep(
+    val description: String,
+    val playerName: String,
+    val teamName: String,
+    val action: String,  // "play", "pass", "round_win", "finish"
+    val cardGroup: CardGroup? = null,
+    val score: Int = 0
+)
+```
+
 ---
 
 ## 构建说明
@@ -234,9 +321,9 @@ apps/communication-card/build/outputs/apk/debug/communication-card-debug.apk
 
 1. 添加在线多人对战功能
 2. 优化 AI 策略（机器学习）
-3. 添加游戏回放功能
-4. 支持自定义规则变体
-5. 添加音效和动画
+3. 支持自定义规则变体
+4. 添加音效和动画
+5. 回放功能增强（显示实际牌面）
 
 ---
 
