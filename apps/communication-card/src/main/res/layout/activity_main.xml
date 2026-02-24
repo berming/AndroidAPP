@@ -158,24 +158,44 @@
         android:textColor="@color/text_primary"
         android:textSize="22sp"
         android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@id/btnRules"
+        app:layout_constraintBottom_toTopOf="@id/bottomButtons"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/settingsCard" />
 
-    <!-- 规则按钮 -->
-    <Button
-        android:id="@+id/btnRules"
-        android:layout_width="200dp"
-        android:layout_height="48dp"
+    <!-- 底部按钮区 -->
+    <LinearLayout
+        android:id="@+id/bottomButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:background="@drawable/button_secondary"
-        android:text="@string/btn_rules"
-        android:textColor="@color/text_primary"
-        android:textSize="16sp"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnStartGame" />
+        app:layout_constraintTop_toBottomOf="@id/btnStartGame">
+
+        <!-- 规则按钮 -->
+        <Button
+            android:id="@+id/btnRules"
+            android:layout_width="160dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/button_secondary"
+            android:text="@string/btn_rules"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp" />
+
+        <!-- 设置按钮 -->
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="160dp"
+            android:layout_height="48dp"
+            android:background="@drawable/button_secondary"
+            android:text="设置"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

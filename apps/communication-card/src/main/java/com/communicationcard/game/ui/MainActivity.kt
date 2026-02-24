@@ -15,12 +15,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rgPlayerCount: RadioGroup
     private lateinit var btnStartGame: Button
     private lateinit var btnRules: Button
+    private lateinit var btnSettings: Button
+
+    private lateinit var preferences: GamePreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        preferences = GamePreferences(this)
         initViews()
+        restoreLastSelections()
         setupListeners()
     }
 
@@ -29,6 +34,24 @@ class MainActivity : AppCompatActivity() {
         rgPlayerCount = findViewById(R.id.rgPlayerCount)
         btnStartGame = findViewById(R.id.btnStartGame)
         btnRules = findViewById(R.id.btnRules)
+        btnSettings = findViewById(R.id.btnSettings)
+    }
+
+    private fun restoreLastSelections() {
+        // Restore last used difficulty
+        val diffId = when (preferences.lastDifficulty) {
+            AIDifficulty.EASY.name -> R.id.rbEasy
+            AIDifficulty.HARD.name -> R.id.rbHard
+            else -> R.id.rbMedium
+        }
+        rgDifficulty.check(diffId)
+
+        // Restore last used player count
+        val playerCountId = when (preferences.lastPlayerCount) {
+            8 -> R.id.rb8Players
+            else -> R.id.rb6Players
+        }
+        rgPlayerCount.check(playerCountId)
     }
 
     private fun setupListeners() {
@@ -38,6 +61,10 @@ class MainActivity : AppCompatActivity() {
 
         btnRules.setOnClickListener {
             showRulesDialog()
+        }
+
+        btnSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 
@@ -54,6 +81,10 @@ class MainActivity : AppCompatActivity() {
             R.id.rb8Players -> 8
             else -> 6
         }
+
+        // Save last selections
+        preferences.lastDifficulty = difficulty.name
+        preferences.lastPlayerCount = playerCount
 
         val intent = Intent(this, GameActivity::class.java).apply {
             putExtra(GameActivity.EXTRA_DIFFICULTY, difficulty.name)
