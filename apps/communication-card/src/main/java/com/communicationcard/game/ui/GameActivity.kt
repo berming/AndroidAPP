@@ -481,7 +481,6 @@ class GameActivity : AppCompatActivity() {
                 }
 
                 // Record game statistics
-                val humanTeam = gameEngine.humanPlayer?.team
                 val humanWon = event.result.winner == humanTeam
                 val isDraw = event.result.winner == null
                 val score = if (humanTeam == Team.TEAM_A) event.result.teamAScore else event.result.teamBScore
