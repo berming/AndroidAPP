@@ -30,6 +30,12 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize" />
 
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize" />
+
     </application>
 
 </manifest>

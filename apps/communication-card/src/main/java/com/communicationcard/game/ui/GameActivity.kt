@@ -30,14 +30,17 @@ class GameActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_DIFFICULTY = "difficulty"
         const val EXTRA_PLAYER_COUNT = "player_count"
-        private const val AI_DELAY_MS = 500L      // Reduced from 1000ms
-        private const val MESSAGE_DISPLAY_MS = 800L  // Reduced from 1500ms
-        private const val REPLAY_STEP_MS = 600L   // Replay auto-play speed
+        private const val MESSAGE_DISPLAY_MS = 800L
+        private const val REPLAY_STEP_MS = 600L
     }
 
     private lateinit var gameEngine: GameEngine
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var soundManager: SoundManager
+    private lateinit var preferences: GamePreferences
+
+    // Dynamic delays based on game speed setting
+    private val aiDelayMs get() = preferences.getAIDelayMs()
 
     // UI Elements
     private lateinit var tvTeamAScore: TextView
@@ -134,6 +137,7 @@ class GameActivity : AppCompatActivity() {
         val playerCount = intent.getIntExtra(EXTRA_PLAYER_COUNT, 6)
 
         soundManager = SoundManager(this)
+        preferences = GamePreferences(this)
         initViews()
         initGame(playerCount, difficulty)
         setupListeners()
@@ -475,6 +479,12 @@ class GameActivity : AppCompatActivity() {
                 } else if (event.result.winner != null) {
                     soundManager.playGameLoseSound()
                 }
+
+                // Record game statistics
+                val humanWon = event.result.winner == humanTeam
+                val isDraw = event.result.winner == null
+                val score = if (humanTeam == Team.TEAM_A) event.result.teamAScore else event.result.teamBScore
+                preferences.recordGameResult(isWin = humanWon && !isDraw, score = score)
 
                 // Disable auto-play when game ends
                 if (isAutoPlayEnabled) {
@@ -936,7 +946,7 @@ class GameActivity : AppCompatActivity() {
             if (gameEngine.gamePhase == GamePhase.PLAYING) {
                 gameEngine.executeAITurn()
             }
-        }, AI_DELAY_MS)
+        }, aiDelayMs)
     }
 
     private fun showHint() {
@@ -1236,7 +1246,7 @@ class GameActivity : AppCompatActivity() {
             if (gameEngine.gamePhase == GamePhase.PLAYING && isAutoPlayEnabled) {
                 executeAutoPlay()
             }
-        }, AI_DELAY_MS)
+        }, aiDelayMs)
     }
 
     private fun executeAutoPlay() {
