@@ -37,4 +37,9 @@
     <!-- 分值色 -->
     <color name="score_positive">#FFD700</color>
     <color name="score_negative">#F44336</color>
+
+    <!-- 计时器颜色 -->
+    <color name="timer_normal">#4CAF50</color>
+    <color name="timer_warning">#FF9800</color>
+    <color name="timer_critical">#F44336</color>
 </resources>

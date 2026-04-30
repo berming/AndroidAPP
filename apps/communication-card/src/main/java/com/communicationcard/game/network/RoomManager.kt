@@ -24,6 +24,10 @@ class RoomManager(
     private var _localPlayerId: String? = null
     val localPlayerId: String? get() = _localPlayerId
 
+    // 本地玩家座位号
+    val localSeatIndex: Int
+        get() = currentRoom.value?.players?.find { it.id == _localPlayerId }?.seatIndex ?: -1
+
     // 房间事件
     private val _roomEvents = MutableSharedFlow<RoomEvent>(replay = 0, extraBufferCapacity = 16)
     val roomEvents: SharedFlow<RoomEvent> = _roomEvents.asSharedFlow()

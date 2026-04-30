@@ -1,29 +1,30 @@
-package com.communicationcard.game.network
+package com.communicationcard.server
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * 网络消息协议
+ * 消息序列化器
+ */
+object MessageSerializer {
+    val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        classDiscriminator = "type"
+    }
+
+    fun fromJson(jsonString: String): GameMessage {
+        return json.decodeFromString(GameMessage.serializer(), jsonString)
+    }
+}
+
+/**
+ * 网络消息协议 (与客户端保持一致)
  */
 @Serializable
 sealed class GameMessage {
     abstract val type: String
-
-    companion object {
-        val json = Json {
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-            classDiscriminator = "type"
-        }
-
-        fun fromJson(jsonString: String): GameMessage {
-            return json.decodeFromString(serializer(), jsonString)
-        }
-    }
-
-    fun toJson(): String = json.encodeToString(serializer(), this)
 }
 
 // ==================== 房间消息 ====================
@@ -268,7 +269,7 @@ data class RoomPlayer(
     val isReady: Boolean,
     val isConnected: Boolean,
     val isAI: Boolean,
-    val team: String? = null,  // "TEAM_A" or "TEAM_B"
+    val team: String? = null,
     val seatIndex: Int
 )
 
@@ -314,8 +315,8 @@ data class SerializedCardGroup(
 data class SerializedPlayer(
     val id: Int,
     val name: String,
-    val type: String,  // "HUMAN", "AI", "REMOTE"
-    val team: String,  // "TEAM_A", "TEAM_B"
+    val type: String,
+    val team: String,
     val hand: List<SerializedCard>,
     val handSize: Int,
     val collectedScore: Int,
@@ -384,10 +385,10 @@ sealed class SerializedGameEvent {
 
 @Serializable
 data class SerializedGameResult(
-    val winner: String?,  // "TEAM_A", "TEAM_B", or null for draw
+    val winner: String?,
     val teamAScore: Int,
     val teamBScore: Int,
-    val trigger: String  // "TEAM_ALL_FINISHED" or "SCORE_REACHED_200"
+    val trigger: String
 )
 
 @Serializable

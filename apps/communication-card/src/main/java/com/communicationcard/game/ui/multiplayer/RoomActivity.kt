@@ -106,8 +106,8 @@ class RoomActivity : AppCompatActivity() {
         }
 
         btnAddAI.setOnClickListener {
-            // TODO: 发送添加AI请求
-            Toast.makeText(this, "添加AI功能待实现", Toast.LENGTH_SHORT).show()
+            val roomId = roomManager.currentRoom.value?.roomId ?: return@setOnClickListener
+            networkManager.send(AddAI(roomId))
         }
 
         fabChat.setOnClickListener {
@@ -155,7 +155,7 @@ class RoomActivity : AppCompatActivity() {
         // 监听聊天消息
         lifecycleScope.launch {
             textChatManager.messages.collectLatest { messages ->
-                // TODO: 更新聊天列表
+                updateChatList(messages)
             }
         }
 
@@ -404,9 +404,22 @@ class RoomActivity : AppCompatActivity() {
 
     private fun navigateToGame(state: SerializedGameState) {
         val intent = Intent(this, OnlineGameActivity::class.java)
-        // TODO: 传递游戏状态
+        intent.putExtra(OnlineGameActivity.EXTRA_GAME_STATE, GameMessage.json.encodeToString(SerializedGameState.serializer(), state))
+        intent.putExtra(OnlineGameActivity.EXTRA_LOCAL_SEAT_INDEX, roomManager.localSeatIndex)
         startActivity(intent)
         finish()
+    }
+
+    private fun updateChatList(messages: List<ChatMessage>) {
+        val adapter = rvMessages.adapter as? ChatAdapter
+        if (adapter == null) {
+            rvMessages.adapter = ChatAdapter(messages)
+        } else {
+            adapter.updateMessages(messages)
+        }
+        if (messages.isNotEmpty()) {
+            rvMessages.scrollToPosition(messages.size - 1)
+        }
     }
 
     override fun onBackPressed() {
