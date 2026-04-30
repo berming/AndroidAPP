@@ -7,7 +7,18 @@ import kotlinx.coroutines.flow.*
 
 /**
  * 多人游戏引擎适配器
- * 提供与GameEngine相同的公共API，但底层通过网络同步
+ *
+ * 设计原则：与GameEngine提供相同的公共API，使UI代码可以无缝切换
+ *
+ * 主要功能：
+ * - 维护本地游戏状态缓存（从服务器同步）
+ * - humanPlay()/humanPass() 发送动作到服务器（不本地验证）
+ * - 通过addEventListener()接收游戏事件
+ * - 提供状态查询：玩家列表、分数、当前出牌等
+ *
+ * 与GameEngine的区别：
+ * - GameEngine: 本地执行游戏逻辑
+ * - MultiplayerGameEngine: 服务器执行，本地只缓存和展示
  */
 class MultiplayerGameEngine(
     private val gameSyncManager: GameSyncManager,

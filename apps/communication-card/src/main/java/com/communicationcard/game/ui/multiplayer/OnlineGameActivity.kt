@@ -20,6 +20,18 @@ import kotlinx.coroutines.launch
 
 /**
  * 多人游戏界面
+ *
+ * 界面结构：
+ * - 顶部：其他玩家区域（显示手牌数、出牌、状态）
+ * - 中部：当前轮信息（分数、最大牌、回合倒计时）
+ * - 底部：本地玩家手牌和操作按钮
+ * - 浮动：聊天按钮和面板
+ * - 遮罩：游戏结束、重连中
+ *
+ * 核心组件：
+ * - MultiplayerGameEngine: 游戏逻辑
+ * - GameSyncManager: 状态同步
+ * - TextChatManager: 聊天功能
  */
 class OnlineGameActivity : AppCompatActivity() {
 

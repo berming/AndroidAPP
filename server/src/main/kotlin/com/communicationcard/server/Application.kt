@@ -13,6 +13,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 沟通牌多人游戏服务器
+ *
+ * 功能说明:
+ * - WebSocket通信，端点: /game
+ * - 房间管理（创建、加入、离开）
+ * - 游戏逻辑（出牌、过牌、AI接管）
+ * - 聊天功能（文字、快捷消息）
+ *
+ * 启动方式: ./gradlew run
+ * 默认端口: 8080
  */
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {

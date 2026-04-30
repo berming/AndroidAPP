@@ -5,7 +5,19 @@ import kotlinx.coroutines.flow.*
 
 /**
  * 游戏状态同步管理器
- * 负责客户端与服务器之间的游戏状态同步
+ *
+ * 职责：
+ * - 监听NetworkManager的游戏消息
+ * - 维护游戏状态Flow（供UI订阅）
+ * - 发送玩家动作到服务器
+ * - 管理回合计时器显示
+ *
+ * 数据流：
+ * - gameState: 当前游戏状态
+ * - gameEvents: 游戏事件（出牌、过牌、完成等）
+ * - actionResults: 动作执行结果
+ * - turnTimeRemaining: 回合剩余时间
+ * - gameEnd: 游戏结束结果
  */
 class GameSyncManager(
     private val networkManager: NetworkManager
