@@ -147,21 +147,42 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- 开始游戏按钮 -->
-    <Button
-        android:id="@+id/btnStartGame"
-        android:layout_width="280dp"
-        android:layout_height="64dp"
+    <!-- 游戏模式按钮 -->
+    <LinearLayout
+        android:id="@+id/gameModeButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:background="@drawable/button_primary"
-        android:text="@string/btn_start_game"
-        android:textColor="@color/text_primary"
-        android:textSize="22sp"
-        android:textStyle="bold"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toTopOf="@id/bottomButtons"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/settingsCard" />
+        app:layout_constraintTop_toBottomOf="@id/settingsCard">
+
+        <!-- 单人游戏按钮 -->
+        <Button
+            android:id="@+id/btnStartGame"
+            android:layout_width="200dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/button_primary"
+            android:text="@string/btn_start_game"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <!-- 多人游戏按钮 -->
+        <Button
+            android:id="@+id/btnMultiplayer"
+            android:layout_width="200dp"
+            android:layout_height="64dp"
+            android:background="@drawable/button_multiplayer"
+            android:text="多人游戏"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
 
     <!-- 底部按钮区 -->
     <LinearLayout
