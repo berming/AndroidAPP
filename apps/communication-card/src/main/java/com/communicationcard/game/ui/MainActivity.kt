@@ -8,12 +8,14 @@ import android.widget.RadioGroup
 import androidx.appcompat.app.AppCompatActivity
 import com.communicationcard.game.R
 import com.communicationcard.game.ai.AIDifficulty
+import com.communicationcard.game.ui.multiplayer.LobbyActivity
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var rgDifficulty: RadioGroup
     private lateinit var rgPlayerCount: RadioGroup
     private lateinit var btnStartGame: Button
+    private lateinit var btnMultiplayer: Button
     private lateinit var btnRules: Button
     private lateinit var btnSettings: Button
 
@@ -33,6 +35,7 @@ class MainActivity : AppCompatActivity() {
         rgDifficulty = findViewById(R.id.rgDifficulty)
         rgPlayerCount = findViewById(R.id.rgPlayerCount)
         btnStartGame = findViewById(R.id.btnStartGame)
+        btnMultiplayer = findViewById(R.id.btnMultiplayer)
         btnRules = findViewById(R.id.btnRules)
         btnSettings = findViewById(R.id.btnSettings)
     }
@@ -57,6 +60,10 @@ class MainActivity : AppCompatActivity() {
     private fun setupListeners() {
         btnStartGame.setOnClickListener {
             startGame()
+        }
+
+        btnMultiplayer.setOnClickListener {
+            startActivity(Intent(this, LobbyActivity::class.java))
         }
 
         btnRules.setOnClickListener {

@@ -19,6 +19,7 @@ class GamePreferences(context: Context) {
         private const val KEY_GAME_SPEED = "game_speed"
         private const val KEY_LAST_DIFFICULTY = "last_difficulty"
         private const val KEY_LAST_PLAYER_COUNT = "last_player_count"
+        private const val KEY_LAST_PLAYER_NAME = "last_player_name"
 
         // 统计键
         private const val KEY_TOTAL_GAMES = "total_games"
@@ -56,6 +57,10 @@ class GamePreferences(context: Context) {
     var lastPlayerCount: Int
         get() = prefs.getInt(KEY_LAST_PLAYER_COUNT, 6)
         set(value) = prefs.edit().putInt(KEY_LAST_PLAYER_COUNT, value).apply()
+
+    var lastPlayerName: String
+        get() = prefs.getString(KEY_LAST_PLAYER_NAME, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_LAST_PLAYER_NAME, value).apply()
 
     /**
      * 获取AI延迟毫秒数

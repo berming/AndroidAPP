@@ -4,8 +4,10 @@ package com.communicationcard.game.model
  * 玩家类型
  */
 enum class PlayerType {
-    HUMAN,  // 人类玩家
-    AI      // AI玩家
+    HUMAN,          // 本地人类玩家
+    AI,             // AI玩家
+    REMOTE,         // 远程人类玩家
+    AI_SUBSTITUTE   // AI代打（玩家断线时临时替代）
 }
 
 /**
@@ -23,7 +25,10 @@ data class Player(
     val id: Int,
     val name: String,
     val type: PlayerType,
-    val team: Team
+    val team: Team,
+    val remoteId: String? = null,       // 网络玩家ID
+    val isConnected: Boolean = true,    // 连接状态
+    val originalType: PlayerType = type // 原始类型（用于AI代打后恢复）
 ) {
     // 手牌
     private val _hand = mutableListOf<Card>()

@@ -21,3 +21,6 @@ include(":apps:communication-card")
 
 // Gomoku (五子棋)
 include(":apps:gomoku")
+
+// Multiplayer Server (多人游戏服务器)
+include(":server")
