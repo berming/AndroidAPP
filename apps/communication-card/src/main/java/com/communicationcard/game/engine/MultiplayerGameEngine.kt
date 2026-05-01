@@ -58,13 +58,18 @@ class MultiplayerGameEngine(
         scope.launch {
             gameSyncManager.gameEnd.collect { result ->
                 val gameResult = GameResult(
-                    winner = if (result.winner == "TEAM_A") Team.TEAM_A else Team.TEAM_B,
+                    winner = when (result.winner) {
+                        "TEAM_A" -> Team.TEAM_A
+                        "TEAM_B" -> Team.TEAM_B
+                        else -> null
+                    },
                     teamAScore = result.teamAScore,
                     teamBScore = result.teamBScore,
                     trigger = if (result.trigger == "TEAM_ALL_FINISHED")
                         SettlementTrigger.TEAM_ALL_FINISHED
                     else
-                        SettlementTrigger.SCORE_REACHED_200
+                        SettlementTrigger.SCORE_REACHED_200,
+                    triggerPlayer = null
                 )
                 eventListeners.forEach { it(GameEvent.GameEnded(gameResult)) }
             }
@@ -186,8 +191,7 @@ class MultiplayerGameEngine(
     private fun deserializeCardGroup(scg: SerializedCardGroup): CardGroup {
         return CardGroup(
             cards = scg.cards.map { deserializeCard(it) },
-            type = CardGroupType.valueOf(scg.type),
-            primaryRank = CardRank.valueOf(scg.primaryRank)
+            type = CardGroupType.valueOf(scg.type)
         )
     }
 

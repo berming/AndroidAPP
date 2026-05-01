@@ -289,7 +289,11 @@ class OnlineGameActivity : AppCompatActivity() {
 
     private fun handleConnectionState(state: ConnectionState) {
         when (state) {
-            ConnectionState.Disconnected, ConnectionState.Reconnecting -> {
+            ConnectionState.Disconnected -> {
+                reconnectOverlay.visibility = View.VISIBLE
+                disableInput()
+            }
+            is ConnectionState.Reconnecting -> {
                 reconnectOverlay.visibility = View.VISIBLE
                 disableInput()
             }
@@ -299,7 +303,7 @@ class OnlineGameActivity : AppCompatActivity() {
             }
             is ConnectionState.Error -> {
                 reconnectOverlay.visibility = View.VISIBLE
-                Toast.makeText(this, "连接错误: ${state.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "连接错误: ${state.reason}", Toast.LENGTH_SHORT).show()
             }
             else -> {}
         }
@@ -390,22 +394,16 @@ class OnlineGameActivity : AppCompatActivity() {
 
         val tvName = view.findViewById<TextView>(R.id.tvPlayerName)
         val tvCards = view.findViewById<TextView>(R.id.tvCardCount)
-        val tvStatus = view.findViewById<TextView>(R.id.tvPlayerStatus)
-        val tvTeam = view.findViewById<TextView>(R.id.tvTeamTag)
+        val tvScore = view.findViewById<TextView>(R.id.tvScore)
+        val teamIndicator = view.findViewById<View>(R.id.teamIndicator)
 
         tvName?.text = player.name
-        tvCards?.text = "${player.handSize}张"
-        tvTeam?.text = if (player.team == Team.TEAM_A) "红" else "蓝"
-        tvTeam?.setBackgroundResource(
-            if (player.team == Team.TEAM_A) R.drawable.tag_team_a else R.drawable.tag_team_b
-        )
+        tvCards?.text = if (player.hasFinished) "已完成" else "${player.handSize}张"
+        tvScore?.text = "已收:${player.collectedScore}分"
 
-        if (player.hasFinished) {
-            tvStatus?.text = "已完成"
-            tvStatus?.visibility = View.VISIBLE
-        } else {
-            tvStatus?.visibility = View.GONE
-        }
+        teamIndicator?.setBackgroundResource(
+            if (player.team == Team.TEAM_A) R.color.team_a else R.color.team_b
+        )
 
         // Show if current player
         val currentPlayer = multiplayerEngine.getCurrentPlayer()
