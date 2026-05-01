@@ -22,5 +22,5 @@ include(":apps:communication-card")
 // Gomoku (五子棋)
 include(":apps:gomoku")
 
-// Multiplayer Server (多人游戏服务器)
-include(":server")
+// 注意: server/ 是独立的 Ktor 项目，需单独构建
+// 启动方式: cd server && ./gradlew run
