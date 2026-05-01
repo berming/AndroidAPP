@@ -2,6 +2,7 @@ package com.communicationcard.server
 
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import java.util.concurrent.atomic.AtomicBoolean
 
