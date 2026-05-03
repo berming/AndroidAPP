@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.communicationcard.game.R
 import com.communicationcard.game.network.*
 import com.communicationcard.game.ui.GamePreferences
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -210,16 +211,20 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun handleRoomEvent(event: RoomEvent) {
+        DebugLogManager.i("LobbyActivity", "handleRoomEvent: $event")
         when (event) {
             is RoomEvent.RoomCreated -> {
+                DebugLogManager.i("LobbyActivity", "RoomCreated: ${event.room.roomCode}, roomId=${event.room.roomId}")
                 hideLoading()
                 navigateToRoom()
             }
             is RoomEvent.JoinedRoom -> {
+                DebugLogManager.i("LobbyActivity", "JoinedRoom: ${event.room.roomCode}")
                 hideLoading()
                 navigateToRoom()
             }
             is RoomEvent.Error -> {
+                DebugLogManager.e("LobbyActivity", "RoomEvent Error: code=${event.code}, msg=${event.message}")
                 hideLoading()
                 Toast.makeText(this, "错误: ${event.message}", Toast.LENGTH_SHORT).show()
             }
@@ -260,8 +265,10 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun doCreateRoom(roomName: String) {
+        DebugLogManager.i("LobbyActivity", "doCreateRoom: roomName=$roomName, playerName=$playerName")
         showLoading("正在创建房间...")
         val sent = roomManager.createRoom(playerName, roomName, 6)
+        DebugLogManager.i("LobbyActivity", "createRoom sent=$sent")
         if (!sent) {
             hideLoading()
             Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
@@ -293,12 +300,18 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun navigateToRoom() {
+        DebugLogManager.i("LobbyActivity", "navigateToRoom - setting holders")
+        DebugLogManager.i("LobbyActivity", "currentRoom=${roomManager.currentRoom.value}")
+        DebugLogManager.i("LobbyActivity", "localPlayerId=${roomManager.localPlayerId}")
+
         // 共享实例给RoomActivity
         NetworkManagerHolder.instance = networkManager
         RoomManagerHolder.instance = roomManager
 
+        DebugLogManager.i("LobbyActivity", "holders set, starting RoomActivity")
         val intent = Intent(this, RoomActivity::class.java)
         startActivity(intent)
+        DebugLogManager.i("LobbyActivity", "RoomActivity started")
     }
 
     private fun setButtonsEnabled(enabled: Boolean) {

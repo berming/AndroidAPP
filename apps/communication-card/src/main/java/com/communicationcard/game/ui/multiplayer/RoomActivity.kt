@@ -2,7 +2,6 @@ package com.communicationcard.game.ui.multiplayer
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
@@ -17,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.communicationcard.game.R
 import com.communicationcard.game.network.*
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -60,23 +60,45 @@ class RoomActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         try {
+            DebugLogManager.i(TAG, "=== RoomActivity onCreate START ===")
+
             enableImmersiveMode()
             setContentView(R.layout.activity_room)
 
+            DebugLogManager.i(TAG, "Checking holders...")
+            DebugLogManager.i(TAG, "NetworkManagerHolder.instance = ${NetworkManagerHolder.instance}")
+            DebugLogManager.i(TAG, "RoomManagerHolder.instance = ${RoomManagerHolder.instance}")
+            DebugLogManager.i(TAG, "currentRoom = ${RoomManagerHolder.instance?.currentRoom?.value}")
+
             if (!initManagers()) {
-                showErrorAndFinish("初始化失败：未找到房间数据")
+                DebugLogManager.e(TAG, "initManagers returned false")
+                showErrorDialog("初始化失败", "未找到房间数据，请重新创建房间")
                 return
             }
 
+            DebugLogManager.i(TAG, "initManagers success, calling initViews...")
             initViews()
+
+            DebugLogManager.i(TAG, "initViews success, calling setupListeners...")
             setupListeners()
+
+            DebugLogManager.i(TAG, "setupListeners success, calling observeState...")
             observeState()
 
-            Log.d(TAG, "RoomActivity created successfully")
+            DebugLogManager.i(TAG, "=== RoomActivity onCreate SUCCESS ===")
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onCreate", e)
-            showErrorAndFinish("房间加载失败: ${e.message}")
+            DebugLogManager.e(TAG, "=== RoomActivity onCreate FAILED ===", e)
+            showErrorDialog("房间加载失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(500)}")
         }
+    }
+
+    private fun showErrorDialog(title: String, message: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("返回") { _, _ -> finish() }
+            .show()
     }
 
     private fun showErrorAndFinish(message: String) {
@@ -103,15 +125,16 @@ class RoomActivity : AppCompatActivity() {
         val rm = RoomManagerHolder.instance
 
         if (nm == null || rm == null) {
-            Log.e(TAG, "Holders are null: NetworkManager=$nm, RoomManager=$rm")
+            DebugLogManager.e(TAG, "Holders are null: NetworkManager=$nm, RoomManager=$rm")
             return false
         }
 
         if (rm.currentRoom.value == null) {
-            Log.e(TAG, "currentRoom is null")
+            DebugLogManager.e(TAG, "currentRoom is null")
             return false
         }
 
+        DebugLogManager.i(TAG, "initManagers: room=${rm.currentRoom.value?.roomCode}")
         networkManager = nm
         roomManager = rm
         textChatManager = TextChatManager(nm, rm)
@@ -226,6 +249,7 @@ class RoomActivity : AppCompatActivity() {
 
     private fun updateRoomUI(room: RoomInfo) {
         try {
+            DebugLogManager.d(TAG, "updateRoomUI: ${room.roomCode}, players=${room.players.size}")
             tvRoomName?.text = room.roomName.ifEmpty { "房间" }
             tvRoomCode?.text = room.roomCode
             tvPlayerCount?.text = "${room.players.size}/${room.maxPlayers} 玩家"
@@ -237,7 +261,7 @@ class RoomActivity : AppCompatActivity() {
             updateHostControls()
             btnStart?.isEnabled = roomManager?.canStartGame() == true
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating room UI", e)
+            DebugLogManager.e(TAG, "Error updating room UI", e)
         }
     }
 

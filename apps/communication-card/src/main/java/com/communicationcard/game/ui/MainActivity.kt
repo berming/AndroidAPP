@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.communicationcard.game.R
 import com.communicationcard.game.ai.AIDifficulty
 import com.communicationcard.game.ui.multiplayer.LobbyActivity
+import com.communicationcard.game.util.DebugLogManager
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,6 +22,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnMultiplayer: Button
     private lateinit var btnRules: Button
     private lateinit var btnSettings: Button
+    private lateinit var btnDebugLogs: Button
 
     private lateinit var preferences: GamePreferences
 
@@ -56,6 +58,9 @@ class MainActivity : AppCompatActivity() {
         btnMultiplayer = findViewById(R.id.btnMultiplayer)
         btnRules = findViewById(R.id.btnRules)
         btnSettings = findViewById(R.id.btnSettings)
+        btnDebugLogs = findViewById(R.id.btnDebugLogs)
+
+        DebugLogManager.i("MainActivity", "App started")
     }
 
     private fun restoreLastSelections() {
@@ -90,6 +95,10 @@ class MainActivity : AppCompatActivity() {
 
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        btnDebugLogs.setOnClickListener {
+            startActivity(Intent(this, LogViewerActivity::class.java))
         }
     }
 

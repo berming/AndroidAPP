@@ -1,5 +1,6 @@
 package com.communicationcard.game.network
 
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -10,6 +11,10 @@ import kotlinx.coroutines.flow.*
 class RoomManager(
     private val networkManager: NetworkManager
 ) {
+    companion object {
+        private const val TAG = "RoomManager"
+    }
+
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     // 当前房间
@@ -42,13 +47,17 @@ class RoomManager(
     }
 
     private suspend fun handleMessage(message: GameMessage) {
+        DebugLogManager.d(TAG, "handleMessage: ${message::class.simpleName}")
         when (message) {
             is RoomCreated -> {
+                DebugLogManager.i(TAG, "RoomCreated: roomCode=${message.room.roomCode}, hostId=${message.room.hostId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.room.hostId
+                DebugLogManager.i(TAG, "Emitting RoomEvent.RoomCreated")
                 _roomEvents.emit(RoomEvent.RoomCreated(message.room))
             }
             is RoomJoined -> {
+                DebugLogManager.i(TAG, "RoomJoined: roomCode=${message.room.roomCode}, playerId=${message.playerId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.playerId
                 _roomEvents.emit(RoomEvent.JoinedRoom(message.room))
