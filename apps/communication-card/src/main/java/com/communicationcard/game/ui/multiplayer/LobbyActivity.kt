@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 class LobbyActivity : AppCompatActivity() {
 
     companion object {
-        // 游戏服务器地址 - 实际部署时需要修改
+        // 游戏服务器地址 - 腾讯云服务器
         private const val SERVER_URL = "ws://175.178.158.35:8080/game"
     }
 
