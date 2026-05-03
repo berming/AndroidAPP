@@ -4,7 +4,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -15,83 +14,59 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 
-/**
- * 沟通牌多人游戏服务器
- */
 fun main() {
-    println("Starting server...")
+    println("=== Starting Server ===")
+
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-        configureServer()
-    }.start(wait = true)
-}
+        println("=== Configuring Server ===")
 
-fun log(message: String) {
-    val time = SimpleDateFormat("HH:mm:ss.SSS").format(Date())
-    println("[$time] $message")
-}
-
-fun Application.configureServer() {
-    // 安装 StatusPages 处理错误
-    install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            log("!!! Exception: ${cause.message}")
-            cause.printStackTrace()
-            call.respondText("Server Error: ${cause.message}", status = HttpStatusCode.InternalServerError)
-        }
-    }
-
-    install(WebSockets) {
-        pingPeriod = Duration.ofSeconds(15)
-        timeout = Duration.ofSeconds(60)
-        maxFrameSize = Long.MAX_VALUE
-        masking = false
-    }
-
-    val roomManager = ServerRoomManager()
-    val gameManager = ServerGameManager(roomManager)
-    val sessions = ConcurrentHashMap<String, GameSession>()
-
-    routing {
-        // 健康检查端点
-        get("/") {
-            log("HTTP GET / from ${call.request.local.remoteHost}")
-            call.respondText("Communication Card Server OK\nTime: ${Date()}", ContentType.Text.Plain)
+        install(WebSockets) {
+            pingPeriod = Duration.ofSeconds(15)
+            timeout = Duration.ofSeconds(60)
+            maxFrameSize = Long.MAX_VALUE
+            masking = false
         }
 
-        get("/health") {
-            log("Health check from ${call.request.local.remoteHost}")
-            call.respondText("OK - Sessions: ${sessions.size}", ContentType.Text.Plain)
-        }
+        println("=== WebSockets installed ===")
 
-        webSocket("/game") {
-            val remoteHost = call.request.local.remoteHost
-            val sessionId = UUID.randomUUID().toString().take(8)
-            log(">>> WebSocket connection attempt from $remoteHost")
+        val roomManager = ServerRoomManager()
+        val gameManager = ServerGameManager(roomManager)
+        val sessions = ConcurrentHashMap<String, GameSession>()
 
-            val session = GameSession(sessionId, this)
-            sessions[sessionId] = session
+        routing {
+            get("/") {
+                println("=== GET / received ===")
+                call.respondText("OK", ContentType.Text.Plain)
+            }
 
-            log(">>> Client connected: $sessionId (total: ${sessions.size})")
+            get("/health") {
+                println("=== GET /health received ===")
+                call.respondText("Healthy", ContentType.Text.Plain)
+            }
 
-            try {
-                handleSession(session, roomManager, gameManager, sessions)
-            } catch (e: ClosedReceiveChannelException) {
-                log("<<< Client disconnected: $sessionId (closed)")
-            } catch (e: Exception) {
-                log("!!! Error in session $sessionId: ${e.message}")
-                e.printStackTrace()
-            } finally {
-                handleDisconnect(session, roomManager, gameManager, sessions)
-                log("<<< Client cleanup: $sessionId (remaining: ${sessions.size})")
+            webSocket("/game") {
+                val sessionId = UUID.randomUUID().toString().take(8)
+                println("=== WebSocket /game connected: $sessionId ===")
+
+                val session = GameSession(sessionId, this)
+                sessions[sessionId] = session
+
+                try {
+                    handleSession(session, roomManager, gameManager, sessions)
+                } catch (e: ClosedReceiveChannelException) {
+                    println("=== WebSocket closed: $sessionId ===")
+                } catch (e: Exception) {
+                    println("=== WebSocket error: ${e.message} ===")
+                    e.printStackTrace()
+                } finally {
+                    handleDisconnect(session, roomManager, gameManager, sessions)
+                }
             }
         }
-    }
 
-    log("===========================================")
-    log("Communication Card Server started on port 8080")
-    log("WebSocket endpoint: ws://0.0.0.0:8080/game")
-    log("Health check: http://0.0.0.0:8080/health")
-    log("===========================================")
+        println("=== Routing configured ===")
+        println("=== Server ready on port 8080 ===")
+    }.start(wait = true)
 }
 
 private suspend fun handleSession(
@@ -114,7 +89,6 @@ private suspend fun handleMessage(
     sessions: ConcurrentHashMap<String, GameSession>
 ) {
     when (message) {
-        // 房间消息
         is CreateRoom -> handleCreateRoom(session, message, roomManager)
         is JoinRoom -> handleJoinRoom(session, message, roomManager)
         is LeaveRoom -> handleLeaveRoom(session, roomManager, gameManager)
@@ -122,21 +96,12 @@ private suspend fun handleMessage(
         is StartGameRequest -> handleStartGame(session, roomManager, gameManager)
         is KickPlayer -> handleKickPlayer(session, message, roomManager)
         is AddAI -> handleAddAI(session, roomManager)
-
-        // 游戏消息
         is GameAction -> handleGameAction(session, message, gameManager)
-
-        // 聊天消息
         is TextChatMessage -> handleTextChat(session, message, roomManager)
         is QuickChatMessage -> handleQuickChat(session, message, roomManager)
-
-        // 系统消息
         is Heartbeat -> session.send(Heartbeat(System.currentTimeMillis()))
         is Reconnect -> handleReconnect(session, message, roomManager, gameManager, sessions)
-
-        else -> {
-            session.send(ErrorMessage(400, "未知消息类型"))
-        }
+        else -> session.send(ErrorMessage(400, "未知消息类型"))
     }
 }
 
@@ -155,13 +120,9 @@ private suspend fun handleJoinRoom(
     roomManager: ServerRoomManager
 ) {
     val result = roomManager.joinRoom(session, message.roomCode.uppercase(), message.playerName)
-
     result.fold(
         onSuccess = { room ->
-            // 通知新玩家
             session.send(RoomJoined(room.toRoomInfo(), session.id))
-
-            // 广播给其他玩家
             broadcastToRoom(room, RoomUpdate(room.toRoomInfo()), excludeId = session.id)
         },
         onFailure = { error ->
@@ -212,20 +173,16 @@ private suspend fun handleStartGame(
         return
     }
 
-    // 自动填充AI到6人
     roomManager.fillWithAI(room, 6)
-
-    // 开始游戏
     room.status = RoomStatus.IN_GAME
     val gameState = gameManager.startGame(room)
 
-    // 广播游戏开始，每个玩家收到自己的视图
     room.players.forEach { player ->
         val playerState = gameManager.getStateForPlayer(room, player.seatIndex)
         player.session?.send(GameStart(playerState))
     }
 
-    println("Game started in room ${room.roomCode} with ${room.players.size} players")
+    println("Game started in room ${room.roomCode}")
 }
 
 private suspend fun handleKickPlayer(
@@ -234,15 +191,11 @@ private suspend fun handleKickPlayer(
     roomManager: ServerRoomManager
 ) {
     val result = roomManager.kickPlayer(session, message.playerId)
-
     result.fold(
         onSuccess = { room ->
-            // 通知被踢玩家
             val kickedPlayer = room.players.find { it.id == message.playerId }
             kickedPlayer?.session?.send(ErrorMessage(403, "你已被踢出房间"))
             kickedPlayer?.session?.close("Kicked from room")
-
-            // 广播房间更新
             broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
         },
         onFailure = { error ->
@@ -256,7 +209,6 @@ private suspend fun handleAddAI(
     roomManager: ServerRoomManager
 ) {
     val result = roomManager.addAI(session)
-
     result.fold(
         onSuccess = { room ->
             broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
@@ -277,18 +229,15 @@ private suspend fun handleGameAction(
     if (result.success) {
         val room = gameManager.roomManager.getRoom(session.roomId ?: "") ?: return
 
-        // 广播动作结果给所有玩家
         room.players.forEach { player ->
             val playerState = gameManager.getStateForPlayer(room, player.seatIndex)
             player.session?.send(GameActionResult(true, null, playerState))
         }
 
-        // 广播游戏事件
         result.event?.let { event ->
             broadcastToRoom(room, GameEventMessage(event))
         }
 
-        // 检查游戏是否结束
         result.gameResult?.let { gameResult ->
             room.status = RoomStatus.FINISHED
             broadcastToRoom(room, GameEnd(gameResult))
@@ -314,7 +263,6 @@ private suspend fun handleTextChat(
     )
 
     if (message.isTeamOnly) {
-        // 只发给同队玩家
         val senderPlayer = room.players.find { it.id == session.id }
         room.players
             .filter { it.team == senderPlayer?.team }
@@ -348,12 +296,10 @@ private suspend fun handleReconnect(
     gameManager: ServerGameManager,
     sessions: ConcurrentHashMap<String, GameSession>
 ) {
-    // 查找之前的会话
     val oldSessionId = message.sessionToken
     val room = roomManager.getRoomByPlayer(oldSessionId)
 
     if (room != null) {
-        // 找到旧玩家并更新会话
         val player = room.players.find { it.id == oldSessionId }
         if (player != null) {
             player.session = session
@@ -362,18 +308,14 @@ private suspend fun handleReconnect(
             session.playerName = player.name
             session.seatIndex = player.seatIndex
 
-            // 更新会话映射
             sessions.remove(oldSessionId)
             sessions[session.id] = session
 
-            // 发送重连成功
             val state = if (room.status == RoomStatus.IN_GAME) {
                 gameManager.getStateForPlayer(room, player.seatIndex)
             } else null
 
             session.send(ReconnectSuccess(state))
-
-            // 通知其他玩家
             broadcastToRoom(room, PlayerReconnected(player.id, player.name), excludeId = session.id)
 
             println("Player ${player.name} reconnected to room ${room.roomCode}")
@@ -398,10 +340,8 @@ private suspend fun handleDisconnect(
     player.isConnected = false
     player.session = null
 
-    // 通知其他玩家
     broadcastToRoom(room, PlayerDisconnected(player.id, player.name))
 
-    // 如果游戏进行中，AI接管
     if (room.status == RoomStatus.IN_GAME) {
         player.isAISubstitute = true
         gameManager.handlePlayerDisconnect(room, player)
