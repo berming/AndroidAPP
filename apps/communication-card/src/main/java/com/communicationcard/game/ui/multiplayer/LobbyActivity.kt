@@ -137,7 +137,6 @@ class LobbyActivity : AppCompatActivity() {
                 statusIndicator.setBackgroundColor(Color.GREEN)
                 tvConnectionStatus.text = "已连接"
                 setButtonsEnabled(true)
-                hideLoading()
             }
             is ConnectionState.Reconnecting -> {
                 statusIndicator.setBackgroundColor(Color.YELLOW)
@@ -184,23 +183,20 @@ class LobbyActivity : AppCompatActivity() {
             Toast.makeText(this, "请输入昵称", Toast.LENGTH_SHORT).show()
             return
         }
-        if (playerName.length < 2) {
-            Toast.makeText(this, "昵称至少2个字符", Toast.LENGTH_SHORT).show()
-            return
-        }
 
         showLoading("正在创建房间...")
-        roomManager.createRoom(playerName, 6)
+        val sent = roomManager.createRoom(playerName, 6)
+        if (!sent) {
+            hideLoading()
+            Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
+            return
+        }
     }
 
     private fun joinRoom() {
         val playerName = etPlayerName.text.toString().trim()
         if (playerName.isEmpty()) {
             Toast.makeText(this, "请输入昵称", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (playerName.length < 2) {
-            Toast.makeText(this, "昵称至少2个字符", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -215,7 +211,12 @@ class LobbyActivity : AppCompatActivity() {
         }
 
         showLoading("正在加入房间...")
-        roomManager.joinRoom(roomCode, playerName)
+        val sent = roomManager.joinRoom(roomCode, playerName)
+        if (!sent) {
+            hideLoading()
+            Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
+            return
+        }
     }
 
     private fun navigateToRoom() {
