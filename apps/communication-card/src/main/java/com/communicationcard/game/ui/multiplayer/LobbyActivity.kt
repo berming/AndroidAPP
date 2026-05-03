@@ -7,8 +7,10 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -28,6 +30,7 @@ class LobbyActivity : AppCompatActivity() {
     companion object {
         // 游戏服务器地址 - 腾讯云服务器
         private const val SERVER_URL = "ws://175.178.158.35:8080/game"
+        private const val MAX_NAME_LENGTH = 12
     }
 
     private lateinit var networkManager: NetworkManager
@@ -35,7 +38,9 @@ class LobbyActivity : AppCompatActivity() {
     private lateinit var preferences: GamePreferences
 
     // UI
-    private lateinit var etPlayerName: EditText
+    private lateinit var playerInfoBar: LinearLayout
+    private lateinit var tvPlayerName: TextView
+    private lateinit var btnEditName: TextView
     private lateinit var etRoomCode: EditText
     private lateinit var btnCreateRoom: Button
     private lateinit var btnJoinRoom: Button
@@ -45,15 +50,25 @@ class LobbyActivity : AppCompatActivity() {
     private lateinit var loadingOverlay: FrameLayout
     private lateinit var tvLoadingText: TextView
 
+    private var playerName: String = ""
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableImmersiveMode()
         setContentView(R.layout.activity_lobby)
 
         preferences = GamePreferences(this)
+        playerName = preferences.lastPlayerName
+
         initViews()
         initNetwork()
         setupListeners()
+        refreshPlayerName()
+
+        // 首次进入：如果没有昵称，提示输入
+        if (playerName.isEmpty()) {
+            showNameDialog(firstTime = true)
+        }
     }
 
     private fun enableImmersiveMode() {
@@ -71,7 +86,9 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        etPlayerName = findViewById(R.id.etPlayerName)
+        playerInfoBar = findViewById(R.id.playerInfoBar)
+        tvPlayerName = findViewById(R.id.tvPlayerName)
+        btnEditName = findViewById(R.id.btnEditName)
         etRoomCode = findViewById(R.id.etRoomCode)
         btnCreateRoom = findViewById(R.id.btnCreateRoom)
         btnJoinRoom = findViewById(R.id.btnJoinRoom)
@@ -80,9 +97,6 @@ class LobbyActivity : AppCompatActivity() {
         tvConnectionStatus = findViewById(R.id.tvConnectionStatus)
         loadingOverlay = findViewById(R.id.loadingOverlay)
         tvLoadingText = findViewById(R.id.tvLoadingText)
-
-        // 恢复上次使用的昵称
-        etPlayerName.setText(preferences.lastPlayerName)
     }
 
     private fun initNetwork() {
@@ -108,17 +122,59 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        btnCreateRoom.setOnClickListener {
-            createRoom()
+        playerInfoBar.setOnClickListener { showNameDialog(firstTime = false) }
+        btnEditName.setOnClickListener { showNameDialog(firstTime = false) }
+        btnCreateRoom.setOnClickListener { createRoom() }
+        btnJoinRoom.setOnClickListener { joinRoom() }
+        btnBack.setOnClickListener { finish() }
+    }
+
+    private fun refreshPlayerName() {
+        if (playerName.isEmpty()) {
+            tvPlayerName.text = "未设置（点击设置昵称）"
+            tvPlayerName.alpha = 0.6f
+        } else {
+            tvPlayerName.text = playerName
+            tvPlayerName.alpha = 1f
+        }
+    }
+
+    private fun showNameDialog(firstTime: Boolean) {
+        val input = EditText(this).apply {
+            setText(playerName)
+            setSelection(playerName.length)
+            hint = "输入昵称（最多 $MAX_NAME_LENGTH 个字符）"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(MAX_NAME_LENGTH))
+        }
+        val container = FrameLayout(this).apply {
+            val padding = (resources.displayMetrics.density * 16).toInt()
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
         }
 
-        btnJoinRoom.setOnClickListener {
-            joinRoom()
+        val builder = AlertDialog.Builder(this)
+            .setTitle(if (firstTime) "设置玩家昵称" else "修改玩家昵称")
+            .setMessage(if (firstTime) "首次进入多人游戏，请先设置一个昵称" else null)
+            .setView(container)
+            .setPositiveButton("确定") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isEmpty()) {
+                    Toast.makeText(this, "昵称不能为空", Toast.LENGTH_SHORT).show()
+                    if (firstTime) showNameDialog(firstTime = true)
+                } else {
+                    playerName = newName
+                    preferences.lastPlayerName = newName
+                    refreshPlayerName()
+                }
+            }
+
+        if (!firstTime) {
+            builder.setNegativeButton("取消", null)
+        } else {
+            builder.setCancelable(false)
         }
 
-        btnBack.setOnClickListener {
-            finish()
-        }
+        builder.show()
     }
 
     private fun updateConnectionUI(state: ConnectionState) {
@@ -157,16 +213,10 @@ class LobbyActivity : AppCompatActivity() {
         when (event) {
             is RoomEvent.RoomCreated -> {
                 hideLoading()
-                // 保存昵称
-                preferences.lastPlayerName = etPlayerName.text.toString().trim()
-                // 跳转到房间
                 navigateToRoom()
             }
             is RoomEvent.JoinedRoom -> {
                 hideLoading()
-                // 保存昵称
-                preferences.lastPlayerName = etPlayerName.text.toString().trim()
-                // 跳转到房间
                 navigateToRoom()
             }
             is RoomEvent.Error -> {
@@ -178,9 +228,8 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun createRoom() {
-        val playerName = etPlayerName.text.toString().trim()
         if (playerName.isEmpty()) {
-            Toast.makeText(this, "请输入昵称", Toast.LENGTH_SHORT).show()
+            showNameDialog(firstTime = true)
             return
         }
 
@@ -189,14 +238,12 @@ class LobbyActivity : AppCompatActivity() {
         if (!sent) {
             hideLoading()
             Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
-            return
         }
     }
 
     private fun joinRoom() {
-        val playerName = etPlayerName.text.toString().trim()
         if (playerName.isEmpty()) {
-            Toast.makeText(this, "请输入昵称", Toast.LENGTH_SHORT).show()
+            showNameDialog(firstTime = true)
             return
         }
 
@@ -215,7 +262,6 @@ class LobbyActivity : AppCompatActivity() {
         if (!sent) {
             hideLoading()
             Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
-            return
         }
     }
 
@@ -250,4 +296,3 @@ class LobbyActivity : AppCompatActivity() {
         }
     }
 }
-
