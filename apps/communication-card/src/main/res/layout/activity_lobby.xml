@@ -1,213 +1,226 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_dark"
-    android:padding="24dp"
-    tools:context=".ui.multiplayer.LobbyActivity">
+    android:fillViewport="true">
 
-    <!-- 标题 -->
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="wrap_content"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="多人游戏"
-        android:textColor="@color/accent"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:padding="20dp"
+        tools:context=".ui.multiplayer.LobbyActivity">
 
-    <!-- 连接状态 -->
-    <LinearLayout
-        android:id="@+id/connectionStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle">
-
-        <View
-            android:id="@+id/statusIndicator"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:background="@drawable/circle_indicator" />
-
+        <!-- 标题 -->
         <TextView
-            android:id="@+id/tvConnectionStatus"
+            android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="正在连接..."
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
+            android:text="多人游戏"
+            android:textColor="@color/accent"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    </LinearLayout>
-
-    <!-- 主要操作区 -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/mainCard"
-        android:layout_width="400dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        app:cardBackgroundColor="#2A2A40"
-        app:cardCornerRadius="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/connectionStatus">
-
+        <!-- 连接状态 -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:id="@+id/connectionStatus"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp">
-
-            <!-- 玩家昵称 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="玩家昵称"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
-
-            <EditText
-                android:id="@+id/etPlayerName"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/edit_text_background"
-                android:hint="输入昵称"
-                android:inputType="text"
-                android:maxLength="12"
-                android:paddingHorizontal="16dp"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_secondary" />
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle">
 
             <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="16dp"
-                android:background="#40FFFFFF" />
+                android:id="@+id/statusIndicator"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/circle_indicator" />
 
-            <!-- 创建房间 -->
-            <Button
-                android:id="@+id/btnCreateRoom"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:background="@drawable/button_primary"
-                android:text="创建房间"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="16dp"
-                android:background="#20FFFFFF" />
-
-            <!-- 加入房间 -->
             <TextView
+                android:id="@+id/tvConnectionStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="房间码"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:layout_marginStart="8dp"
+                android:text="正在连接..."
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+
+        <!-- 主要操作区 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/mainCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="#2A2A40"
+            app:cardCornerRadius="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/connectionStatus"
+            app:layout_constraintWidth_max="450dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- 玩家昵称 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="玩家昵称"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
 
                 <EditText
-                    android:id="@+id/etRoomCode"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_marginEnd="12dp"
-                    android:layout_weight="1"
+                    android:id="@+id/etPlayerName"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="6dp"
                     android:background="@drawable/edit_text_background"
-                    android:hint="输入房间码"
-                    android:inputType="textCapCharacters"
-                    android:maxLength="6"
-                    android:paddingHorizontal="16dp"
-                    android:textAllCaps="true"
+                    android:hint="输入昵称"
+                    android:inputType="text"
+                    android:maxLength="12"
+                    android:paddingHorizontal="14dp"
                     android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_secondary" />
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="15sp" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="14dp"
+                    android:background="#40FFFFFF" />
+
+                <!-- 创建房间 -->
                 <Button
-                    android:id="@+id/btnJoinRoom"
-                    android:layout_width="100dp"
+                    android:id="@+id/btnCreateRoom"
+                    android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:background="@drawable/button_secondary"
-                    android:text="加入"
+                    android:background="@drawable/button_primary"
+                    android:text="创建房间"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp" />
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="14dp"
+                    android:background="#20FFFFFF" />
+
+                <!-- 加入房间 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="房间码"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etRoomCode"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_marginEnd="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/edit_text_background"
+                        android:hint="输入房间码"
+                        android:inputType="textCapCharacters"
+                        android:maxLength="6"
+                        android:paddingHorizontal="14dp"
+                        android:textAllCaps="true"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="15sp" />
+
+                    <Button
+                        android:id="@+id/btnJoinRoom"
+                        android:layout_width="90dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="加入"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp" />
+
+                </LinearLayout>
 
             </LinearLayout>
 
-        </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
-    </androidx.cardview.widget.CardView>
+        <!-- 返回按钮 -->
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="140dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/button_secondary"
+            android:text="返回"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/mainCard"
+            app:layout_constraintVertical_bias="0" />
 
-    <!-- 返回按钮 -->
-    <Button
-        android:id="@+id/btnBack"
-        android:layout_width="160dp"
-        android:layout_height="48dp"
-        android:layout_marginTop="24dp"
-        android:background="@drawable/button_secondary"
-        android:text="返回"
-        android:textColor="@color/text_primary"
-        android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/mainCard" />
+        <!-- 加载遮罩 -->
+        <FrameLayout
+            android:id="@+id/loadingOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#CC000000"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-    <!-- 加载遮罩 -->
-    <FrameLayout
-        android:id="@+id/loadingOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#CC000000"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ProgressBar
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:indeterminateTint="@color/accent" />
-
-            <TextView
-                android:id="@+id/tvLoadingText"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="正在连接..."
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical">
 
-        </LinearLayout>
+                <ProgressBar
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:indeterminateTint="@color/accent" />
 
-    </FrameLayout>
+                <TextView
+                    android:id="@+id/tvLoadingText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="正在连接..."
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            </LinearLayout>
+
+        </FrameLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</ScrollView>
