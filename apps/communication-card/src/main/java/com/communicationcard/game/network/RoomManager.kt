@@ -76,8 +76,8 @@ class RoomManager(
     /**
      * 创建房间
      */
-    fun createRoom(playerName: String, maxPlayers: Int = 6): Boolean {
-        return networkManager.send(CreateRoom(playerName, maxPlayers))
+    fun createRoom(playerName: String, roomName: String = "", maxPlayers: Int = 6): Boolean {
+        return networkManager.send(CreateRoom(playerName, roomName, maxPlayers))
     }
 
     /**

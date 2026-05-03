@@ -233,8 +233,35 @@ class LobbyActivity : AppCompatActivity() {
             return
         }
 
+        showCreateRoomDialog()
+    }
+
+    private fun showCreateRoomDialog() {
+        val input = EditText(this).apply {
+            hint = "房间名称（可选，留空使用默认）"
+            filters = arrayOf(android.text.InputFilter.LengthFilter(20))
+        }
+        val container = FrameLayout(this).apply {
+            val padding = (resources.displayMetrics.density * 16).toInt()
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("创建房间")
+            .setMessage("为你的房间起一个名字，方便好友识别")
+            .setView(container)
+            .setPositiveButton("创建") { _, _ ->
+                val roomName = input.text.toString().trim()
+                doCreateRoom(roomName)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doCreateRoom(roomName: String) {
         showLoading("正在创建房间...")
-        val sent = roomManager.createRoom(playerName, 6)
+        val sent = roomManager.createRoom(playerName, roomName, 6)
         if (!sent) {
             hideLoading()
             Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
