@@ -1,165 +1,541 @@
-# 沟通牌 - 多人游戏模式
+# 沟通牌 - 多人游戏完整指南
 
-## 功能概述
+## 快速开始
 
-多人游戏模式支持多名玩家通过网络在线对战，不足6人时自动补充AI玩家。
+### 1. 启动服务器
 
-### 主要功能
-- **在线对战**: 2-6名真人玩家通过WebSocket连接
-- **AI补位**: 不足6人时自动填充AI玩家
-- **文字聊天**: 支持自由输入和快捷消息
-- **断线重连**: 断开连接后自动尝试重连，AI暂时接管
-- **回合计时**: 30秒出牌时间限制，超时自动过牌
+```bash
+# 进入服务器目录
+cd server
 
-## 架构说明
-
-### 服务端 (server/)
-
-```
-server/
-├── build.gradle.kts              # Ktor依赖配置
-└── src/main/kotlin/com/communicationcard/server/
-    ├── Application.kt            # 主服务器，WebSocket路由
-    ├── Messages.kt               # 消息协议（与客户端共享）
-    ├── GameSession.kt            # WebSocket会话封装
-    ├── ServerRoomManager.kt      # 房间管理（创建/加入/离开）
-    └── ServerGameManager.kt      # 游戏逻辑（出牌/AI/计时）
+# 启动服务器 (首次运行会下载依赖)
+./gradlew run
 ```
 
-**技术栈**:
-- Ktor Server (Netty引擎)
-- WebSocket通信
-- kotlinx-serialization JSON序列化
-- Kotlin协程
-
-### 客户端 (apps/communication-card/)
-
+成功启动后显示:
 ```
-网络层 (network/):
-├── NetworkManager.kt        # WebSocket连接管理，心跳，重连
-├── RoomManager.kt           # 房间状态管理
-├── GameSyncManager.kt       # 游戏状态同步
-├── TextChatManager.kt       # 聊天消息管理
-└── GameMessage.kt           # 消息协议定义
-
-游戏引擎 (engine/):
-└── MultiplayerGameEngine.kt # 多人游戏引擎适配器
-
-界面 (ui/multiplayer/):
-├── LobbyActivity.kt         # 大厅（创建/加入房间）
-├── RoomActivity.kt          # 房间等待界面
-├── OnlineGameActivity.kt    # 多人游戏界面
-└── ChatAdapter.kt           # 聊天消息适配器
+Communication Card Server started on port 8080
+Application started in X.XXX seconds.
+Responding at http://0.0.0.0:8080
 ```
 
-## 消息协议
+### 2. 配置客户端连接地址
 
-### 房间消息
-| 类型 | 方向 | 说明 |
-|------|------|------|
-| `room.create` | C→S | 创建房间 |
-| `room.created` | S→C | 房间创建成功 |
-| `room.join` | C→S | 加入房间 |
-| `room.joined` | S→C | 加入成功 |
-| `room.leave` | C→S | 离开房间 |
-| `room.update` | S→C | 房间状态更新 |
-| `room.ready` | C→S | 准备/取消准备 |
-| `room.start` | C→S | 开始游戏（仅房主） |
-| `room.kick` | C→S | 踢出玩家（仅房主） |
-| `room.add_ai` | C→S | 添加AI玩家（仅房主） |
+修改 `LobbyActivity.kt` 中的服务器地址:
 
-### 游戏消息
-| 类型 | 方向 | 说明 |
-|------|------|------|
-| `game.start` | S→C | 游戏开始，发送初始状态 |
-| `game.action` | C→S | 玩家动作（出牌/过牌） |
-| `game.action_result` | S→C | 动作结果 |
-| `game.event` | S→C | 游戏事件广播 |
-| `game.sync` | S→C | 状态同步 |
-| `game.turn_timeout` | S→C | 回合超时 |
-| `game.end` | S→C | 游戏结束 |
+```kotlin
+// 文件: apps/communication-card/src/main/java/com/communicationcard/game/ui/multiplayer/LobbyActivity.kt
 
-### 聊天消息
-| 类型 | 方向 | 说明 |
-|------|------|------|
-| `chat.text` | 双向 | 文字消息 |
-| `chat.quick` | 双向 | 快捷消息 |
+companion object {
+    // 根据实际情况修改:
+    
+    // 本地开发 - Android模拟器连接本机
+    private const val SERVER_URL = "ws://10.0.2.2:8080/game"
+    
+    // 本地开发 - 真机通过WiFi连接 (替换为电脑IP)
+    // private const val SERVER_URL = "ws://192.168.1.100:8080/game"
+    
+    // 生产环境 - 云服务器
+    // private const val SERVER_URL = "ws://your-server.com:8080/game"
+}
+```
 
-### 系统消息
-| 类型 | 方向 | 说明 |
-|------|------|------|
-| `sys.heartbeat` | 双向 | 心跳保活 |
-| `sys.error` | S→C | 错误消息 |
-| `sys.player_disconnected` | S→C | 玩家断开连接 |
-| `sys.player_reconnected` | S→C | 玩家重新连接 |
-| `sys.reconnect` | C→S | 请求重连 |
-| `sys.reconnect_success` | S→C | 重连成功 |
+### 3. 运行游戏
 
-## 运行说明
+1. 安装APK到手机/模拟器
+2. 点击"多人游戏"
+3. 输入昵称
+4. 创建房间或输入房间码加入
 
-### 启动服务器
+---
+
+## 服务器部署
+
+### 方式一: 本地运行 (开发测试)
+
+**环境要求:**
+- JDK 17 或更高版本
+- Gradle 8.x (项目自带wrapper)
 
 ```bash
 cd server
 ./gradlew run
 ```
 
-服务器默认监听 `0.0.0.0:8080`，WebSocket端点为 `/game`
+**Android模拟器连接:** `ws://10.0.2.2:8080/game`  
+**真机连接:** `ws://<电脑局域网IP>:8080/game`
 
-### 客户端连接
+查看电脑IP:
+- Windows: `ipconfig`
+- Mac/Linux: `ifconfig` 或 `ip addr`
 
-客户端默认连接地址（在LobbyActivity.kt中配置）:
-- Android模拟器: `ws://10.0.2.2:8080/game`
-- 真机测试: 需修改为服务器实际IP
+### 方式二: 云服务器部署 (生产环境)
 
-### 游戏流程
+#### 步骤1: 准备服务器
 
-1. **创建/加入房间**
-   - 玩家在大厅输入昵称
-   - 创建新房间或输入房间码加入
+推荐配置:
+- 系统: Ubuntu 20.04+
+- 内存: 1GB+
+- CPU: 1核+
+- 开放端口: 8080
 
-2. **等待准备**
-   - 房间内玩家点击"准备"
-   - 房主可添加AI玩家
-   - 所有玩家准备后，房主可开始游戏
+```bash
+# 安装JDK
+sudo apt update
+sudo apt install openjdk-17-jdk -y
 
-3. **游戏进行**
-   - 自动填充AI至6人
-   - 黑桃3的玩家先出
-   - 每回合30秒时间限制
-   - 支持聊天和快捷消息
+# 验证安装
+java -version
+```
 
-4. **游戏结束**
-   - 一队全部出完或达到200分
-   - 显示最终比分
+#### 步骤2: 上传服务器代码
 
-## 快捷消息
+```bash
+# 在本地打包
+cd server
+./gradlew build
 
-| 类型 | 文本 |
-|------|------|
-| NICE_PLAY | 好牌！ |
-| HELP_TEAMMATE | 队友上！ |
-| PASS | 要不起 |
-| BOMB_WARNING | 小心炸弹 |
-| GOOD_GAME | GG |
-| HURRY_UP | 快点啊 |
-| SORRY | 抱歉 |
-| THANKS | 谢谢 |
+# 上传到服务器 (使用scp或其他方式)
+scp -r server/ user@your-server:/home/user/
+```
 
-## 配置说明
+#### 步骤3: 启动服务
 
-### 服务器配置
+```bash
+# SSH到服务器
+ssh user@your-server
 
-在 `Application.kt` 中可修改:
-- 端口号: 默认 8080
-- WebSocket超时: 默认 60秒
-- 心跳间隔: 默认 15秒
+# 进入目录并启动
+cd server
+./gradlew run
+```
 
-### 游戏配置
+#### 步骤4: 后台运行 (可选)
 
-在 `ServerGameManager.kt` 中可修改:
-- 回合超时: `TURN_TIMEOUT_MS = 30000` (30秒)
-- AI出牌延迟: `AI_DELAY_MS = 1000` (1秒)
+使用 `screen` 或 `systemd` 保持服务运行:
+
+```bash
+# 使用screen
+screen -S card-server
+./gradlew run
+# 按 Ctrl+A, D 分离
+
+# 重新连接
+screen -r card-server
+```
+
+或创建systemd服务:
+
+```bash
+sudo nano /etc/systemd/system/card-server.service
+```
+
+```ini
+[Unit]
+Description=Communication Card Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/server
+ExecStart=/home/ubuntu/server/gradlew run
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable card-server
+sudo systemctl start card-server
+sudo systemctl status card-server
+```
+
+#### 步骤5: 防火墙配置
+
+```bash
+# Ubuntu UFW
+sudo ufw allow 8080/tcp
+
+# 或者 iptables
+sudo iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+```
+
+云服务器还需在控制台安全组中开放8080端口。
+
+### 腾讯云 Ubuntu 22.04 LTS 快速部署
+
+完整的一键部署命令（SSH登录后按顺序执行）：
+
+```bash
+# 1. 系统更新和 JDK 安装
+apt update && apt upgrade -y
+apt install -y openjdk-17-jdk git
+
+# 2. 克隆代码
+cd /opt
+git clone https://github.com/你的用户名/AndroidAPP.git
+cd AndroidAPP/server
+chmod +x gradlew
+
+# 3. 构建测试
+./gradlew build
+
+# 4. 配置防火墙
+ufw allow 8080/tcp
+ufw allow 22/tcp
+ufw --force enable
+
+# 5. 创建服务
+cat > /etc/systemd/system/communication-card.service << 'EOF'
+[Unit]
+Description=Communication Card Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/AndroidAPP/server
+ExecStart=/opt/AndroidAPP/server/gradlew run --no-daemon
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. 启动服务
+systemctl daemon-reload
+systemctl enable communication-card
+systemctl start communication-card
+
+# 7. 验证
+systemctl status communication-card
+curl http://localhost:8080/
+```
+
+**别忘了在腾讯云控制台安全组中开放 8080 端口！**
+
+服务管理命令：
+```bash
+systemctl start communication-card    # 启动
+systemctl stop communication-card     # 停止
+systemctl restart communication-card  # 重启
+journalctl -u communication-card -f   # 查看日志
+```
+
+---
+
+## 网络配置
+
+### 连接地址格式
+
+```
+ws://<IP或域名>:<端口>/game
+```
+
+### 不同场景的配置
+
+| 场景 | 服务器位置 | 客户端地址 |
+|------|-----------|-----------|
+| 模拟器测试 | 本机 | `ws://10.0.2.2:8080/game` |
+| 真机局域网 | 本机 | `ws://192.168.x.x:8080/game` |
+| 真机公网 | 云服务器 | `ws://公网IP:8080/game` |
+| 正式环境 | 云服务器+域名 | `ws://game.example.com:8080/game` |
+
+### WSS (安全连接) 配置
+
+生产环境建议使用HTTPS/WSS。可通过Nginx反向代理:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name game.example.com;
+    
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    location /game {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+}
+```
+
+客户端连接: `wss://game.example.com/game`
+
+---
+
+## 游戏流程详解
+
+### 创建房间
+
+1. 进入"多人游戏"
+2. 输入昵称 (最多12字符)
+3. 点击"创建房间"
+4. 获得6位房间码 (如: `ABC123`)
+5. 分享房间码给朋友
+
+### 加入房间
+
+1. 进入"多人游戏"  
+2. 输入昵称
+3. 输入房间码
+4. 点击"加入"
+
+### 房间等待
+
+- 玩家自动分配到红队/蓝队
+- 点击"准备"表示就绪
+- 房主可以:
+  - 点击"添加AI"填充空位
+  - 踢出玩家
+  - 所有人准备后点击"开始游戏"
+
+### 游戏中
+
+- 界面与单机模式相同
+- 增加:
+  - 回合倒计时 (30秒)
+  - 当前玩家高亮
+  - 聊天按钮 (右下角)
+  - 断线重连提示
+
+### 聊天功能
+
+点击聊天按钮打开面板:
+- 输入文字发送
+- 快捷消息一键发送
+- 队内消息仅队友可见
+
+---
+
+## 服务器配置参数
+
+### 端口修改
+
+`server/src/main/kotlin/.../Application.kt`:
+
+```kotlin
+embeddedServer(Netty, port = 8080) {  // 修改端口
+    ...
+}
+```
+
+### 游戏参数
+
+`server/src/main/kotlin/.../ServerGameManager.kt`:
+
+```kotlin
+companion object {
+    const val TURN_TIMEOUT_MS = 30_000L  // 回合超时时间
+    const val AI_DELAY_MS = 1_000L       // AI出牌延迟
+}
+```
+
+### 心跳配置
+
+`server/src/main/kotlin/.../Application.kt`:
+
+```kotlin
+install(WebSockets) {
+    pingPeriod = Duration.ofSeconds(15)   // 心跳间隔
+    timeout = Duration.ofSeconds(60)       // 超时时间
+}
+```
+
+---
+
+## 故障排查
+
+### 连接失败
+
+1. **检查服务器是否启动**
+   ```bash
+   curl http://server-ip:8080
+   # 应返回 "Communication Card Server"
+   ```
+
+2. **检查端口是否开放**
+   ```bash
+   telnet server-ip 8080
+   ```
+
+3. **检查防火墙**
+   - 本机防火墙
+   - 云服务器安全组
+
+4. **检查客户端地址配置**
+   - 确认IP正确
+   - 确认协议是 `ws://` 不是 `http://`
+
+### 频繁断线
+
+1. 检查网络稳定性
+2. 检查心跳配置
+3. 查看服务器日志
+
+### 游戏不同步
+
+1. 检查服务器日志中的错误
+2. 尝试重新进入房间
+3. 确保客户端版本一致
+
+---
+
+## 消息协议参考
+
+### 房间消息
+
+| 类型 | 方向 | 说明 |
+|------|------|------|
+| `room.create` | C→S | 创建房间 |
+| `room.created` | S→C | 房间创建成功，返回房间码 |
+| `room.join` | C→S | 加入房间 |
+| `room.joined` | S→C | 加入成功 |
+| `room.leave` | C→S | 离开房间 |
+| `room.update` | S→C | 房间状态更新 |
+| `room.ready` | C→S | 准备/取消准备 |
+| `room.start` | C→S | 开始游戏（仅房主） |
+| `room.add_ai` | C→S | 添加AI玩家（仅房主） |
+
+### 游戏消息
+
+| 类型 | 方向 | 说明 |
+|------|------|------|
+| `game.start` | S→C | 游戏开始，包含初始手牌 |
+| `game.action` | C→S | 玩家动作（出牌/过牌） |
+| `game.event` | S→C | 游戏事件广播 |
+| `game.sync` | S→C | 完整状态同步 |
+| `game.end` | S→C | 游戏结束 |
+
+### 系统消息
+
+| 类型 | 方向 | 说明 |
+|------|------|------|
+| `sys.heartbeat` | 双向 | 心跳保活 |
+| `sys.error` | S→C | 错误消息 |
+| `sys.reconnect` | C→S | 请求重连 |
+
+---
+
+## 文件结构
+
+```
+server/                              # 服务器
+├── build.gradle.kts                 # 依赖配置
+├── gradlew                          # Gradle Wrapper
+└── src/main/kotlin/.../
+    ├── Application.kt               # 主入口，WebSocket路由
+    ├── Messages.kt                  # 消息协议定义
+    ├── GameSession.kt               # 会话封装
+    ├── ServerRoomManager.kt         # 房间管理
+    └── ServerGameManager.kt         # 游戏逻辑
+
+apps/communication-card/             # Android客户端
+└── src/main/java/.../
+    ├── network/
+    │   ├── NetworkManager.kt        # WebSocket连接
+    │   ├── RoomManager.kt           # 房间状态
+    │   ├── GameSyncManager.kt       # 游戏同步
+    │   ├── TextChatManager.kt       # 聊天
+    │   └── GameMessage.kt           # 消息协议
+    ├── engine/
+    │   └── MultiplayerGameEngine.kt # 多人引擎
+    └── ui/multiplayer/
+        ├── LobbyActivity.kt         # 大厅
+        ├── RoomActivity.kt          # 房间
+        ├── OnlineGameActivity.kt    # 游戏
+        └── ChatAdapter.kt           # 聊天适配器
+```
+
+---
+
+## 常见问题排查
+
+### 连接失败
+
+1. **检查服务器是否运行**
+   ```bash
+   systemctl status communication-card
+   # 或
+   ps aux | grep java
+   ```
+
+2. **检查端口是否监听**
+   ```bash
+   netstat -tlnp | grep 8080
+   # 或
+   ss -tlnp | grep 8080
+   ```
+
+3. **检查防火墙**
+   ```bash
+   # Ubuntu 防火墙
+   ufw status
+   
+   # 腾讯云安全组
+   # 登录控制台 → 云服务器 → 安全组 → 检查入站规则
+   ```
+
+4. **测试网络连通性**
+   ```bash
+   # 在手机或电脑上
+   telnet 你的服务器IP 8080
+   ```
+
+### 服务启动失败
+
+1. **查看错误日志**
+   ```bash
+   journalctl -u communication-card -n 50
+   ```
+
+2. **手动运行查看报错**
+   ```bash
+   cd /opt/AndroidAPP/server
+   ./gradlew run
+   ```
+
+3. **检查 Java 版本**
+   ```bash
+   java -version
+   # 需要 Java 17 或更高
+   ```
+
+4. **检查端口占用**
+   ```bash
+   lsof -i :8080
+   # 如有其他进程占用，先停止或改用其他端口
+   ```
+
+### 修改服务器端口
+
+如需更改端口（如改为 8888），编辑 `server/src/main/kotlin/.../Application.kt`：
+
+```kotlin
+embeddedServer(Netty, port = 8888, host = "0.0.0.0") {
+    // ...
+}
+```
+
+同时更新客户端 `LobbyActivity.kt` 中的端口号。
+
+### 性能优化（可选）
+
+```bash
+# 增加文件描述符限制
+echo '* soft nofile 65535' >> /etc/security/limits.conf
+echo '* hard nofile 65535' >> /etc/security/limits.conf
+
+# 优化 JVM 内存（在服务文件中添加）
+# ExecStart=... -Xms256m -Xmx512m
+```
 
 ## 注意事项
 
@@ -167,3 +543,5 @@ cd server
 2. **最低人数**: 需要至少2名真人玩家才能开始
 3. **最大人数**: 支持最多6名玩家（真人+AI）
 4. **断线处理**: 断线玩家由AI接管，重连后恢复控制
+5. **版本兼容**: 确保所有客户端版本一致
+6. **安全建议**: 生产环境建议配置 HTTPS/WSS 和域名
