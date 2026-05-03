@@ -8,8 +8,6 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.communicationcard.game.R
 import com.communicationcard.game.network.ChatMessage
-import java.text.SimpleDateFormat
-import java.util.*
 
 /**
  * 聊天消息适配器
@@ -17,8 +15,6 @@ import java.util.*
 class ChatAdapter(
     private var messages: List<ChatMessage>
 ) : RecyclerView.Adapter<ChatAdapter.ChatViewHolder>() {
-
-    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
         val view = LayoutInflater.from(parent.context)
@@ -38,32 +34,30 @@ class ChatAdapter(
     }
 
     inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvSenderName: TextView = itemView.findViewById(R.id.tvSenderName)
+        private val tvSender: TextView = itemView.findViewById(R.id.tvSender)
         private val tvMessage: TextView = itemView.findViewById(R.id.tvMessage)
-        private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
         fun bind(message: ChatMessage) {
-            tvSenderName.text = message.senderName
+            tvSender.text = "${message.senderName}:"
             tvMessage.text = message.text
-            tvTime.text = timeFormat.format(Date(message.timestamp))
 
             val context = itemView.context
 
             when {
                 message.isSystemMessage -> {
-                    tvSenderName.setTextColor(ContextCompat.getColor(context, R.color.accent))
+                    tvSender.setTextColor(ContextCompat.getColor(context, R.color.accent))
                     tvMessage.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 }
                 message.isQuickMessage -> {
-                    tvSenderName.setTextColor(ContextCompat.getColor(context, R.color.primary_light))
+                    tvSender.setTextColor(ContextCompat.getColor(context, R.color.primary_light))
                     tvMessage.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 }
                 message.isTeamOnly -> {
-                    tvSenderName.setTextColor(ContextCompat.getColor(context, R.color.team_a))
+                    tvSender.setTextColor(ContextCompat.getColor(context, R.color.team_a))
                     tvMessage.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 }
                 else -> {
-                    tvSenderName.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+                    tvSender.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                     tvMessage.setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 }
             }

@@ -24,23 +24,23 @@
     <!-- 队伍 -->
     <string name="team_a">红队</string>
     <string name="team_b">蓝队</string>
-    <string name="team_score">%s: %d分</string>
+    <string name="team_score">%1$s: %2$d分</string>
 
     <!-- 游戏状态 -->
     <string name="dealing">发牌中...</string>
     <string name="your_turn">轮到你出牌</string>
     <string name="waiting">等待 %s 出牌</string>
     <string name="passed">%s 过牌</string>
-    <string name="played">%s 出了 %s</string>
-    <string name="round_won">%s 赢得此轮，获得 %d 分</string>
-    <string name="player_finished">%s 已走完（第%d个）</string>
+    <string name="played">%1$s 出了 %2$s</string>
+    <string name="round_won">%1$s 赢得此轮，获得 %2$d 分</string>
+    <string name="player_finished">%1$s 已走完（第%2$d个）</string>
 
     <!-- 游戏结果 -->
     <string name="game_over">游戏结束</string>
     <string name="you_win">你的队伍获胜！</string>
     <string name="you_lose">你的队伍失败</string>
     <string name="draw">平局</string>
-    <string name="final_score">最终得分：红队 %d 分，蓝队 %d 分</string>
+    <string name="final_score">最终得分：红队 %1$d 分，蓝队 %2$d 分</string>
     <string name="btn_play_again">再来一局</string>
     <string name="btn_back_menu">返回主界面</string>
 
