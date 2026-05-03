@@ -201,6 +201,11 @@ class LobbyActivity : AppCompatActivity() {
                 statusIndicator.setBackgroundColor(Color.GRAY)
                 tvConnectionStatus.text = "未连接"
                 setButtonsEnabled(false)
+                // 连接断开时隐藏loading，防止卡住
+                if (loadingOverlay.visibility == View.VISIBLE) {
+                    hideLoading()
+                    Toast.makeText(this, "连接已断开，请重试", Toast.LENGTH_SHORT).show()
+                }
             }
             is ConnectionState.Connecting -> {
                 statusIndicator.setBackgroundColor(Color.YELLOW)
@@ -216,6 +221,11 @@ class LobbyActivity : AppCompatActivity() {
                 statusIndicator.setBackgroundColor(Color.YELLOW)
                 tvConnectionStatus.text = "重连中(${state.attempt})..."
                 setButtonsEnabled(false)
+                // 重连时也隐藏loading，因为之前的请求可能已丢失
+                if (loadingOverlay.visibility == View.VISIBLE) {
+                    hideLoading()
+                    Toast.makeText(this, "连接中断，正在重连...", Toast.LENGTH_SHORT).show()
+                }
             }
             is ConnectionState.Error -> {
                 statusIndicator.setBackgroundColor(Color.RED)
