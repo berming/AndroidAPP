@@ -1,222 +1,227 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_dark"
-    android:padding="32dp"
-    tools:context=".ui.MainActivity">
+    android:fillViewport="true">
 
-    <!-- 标题 -->
-    <TextView
-        android:id="@+id/tvTitle"
-        android:layout_width="wrap_content"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/title_main"
-        android:textColor="@color/text_primary"
-        android:textSize="48sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@id/tvSubtitle"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
+        android:padding="24dp"
+        tools:context=".ui.MainActivity">
 
-    <TextView
-        android:id="@+id/tvSubtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/subtitle"
-        android:textColor="@color/text_secondary"
-        android:textSize="18sp"
-        app:layout_constraintBottom_toTopOf="@id/settingsCard"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle" />
-
-    <!-- 设置区域 -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/settingsCard"
-        android:layout_width="400dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        app:cardBackgroundColor="#2A2A40"
-        app:cardCornerRadius="16dp"
-        app:layout_constraintBottom_toTopOf="@id/btnStartGame"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvSubtitle">
-
-        <LinearLayout
-            android:layout_width="match_parent"
+        <!-- 标题 -->
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp">
+            android:text="@string/title_main"
+            android:textColor="@color/text_primary"
+            android:textSize="42sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- 难度选择 -->
-            <TextView
-                android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/tvSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle" />
+
+        <!-- 设置区域 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/settingsCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            app:cardBackgroundColor="#2A2A40"
+            app:cardCornerRadius="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvSubtitle"
+            app:layout_constraintWidth_max="450dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/difficulty"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <!-- 难度选择 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/difficulty"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <RadioGroup
+                    android:id="@+id/rgDifficulty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/rbEasy"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:buttonTint="@color/accent"
+                        android:text="@string/difficulty_easy"
+                        android:textColor="@color/text_secondary" />
+
+                    <RadioButton
+                        android:id="@+id/rbMedium"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:buttonTint="@color/accent"
+                        android:checked="true"
+                        android:text="@string/difficulty_medium"
+                        android:textColor="@color/text_secondary" />
+
+                    <RadioButton
+                        android:id="@+id/rbHard"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:buttonTint="@color/accent"
+                        android:text="@string/difficulty_hard"
+                        android:textColor="@color/text_secondary" />
+
+                </RadioGroup>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="12dp"
+                    android:background="#40FFFFFF" />
+
+                <!-- 人数选择 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/player_count"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <RadioGroup
+                    android:id="@+id/rgPlayerCount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <RadioButton
+                        android:id="@+id/rb6Players"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:buttonTint="@color/accent"
+                        android:checked="true"
+                        android:text="@string/players_6"
+                        android:textColor="@color/text_secondary" />
+
+                    <RadioButton
+                        android:id="@+id/rb8Players"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:buttonTint="@color/accent"
+                        android:text="@string/players_8"
+                        android:textColor="@color/text_secondary" />
+
+                </RadioGroup>
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- 游戏模式按钮 -->
+        <LinearLayout
+            android:id="@+id/gameModeButtons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/settingsCard">
+
+            <!-- 单人游戏按钮 -->
+            <Button
+                android:id="@+id/btnStartGame"
+                android:layout_width="160dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_primary"
+                android:text="@string/btn_start_game"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-            <RadioGroup
-                android:id="@+id/rgDifficulty"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <RadioButton
-                    android:id="@+id/rbEasy"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:buttonTint="@color/accent"
-                    android:text="@string/difficulty_easy"
-                    android:textColor="@color/text_secondary" />
-
-                <RadioButton
-                    android:id="@+id/rbMedium"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:buttonTint="@color/accent"
-                    android:checked="true"
-                    android:text="@string/difficulty_medium"
-                    android:textColor="@color/text_secondary" />
-
-                <RadioButton
-                    android:id="@+id/rbHard"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:buttonTint="@color/accent"
-                    android:text="@string/difficulty_hard"
-                    android:textColor="@color/text_secondary" />
-
-            </RadioGroup>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="16dp"
-                android:background="#40FFFFFF" />
-
-            <!-- 人数选择 -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/player_count"
+            <!-- 多人游戏按钮 -->
+            <Button
+                android:id="@+id/btnMultiplayer"
+                android:layout_width="160dp"
+                android:layout_height="56dp"
+                android:background="@drawable/button_multiplayer"
+                android:text="多人游戏"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp" />
-
-            <RadioGroup
-                android:id="@+id/rgPlayerCount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <RadioButton
-                    android:id="@+id/rb6Players"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:buttonTint="@color/accent"
-                    android:checked="true"
-                    android:text="@string/players_6"
-                    android:textColor="@color/text_secondary" />
-
-                <RadioButton
-                    android:id="@+id/rb8Players"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:buttonTint="@color/accent"
-                    android:text="@string/players_8"
-                    android:textColor="@color/text_secondary" />
-
-            </RadioGroup>
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
         </LinearLayout>
 
-    </androidx.cardview.widget.CardView>
+        <!-- 底部按钮区 -->
+        <LinearLayout
+            android:id="@+id/bottomButtons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/gameModeButtons"
+            app:layout_constraintVertical_bias="0">
 
-    <!-- 游戏模式按钮 -->
-    <LinearLayout
-        android:id="@+id/gameModeButtons"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toTopOf="@id/bottomButtons"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/settingsCard">
+            <!-- 规则按钮 -->
+            <Button
+                android:id="@+id/btnRules"
+                android:layout_width="140dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="12dp"
+                android:background="@drawable/button_secondary"
+                android:text="@string/btn_rules"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
 
-        <!-- 单人游戏按钮 -->
-        <Button
-            android:id="@+id/btnStartGame"
-            android:layout_width="200dp"
-            android:layout_height="64dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/button_primary"
-            android:text="@string/btn_start_game"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            <!-- 设置按钮 -->
+            <Button
+                android:id="@+id/btnSettings"
+                android:layout_width="140dp"
+                android:layout_height="44dp"
+                android:background="@drawable/button_secondary"
+                android:text="设置"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
 
-        <!-- 多人游戏按钮 -->
-        <Button
-            android:id="@+id/btnMultiplayer"
-            android:layout_width="200dp"
-            android:layout_height="64dp"
-            android:background="@drawable/button_multiplayer"
-            android:text="多人游戏"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+        </LinearLayout>
 
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- 底部按钮区 -->
-    <LinearLayout
-        android:id="@+id/bottomButtons"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnStartGame">
-
-        <!-- 规则按钮 -->
-        <Button
-            android:id="@+id/btnRules"
-            android:layout_width="160dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/button_secondary"
-            android:text="@string/btn_rules"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp" />
-
-        <!-- 设置按钮 -->
-        <Button
-            android:id="@+id/btnSettings"
-            android:layout_width="160dp"
-            android:layout_height="48dp"
-            android:background="@drawable/button_secondary"
-            android:text="设置"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp" />
-
-    </LinearLayout>
-
-</androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
