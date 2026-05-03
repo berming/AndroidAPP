@@ -164,6 +164,67 @@ sudo iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
 
 云服务器还需在控制台安全组中开放8080端口。
 
+### 腾讯云 Ubuntu 22.04 LTS 快速部署
+
+完整的一键部署命令（SSH登录后按顺序执行）：
+
+```bash
+# 1. 系统更新和 JDK 安装
+apt update && apt upgrade -y
+apt install -y openjdk-17-jdk git
+
+# 2. 克隆代码
+cd /opt
+git clone https://github.com/你的用户名/AndroidAPP.git
+cd AndroidAPP/server
+chmod +x gradlew
+
+# 3. 构建测试
+./gradlew build
+
+# 4. 配置防火墙
+ufw allow 8080/tcp
+ufw allow 22/tcp
+ufw --force enable
+
+# 5. 创建服务
+cat > /etc/systemd/system/communication-card.service << 'EOF'
+[Unit]
+Description=Communication Card Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/AndroidAPP/server
+ExecStart=/opt/AndroidAPP/server/gradlew run --no-daemon
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. 启动服务
+systemctl daemon-reload
+systemctl enable communication-card
+systemctl start communication-card
+
+# 7. 验证
+systemctl status communication-card
+curl http://localhost:8080/
+```
+
+**别忘了在腾讯云控制台安全组中开放 8080 端口！**
+
+服务管理命令：
+```bash
+systemctl start communication-card    # 启动
+systemctl stop communication-card     # 停止
+systemctl restart communication-card  # 重启
+journalctl -u communication-card -f   # 查看日志
+```
+
 ---
 
 ## 网络配置
@@ -395,10 +456,92 @@ apps/communication-card/             # Android客户端
 
 ---
 
+## 常见问题排查
+
+### 连接失败
+
+1. **检查服务器是否运行**
+   ```bash
+   systemctl status communication-card
+   # 或
+   ps aux | grep java
+   ```
+
+2. **检查端口是否监听**
+   ```bash
+   netstat -tlnp | grep 8080
+   # 或
+   ss -tlnp | grep 8080
+   ```
+
+3. **检查防火墙**
+   ```bash
+   # Ubuntu 防火墙
+   ufw status
+   
+   # 腾讯云安全组
+   # 登录控制台 → 云服务器 → 安全组 → 检查入站规则
+   ```
+
+4. **测试网络连通性**
+   ```bash
+   # 在手机或电脑上
+   telnet 你的服务器IP 8080
+   ```
+
+### 服务启动失败
+
+1. **查看错误日志**
+   ```bash
+   journalctl -u communication-card -n 50
+   ```
+
+2. **手动运行查看报错**
+   ```bash
+   cd /opt/AndroidAPP/server
+   ./gradlew run
+   ```
+
+3. **检查 Java 版本**
+   ```bash
+   java -version
+   # 需要 Java 17 或更高
+   ```
+
+4. **检查端口占用**
+   ```bash
+   lsof -i :8080
+   # 如有其他进程占用，先停止或改用其他端口
+   ```
+
+### 修改服务器端口
+
+如需更改端口（如改为 8888），编辑 `server/src/main/kotlin/.../Application.kt`：
+
+```kotlin
+embeddedServer(Netty, port = 8888, host = "0.0.0.0") {
+    // ...
+}
+```
+
+同时更新客户端 `LobbyActivity.kt` 中的端口号。
+
+### 性能优化（可选）
+
+```bash
+# 增加文件描述符限制
+echo '* soft nofile 65535' >> /etc/security/limits.conf
+echo '* hard nofile 65535' >> /etc/security/limits.conf
+
+# 优化 JVM 内存（在服务文件中添加）
+# ExecStart=... -Xms256m -Xmx512m
+```
+
 ## 注意事项
 
-1. **最低人数**: 至少2名真人玩家
-2. **最大人数**: 6人 (真人+AI)
-3. **断线处理**: AI自动接管，重连后恢复
-4. **网络要求**: 客户端需能访问服务器端口
+1. **网络要求**: 客户端和服务器需在同一网络或服务器有公网IP
+2. **最低人数**: 需要至少2名真人玩家才能开始
+3. **最大人数**: 支持最多6名玩家（真人+AI）
+4. **断线处理**: 断线玩家由AI接管，重连后恢复控制
 5. **版本兼容**: 确保所有客户端版本一致
+6. **安全建议**: 生产环境建议配置 HTTPS/WSS 和域名
