@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -18,6 +19,7 @@ import java.text.SimpleDateFormat
  * 沟通牌多人游戏服务器
  */
 fun main() {
+    println("Starting server...")
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         configureServer()
     }.start(wait = true)
@@ -29,6 +31,15 @@ fun log(message: String) {
 }
 
 fun Application.configureServer() {
+    // 安装 StatusPages 处理错误
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            log("!!! Exception: ${cause.message}")
+            cause.printStackTrace()
+            call.respondText("Server Error: ${cause.message}", status = HttpStatusCode.InternalServerError)
+        }
+    }
+
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(60)
@@ -44,7 +55,7 @@ fun Application.configureServer() {
         // 健康检查端点
         get("/") {
             log("HTTP GET / from ${call.request.local.remoteHost}")
-            call.respondText("Communication Card Server OK", ContentType.Text.Plain)
+            call.respondText("Communication Card Server OK\nTime: ${Date()}", ContentType.Text.Plain)
         }
 
         get("/health") {
