@@ -24,8 +24,16 @@ class NetworkManager(
         private const val RECONNECT_BASE_DELAY_MS = 2000L
     }
 
+    init {
+        Log.w(TAG, "========================================")
+        Log.w(TAG, "NetworkManager initialized")
+        Log.w(TAG, "Server URL: $serverUrl")
+        Log.w(TAG, "========================================")
+    }
+
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
@@ -52,10 +60,13 @@ class NetworkManager(
      * 连接到服务器
      */
     fun connect(token: String? = null): Job {
+        Log.w(TAG, ">>> connect() called, current state: ${_connectionState.value}")
+        Log.w(TAG, ">>> Network available: ${isNetworkAvailable()}")
+
         return scope.launch {
             if (_connectionState.value == ConnectionState.Connected ||
                 _connectionState.value == ConnectionState.Connecting) {
-                Log.d(TAG, "Already connected or connecting")
+                Log.w(TAG, ">>> Already connected or connecting, skipping")
                 return@launch
             }
 
@@ -63,10 +74,12 @@ class NetworkManager(
             _connectionState.value = ConnectionState.Connecting
             reconnectAttempts = 0
 
+            Log.w(TAG, ">>> Starting connection to: $serverUrl")
+
             try {
                 establishConnection()
             } catch (e: Exception) {
-                Log.e(TAG, "Connection failed", e)
+                Log.e(TAG, ">>> Connection exception: ${e.javaClass.simpleName}: ${e.message}", e)
                 _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
                 _connectionEvents.emit(ConnectionEvent.ConnectionFailed(e.message ?: "Unknown error"))
             }
@@ -74,6 +87,8 @@ class NetworkManager(
     }
 
     private suspend fun establishConnection() {
+        Log.w(TAG, ">>> establishConnection() - Building request for: $serverUrl")
+
         val request = Request.Builder()
             .url(serverUrl)
             .apply {
@@ -81,9 +96,11 @@ class NetworkManager(
             }
             .build()
 
+        Log.w(TAG, ">>> Request built, creating WebSocket...")
+
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.d(TAG, "WebSocket connected")
+                Log.w(TAG, ">>> onOpen() - WebSocket connected! Response: ${response.code}")
                 scope.launch {
                     _connectionState.value = ConnectionState.Connected
                     reconnectAttempts = 0
@@ -93,7 +110,7 @@ class NetworkManager(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.d(TAG, "Received: $text")
+                Log.d(TAG, ">>> onMessage(): $text")
                 scope.launch {
                     try {
                         val message = GameMessage.fromJson(text)
@@ -105,24 +122,28 @@ class NetworkManager(
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closing: $code - $reason")
+                Log.w(TAG, ">>> onClosing(): code=$code, reason=$reason")
                 webSocket.close(1000, null)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.d(TAG, "WebSocket closed: $code - $reason")
+                Log.w(TAG, ">>> onClosed(): code=$code, reason=$reason")
                 scope.launch {
                     handleDisconnection(code, reason)
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket failure", t)
+                Log.e(TAG, ">>> onFailure(): ${t.javaClass.simpleName}: ${t.message}")
+                Log.e(TAG, ">>> Response: ${response?.code} ${response?.message}")
+                t.printStackTrace()
                 scope.launch {
                     handleDisconnection(-1, t.message ?: "Connection failed")
                 }
             }
         })
+
+        Log.w(TAG, ">>> WebSocket created, waiting for callbacks...")
     }
 
     private suspend fun handleMessage(message: GameMessage) {

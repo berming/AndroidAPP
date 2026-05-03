@@ -1,8 +1,10 @@
 package com.communicationcard.server
 
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -10,23 +12,20 @@ import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.text.SimpleDateFormat
 
 /**
  * 沟通牌多人游戏服务器
- *
- * 功能说明:
- * - WebSocket通信，端点: /game
- * - 房间管理（创建、加入、离开）
- * - 游戏逻辑（出牌、过牌、AI接管）
- * - 聊天功能（文字、快捷消息）
- *
- * 启动方式: ./gradlew run
- * 默认端口: 8080
  */
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         configureServer()
     }.start(wait = true)
+}
+
+fun log(message: String) {
+    val time = SimpleDateFormat("HH:mm:ss.SSS").format(Date())
+    println("[$time] $message")
 }
 
 fun Application.configureServer() {
@@ -42,26 +41,46 @@ fun Application.configureServer() {
     val sessions = ConcurrentHashMap<String, GameSession>()
 
     routing {
+        // 健康检查端点
+        get("/") {
+            log("HTTP GET / from ${call.request.local.remoteHost}")
+            call.respondText("Communication Card Server OK", ContentType.Text.Plain)
+        }
+
+        get("/health") {
+            log("Health check from ${call.request.local.remoteHost}")
+            call.respondText("OK - Sessions: ${sessions.size}", ContentType.Text.Plain)
+        }
+
         webSocket("/game") {
-            val sessionId = UUID.randomUUID().toString()
+            val remoteHost = call.request.local.remoteHost
+            val sessionId = UUID.randomUUID().toString().take(8)
+            log(">>> WebSocket connection attempt from $remoteHost")
+
             val session = GameSession(sessionId, this)
             sessions[sessionId] = session
 
-            println("Client connected: $sessionId")
+            log(">>> Client connected: $sessionId (total: ${sessions.size})")
 
             try {
                 handleSession(session, roomManager, gameManager, sessions)
             } catch (e: ClosedReceiveChannelException) {
-                println("Client disconnected: $sessionId")
+                log("<<< Client disconnected: $sessionId (closed)")
             } catch (e: Exception) {
-                println("Error in session $sessionId: ${e.message}")
+                log("!!! Error in session $sessionId: ${e.message}")
+                e.printStackTrace()
             } finally {
                 handleDisconnect(session, roomManager, gameManager, sessions)
+                log("<<< Client cleanup: $sessionId (remaining: ${sessions.size})")
             }
         }
     }
 
-    println("Communication Card Server started on port 8080")
+    log("===========================================")
+    log("Communication Card Server started on port 8080")
+    log("WebSocket endpoint: ws://0.0.0.0:8080/game")
+    log("Health check: http://0.0.0.0:8080/health")
+    log("===========================================")
 }
 
 private suspend fun handleSession(
