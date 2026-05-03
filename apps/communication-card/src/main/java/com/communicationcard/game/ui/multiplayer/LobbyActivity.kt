@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 class LobbyActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "LobbyActivity"
         // 游戏服务器地址 - 腾讯云服务器
         private const val SERVER_URL = "ws://175.178.158.35:8080/game"
         private const val MAX_NAME_LENGTH = 12
@@ -55,20 +56,36 @@ class LobbyActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableImmersiveMode()
-        setContentView(R.layout.activity_lobby)
+        DebugLogManager.i(TAG, "=== LobbyActivity onCreate START ===")
 
-        preferences = GamePreferences(this)
-        playerName = preferences.lastPlayerName
+        try {
+            enableImmersiveMode()
+            DebugLogManager.i(TAG, "setContentView...")
+            setContentView(R.layout.activity_lobby)
 
-        initViews()
-        initNetwork()
-        setupListeners()
-        refreshPlayerName()
+            DebugLogManager.i(TAG, "init preferences...")
+            preferences = GamePreferences(this)
+            playerName = preferences.lastPlayerName
+            DebugLogManager.i(TAG, "playerName=$playerName")
 
-        // 首次进入：如果没有昵称，提示输入
-        if (playerName.isEmpty()) {
-            showNameDialog(firstTime = true)
+            DebugLogManager.i(TAG, "initViews...")
+            initViews()
+            DebugLogManager.i(TAG, "initNetwork...")
+            initNetwork()
+            DebugLogManager.i(TAG, "setupListeners...")
+            setupListeners()
+            DebugLogManager.i(TAG, "refreshPlayerName...")
+            refreshPlayerName()
+
+            // 首次进入：如果没有昵称，提示输入
+            if (playerName.isEmpty()) {
+                DebugLogManager.i(TAG, "showing first time name dialog")
+                showNameDialog(firstTime = true)
+            }
+
+            DebugLogManager.i(TAG, "=== LobbyActivity onCreate SUCCESS ===")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "=== LobbyActivity onCreate FAILED ===", e)
         }
     }
 
@@ -211,20 +228,20 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun handleRoomEvent(event: RoomEvent) {
-        DebugLogManager.i("LobbyActivity", "handleRoomEvent: $event")
+        DebugLogManager.i(TAG, "handleRoomEvent: $event")
         when (event) {
             is RoomEvent.RoomCreated -> {
-                DebugLogManager.i("LobbyActivity", "RoomCreated: ${event.room.roomCode}, roomId=${event.room.roomId}")
+                DebugLogManager.i(TAG, "RoomCreated: ${event.room.roomCode}, roomId=${event.room.roomId}")
                 hideLoading()
                 navigateToRoom()
             }
             is RoomEvent.JoinedRoom -> {
-                DebugLogManager.i("LobbyActivity", "JoinedRoom: ${event.room.roomCode}")
+                DebugLogManager.i(TAG, "JoinedRoom: ${event.room.roomCode}")
                 hideLoading()
                 navigateToRoom()
             }
             is RoomEvent.Error -> {
-                DebugLogManager.e("LobbyActivity", "RoomEvent Error: code=${event.code}, msg=${event.message}")
+                DebugLogManager.e(TAG, "RoomEvent Error: code=${event.code}, msg=${event.message}")
                 hideLoading()
                 Toast.makeText(this, "错误: ${event.message}", Toast.LENGTH_SHORT).show()
             }
@@ -233,7 +250,9 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun createRoom() {
+        DebugLogManager.i(TAG, "createRoom() called, playerName=$playerName")
         if (playerName.isEmpty()) {
+            DebugLogManager.i(TAG, "playerName empty, showing name dialog")
             showNameDialog(firstTime = true)
             return
         }
@@ -242,6 +261,7 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun showCreateRoomDialog() {
+        DebugLogManager.i(TAG, "showCreateRoomDialog()")
         val input = EditText(this).apply {
             hint = "房间名称（可选，留空使用默认）"
             filters = arrayOf(android.text.InputFilter.LengthFilter(20))
@@ -257,6 +277,7 @@ class LobbyActivity : AppCompatActivity() {
             .setMessage("为你的房间起一个名字，方便好友识别")
             .setView(container)
             .setPositiveButton("创建") { _, _ ->
+                DebugLogManager.i(TAG, "Dialog positive button clicked")
                 val roomName = input.text.toString().trim()
                 doCreateRoom(roomName)
             }
@@ -265,10 +286,10 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun doCreateRoom(roomName: String) {
-        DebugLogManager.i("LobbyActivity", "doCreateRoom: roomName=$roomName, playerName=$playerName")
+        DebugLogManager.i(TAG, "doCreateRoom: roomName=$roomName, playerName=$playerName")
         showLoading("正在创建房间...")
         val sent = roomManager.createRoom(playerName, roomName, 6)
-        DebugLogManager.i("LobbyActivity", "createRoom sent=$sent")
+        DebugLogManager.i(TAG, "createRoom sent=$sent")
         if (!sent) {
             hideLoading()
             Toast.makeText(this, "未连接到服务器，请稍后重试", Toast.LENGTH_SHORT).show()
@@ -300,18 +321,18 @@ class LobbyActivity : AppCompatActivity() {
     }
 
     private fun navigateToRoom() {
-        DebugLogManager.i("LobbyActivity", "navigateToRoom - setting holders")
-        DebugLogManager.i("LobbyActivity", "currentRoom=${roomManager.currentRoom.value}")
-        DebugLogManager.i("LobbyActivity", "localPlayerId=${roomManager.localPlayerId}")
+        DebugLogManager.i(TAG, "navigateToRoom - setting holders")
+        DebugLogManager.i(TAG, "currentRoom=${roomManager.currentRoom.value}")
+        DebugLogManager.i(TAG, "localPlayerId=${roomManager.localPlayerId}")
 
         // 共享实例给RoomActivity
         NetworkManagerHolder.instance = networkManager
         RoomManagerHolder.instance = roomManager
 
-        DebugLogManager.i("LobbyActivity", "holders set, starting RoomActivity")
+        DebugLogManager.i(TAG, "holders set, starting RoomActivity")
         val intent = Intent(this, RoomActivity::class.java)
         startActivity(intent)
-        DebugLogManager.i("LobbyActivity", "RoomActivity started")
+        DebugLogManager.i(TAG, "RoomActivity started")
     }
 
     private fun setButtonsEnabled(enabled: Boolean) {
