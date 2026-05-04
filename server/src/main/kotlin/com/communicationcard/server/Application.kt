@@ -157,7 +157,8 @@ private suspend fun handleLeaveRoom(
             player.isAISubstitute = true
             broadcastToRoom(room, PlayerDisconnected(player.id, player.name))
             gameManager.handlePlayerDisconnect(room, player)
-            // 玩家选择主动离开，不再保留房间映射，禁止重连回此房间
+            // 玩家选择主动离开，清除映射防止其用旧 token 重连回此房间
+            roomManager.forgetPlayerMapping(session.id)
             session.roomId = null
         }
         return

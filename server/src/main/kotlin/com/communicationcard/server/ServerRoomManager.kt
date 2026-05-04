@@ -275,6 +275,13 @@ class ServerRoomManager {
     }
 
     /**
+     * 清除某玩家ID到房间的映射（用于显式离开后阻止其用旧token重连回原房间）
+     */
+    fun forgetPlayerMapping(playerId: String) {
+        playerToRoom.remove(playerId)
+    }
+
+    /**
      * 获取房间内的所有会话
      */
     fun getRoomSessions(roomId: String): List<GameSession> {

@@ -119,6 +119,8 @@ class RoomManager(
         if (result) {
             _currentRoom.value = null
             _localPlayerId = null
+            // 清除会话令牌：避免连接断开后用旧 token 重连回已离开的房间
+            networkManager.setSessionToken(null)
         }
         return result
     }
