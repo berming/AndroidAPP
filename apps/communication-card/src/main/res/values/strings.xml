@@ -5,7 +5,7 @@
     <!-- 主界面 -->
     <string name="title_main">沟通牌</string>
     <string name="subtitle">团队对抗型扑克牌游戏</string>
-    <string name="btn_start_game">开始游戏</string>
+    <string name="btn_start_game">单机游戏</string>
     <string name="btn_rules">游戏规则</string>
     <string name="btn_settings">设置</string>
 
