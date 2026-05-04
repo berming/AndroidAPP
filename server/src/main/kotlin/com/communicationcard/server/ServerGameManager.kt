@@ -280,6 +280,9 @@ class ServerGameManager(
             state.teamBScore += score
         }
 
+        // 同时累加到该玩家的"已收分"（与单机版一致）
+        state.playerScores[winnerId] = (state.playerScores[winnerId] ?: 0) + score
+
         // 赢家成为下一轮首家
         state.currentPlayerIndex = winnerId
 
@@ -316,7 +319,6 @@ class ServerGameManager(
     private fun checkGameEnd(room: ServerRoom): SerializedGameResult? {
         val state = room.gameState ?: return null
 
-        // 检查是否有一队全部出完
         val teamAPlayers = room.players.filter { it.team == "TEAM_A" }
         val teamBPlayers = room.players.filter { it.team == "TEAM_B" }
 
@@ -326,55 +328,79 @@ class ServerGameManager(
         val teamBFinished = teamBPlayers.isNotEmpty() &&
             teamBPlayers.all { state.hands[it.seatIndex]?.isEmpty() == true }
 
+        // === TEAM_ALL_FINISHED 触发：与单机版 SettlementCalculator 保持一致 ===
+        // 赢方得分 = 赢方所有已收 + 输方未走完玩家的已收 + 输方未走完玩家的剩余手牌分
+        // 输方得分 = 输方已走完玩家的已收
         if (teamAFinished) {
-            // A队获胜，计算最终得分
-            val loserHandScore = teamBPlayers.sumOf { player ->
-                state.hands[player.seatIndex]?.sumOf { getCardScore(it) } ?: 0
-            }
-            state.teamAScore += loserHandScore
-
+            val (a, b) = computeAllFinishedScores(state, winner = teamAPlayers, loser = teamBPlayers)
+            state.teamAScore = a
+            state.teamBScore = b
             return SerializedGameResult(
                 winner = "TEAM_A",
-                teamAScore = state.teamAScore,
-                teamBScore = state.teamBScore,
+                teamAScore = a,
+                teamBScore = b,
                 trigger = "TEAM_ALL_FINISHED"
             )
         }
 
         if (teamBFinished) {
-            val loserHandScore = teamAPlayers.sumOf { player ->
-                state.hands[player.seatIndex]?.sumOf { getCardScore(it) } ?: 0
-            }
-            state.teamBScore += loserHandScore
-
+            val (b, a) = computeAllFinishedScores(state, winner = teamBPlayers, loser = teamAPlayers)
+            state.teamAScore = a
+            state.teamBScore = b
             return SerializedGameResult(
                 winner = "TEAM_B",
-                teamAScore = state.teamAScore,
-                teamBScore = state.teamBScore,
+                teamAScore = a,
+                teamBScore = b,
                 trigger = "TEAM_ALL_FINISHED"
             )
         }
 
-        // 检查是否达到200分
-        if (state.teamAScore >= 200) {
+        // === SCORE_REACHED_200 触发：只算已走完玩家的"已收"分 ===
+        val teamAFinishedScore = teamAPlayers
+            .filter { state.hands[it.seatIndex]?.isEmpty() == true }
+            .sumOf { state.playerScores[it.seatIndex] ?: 0 }
+        val teamBFinishedScore = teamBPlayers
+            .filter { state.hands[it.seatIndex]?.isEmpty() == true }
+            .sumOf { state.playerScores[it.seatIndex] ?: 0 }
+
+        if (teamAFinishedScore >= 200) {
             return SerializedGameResult(
                 winner = "TEAM_A",
-                teamAScore = state.teamAScore,
-                teamBScore = state.teamBScore,
+                teamAScore = teamAFinishedScore,
+                teamBScore = teamBFinishedScore,
                 trigger = "SCORE_REACHED_200"
             )
         }
-
-        if (state.teamBScore >= 200) {
+        if (teamBFinishedScore >= 200) {
             return SerializedGameResult(
                 winner = "TEAM_B",
-                teamAScore = state.teamAScore,
-                teamBScore = state.teamBScore,
+                teamAScore = teamAFinishedScore,
+                teamBScore = teamBFinishedScore,
                 trigger = "SCORE_REACHED_200"
             )
         }
 
         return null
+    }
+
+    /**
+     * TEAM_ALL_FINISHED 结算：返回 (winnerScore, loserScore)
+     */
+    private fun computeAllFinishedScores(
+        state: ServerGameState,
+        winner: List<ServerPlayer>,
+        loser: List<ServerPlayer>
+    ): Pair<Int, Int> {
+        val winnerScore = winner.sumOf { state.playerScores[it.seatIndex] ?: 0 } +
+            loser.filter { state.hands[it.seatIndex]?.isNotEmpty() == true }
+                .sumOf { p ->
+                    (state.playerScores[p.seatIndex] ?: 0) +
+                        (state.hands[p.seatIndex]?.sumOf { c -> getCardScore(c) } ?: 0)
+                }
+        val loserScore = loser
+            .filter { state.hands[it.seatIndex]?.isEmpty() == true }
+            .sumOf { state.playerScores[it.seatIndex] ?: 0 }
+        return Pair(winnerScore, loserScore)
     }
 
     /**
@@ -394,7 +420,7 @@ class ServerGameManager(
                 team = player.team,
                 hand = if (isMyself) hand.map { it.toSerialized() } else emptyList(),
                 handSize = hand.size,
-                collectedScore = 0,
+                collectedScore = state.playerScores[player.seatIndex] ?: 0,
                 hasFinished = hand.isEmpty(),
                 finishOrder = state.finishOrder.indexOf(player.seatIndex).let { if (it >= 0) it + 1 else 0 },
                 remoteId = player.id
@@ -854,7 +880,9 @@ class ServerGameState(
     var teamAScore: Int,
     var teamBScore: Int,
     val finishOrder: MutableList<Int>,
-    var version: Long
+    var version: Long,
+    // 每个玩家累计已收分（赢得回合获得的分数总和）
+    val playerScores: MutableMap<Int, Int> = mutableMapOf()
 )
 
 /**
