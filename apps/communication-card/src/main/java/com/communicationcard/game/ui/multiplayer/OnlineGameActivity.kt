@@ -73,10 +73,16 @@ class OnlineGameActivity : AppCompatActivity() {
     private lateinit var tvPlayerCardCount: TextView
     private lateinit var tvPlayerScore: TextView
 
-    // History overlay
+    // History overlay (分页)
     private lateinit var historyOverlay: FrameLayout
-    private lateinit var tvHistoryContent: TextView
+    private lateinit var tvHistoryColumn1: TextView
+    private lateinit var tvHistoryColumn2: TextView
+    private lateinit var tvHistoryPageInfo: TextView
     private lateinit var btnCloseHistory: Button
+    private lateinit var btnHistoryPrev: Button
+    private lateinit var btnHistoryNext: Button
+    private var historyCurrentPage = 0
+    private val historyLinesPerColumn = 15
 
     // Current round display
     private lateinit var tvCurrentLeader: TextView
@@ -179,10 +185,14 @@ class OnlineGameActivity : AppCompatActivity() {
         tvPlayerCardCount = findViewById(R.id.tvPlayerCardCount)
         tvPlayerScore = findViewById(R.id.tvPlayerScore)
 
-        // History overlay
+        // History overlay (分页)
         historyOverlay = findViewById(R.id.historyOverlay)
-        tvHistoryContent = findViewById(R.id.tvHistoryContent)
+        tvHistoryColumn1 = findViewById(R.id.tvHistoryColumn1)
+        tvHistoryColumn2 = findViewById(R.id.tvHistoryColumn2)
+        tvHistoryPageInfo = findViewById(R.id.tvHistoryPageInfo)
         btnCloseHistory = findViewById(R.id.btnCloseHistory)
+        btnHistoryPrev = findViewById(R.id.btnHistoryPrev)
+        btnHistoryNext = findViewById(R.id.btnHistoryNext)
 
         // Current round display
         tvCurrentLeader = findViewById(R.id.tvCurrentLeader)
@@ -268,6 +278,8 @@ class OnlineGameActivity : AppCompatActivity() {
         btnHistory.setOnClickListener { showHistory() }
         btnShowHistory.setOnClickListener { showHistory() }
         btnCloseHistory.setOnClickListener { historyOverlay.visibility = View.GONE }
+        btnHistoryPrev.setOnClickListener { showHistoryPage(historyCurrentPage - 1) }
+        btnHistoryNext.setOnClickListener { showHistoryPage(historyCurrentPage + 1) }
 
         // 托管按钮改为离开
         btnAutoPlay.setOnClickListener { showLeaveConfirmDialog() }
@@ -396,12 +408,13 @@ class OnlineGameActivity : AppCompatActivity() {
             }
 
             is GameEvent.StateRefresh -> {
-                // 状态刷新：更新所有UI元素
+                // 状态刷新：只更新必要的UI元素（不重建手牌，避免清空选中）
                 updateAllPlayerViews()
-                updatePlayerHand()
                 updateScores()
                 updateCurrentRoundDisplay()
                 updateButtonStates()
+                // 更新回合指示器
+                multiplayerEngine.getCurrentPlayer()?.let { updateTurnIndicator(it) }
             }
 
             else -> {}
@@ -545,7 +558,7 @@ class OnlineGameActivity : AppCompatActivity() {
             val cardCount = winningPlay.cards.size
             winningPlay.cards.forEachIndexed { index, card ->
                 val useBombOverlap = isBomb && index < cardCount - 1
-                val cardView = createMiniCardView(card, useBombOverlap)
+                val cardView = createMiniCardView(card, useBombOverlap, large = true)
                 currentWinningCards.addView(cardView)
             }
 
@@ -562,16 +575,23 @@ class OnlineGameActivity : AppCompatActivity() {
         currentWinningCards.startAnimation(createCardPlayAnimation(0))
     }
 
-    private fun createMiniCardView(card: Card, bombOverlap: Boolean = false): View {
+    private fun createMiniCardView(card: Card, bombOverlap: Boolean = false, large: Boolean = false): View {
         val view = LayoutInflater.from(this).inflate(R.layout.view_card, null)
 
         val tvRank = view.findViewById<TextView>(R.id.tvRank)
         val tvSuit = view.findViewById<TextView>(R.id.tvSuit)
 
         tvRank.text = card.rank.displayName
-        tvRank.textSize = 10f
         tvSuit.text = if (card.isJoker) "★" else card.suit.symbol
-        tvSuit.textSize = 8f
+
+        // 大尺寸用于中央显示，小尺寸用于对手区域
+        if (large) {
+            tvRank.textSize = 16f
+            tvSuit.textSize = 12f
+        } else {
+            tvRank.textSize = 12f
+            tvSuit.textSize = 9f
+        }
 
         val color = when {
             card.isJoker && card.rank == CardRank.BIG_JOKER -> R.color.card_red
@@ -583,9 +603,10 @@ class OnlineGameActivity : AppCompatActivity() {
         tvRank.setTextColor(ContextCompat.getColor(this, color))
         tvSuit.setTextColor(ContextCompat.getColor(this, color))
 
-        val cardWidth = 28.dpToPx()
-        val params = LinearLayout.LayoutParams(cardWidth, 40.dpToPx())
-        params.marginEnd = if (bombOverlap) (-cardWidth * 0.2).toInt() else (-6).dpToPx()
+        val cardWidth = if (large) 38.dpToPx() else 32.dpToPx()
+        val cardHeight = if (large) 54.dpToPx() else 46.dpToPx()
+        val params = LinearLayout.LayoutParams(cardWidth, cardHeight)
+        params.marginEnd = if (bombOverlap) (-cardWidth * 0.25).toInt() else (-4).dpToPx()
         view.layoutParams = params
 
         return view
@@ -860,8 +881,39 @@ class OnlineGameActivity : AppCompatActivity() {
     }
 
     private fun showHistory() {
-        tvHistoryContent.text = gameHistory.joinToString("\n")
+        historyCurrentPage = 0
+        showHistoryPage(0)
         historyOverlay.visibility = View.VISIBLE
+    }
+
+    private fun showHistoryPage(page: Int) {
+        val linesPerPage = historyLinesPerColumn * 2  // 两栏
+        val totalPages = (gameHistory.size + linesPerPage - 1) / linesPerPage
+        val safePage = page.coerceIn(0, maxOf(0, totalPages - 1))
+        historyCurrentPage = safePage
+
+        val startIndex = safePage * linesPerPage
+        val endIndex = minOf(startIndex + linesPerPage, gameHistory.size)
+        val pageLines = if (startIndex < gameHistory.size) {
+            gameHistory.subList(startIndex, endIndex)
+        } else {
+            emptyList()
+        }
+
+        // 分配到两栏
+        val midPoint = (pageLines.size + 1) / 2
+        val column1Lines = pageLines.take(midPoint)
+        val column2Lines = pageLines.drop(midPoint)
+
+        tvHistoryColumn1.text = column1Lines.joinToString("\n")
+        tvHistoryColumn2.text = column2Lines.joinToString("\n")
+        tvHistoryPageInfo.text = "${safePage + 1}/$totalPages"
+
+        // 更新按钮状态
+        btnHistoryPrev.isEnabled = safePage > 0
+        btnHistoryNext.isEnabled = safePage < totalPages - 1
+        btnHistoryPrev.alpha = if (safePage > 0) 1f else 0.5f
+        btnHistoryNext.alpha = if (safePage < totalPages - 1) 1f else 0.5f
     }
 
     private fun showGameOver(result: GameResult) {
