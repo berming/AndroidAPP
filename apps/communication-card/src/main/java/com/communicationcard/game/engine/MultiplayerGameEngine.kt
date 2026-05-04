@@ -110,7 +110,7 @@ class MultiplayerGameEngine(
 
     fun getCurrentPlayer(): Player? {
         val state = gameSyncManager.gameState.value ?: return null
-        return cachedPlayers.getOrNull(state.currentPlayerIndex)
+        return cachedPlayers.find { it.id == state.currentPlayerIndex }
     }
 
     fun getLastPlay(): CardGroup? = cachedLastPlay
@@ -207,23 +207,23 @@ class MultiplayerGameEngine(
         return when (event) {
             is SerializedGameEvent.CardsDealt -> GameEvent.CardsDealt(event.playerCount)
             is SerializedGameEvent.TurnStart -> {
-                val player = cachedPlayers.getOrNull(event.playerId) ?: cachedPlayers.first()
+                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
                 GameEvent.TurnStart(player)
             }
             is SerializedGameEvent.CardsPlayed -> {
-                val player = cachedPlayers.getOrNull(event.playerId) ?: cachedPlayers.first()
+                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
                 GameEvent.CardsPlayed(player, deserializeCardGroup(event.cardGroup))
             }
             is SerializedGameEvent.PlayerPassed -> {
-                val player = cachedPlayers.getOrNull(event.playerId) ?: cachedPlayers.first()
+                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
                 GameEvent.PlayerPassed(player)
             }
             is SerializedGameEvent.RoundWon -> {
-                val player = cachedPlayers.getOrNull(event.playerId) ?: cachedPlayers.first()
+                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
                 GameEvent.RoundWon(player, emptyList(), event.score)
             }
             is SerializedGameEvent.PlayerFinished -> {
-                val player = cachedPlayers.getOrNull(event.playerId) ?: cachedPlayers.first()
+                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
                 GameEvent.PlayerFinished(player, event.order)
             }
             is SerializedGameEvent.ScoreUpdate -> {
