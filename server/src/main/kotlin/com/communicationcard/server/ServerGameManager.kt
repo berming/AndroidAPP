@@ -569,8 +569,10 @@ class ServerGameManager(
         // 优先选择同类型的牌（不用炸弹）
         val sameTypePlays = validPlays.filter { it.type == lastPlay.type }
         if (sameTypePlays.isNotEmpty()) {
-            // 选择最小的同类型牌
-            val bestPlay = sameTypePlays.minByOrNull { getRankValue(it.primaryRank) }!!
+            // 选择最小的同类型牌：先比张数（避免浪费大炸弹），再比点数
+            val bestPlay = sameTypePlays.minWithOrNull(
+                compareBy({ it.cards.size }, { getRankValue(it.primaryRank) })
+            )!!
             return PlayerAction.PlayCards(playerId, bestPlay.cards.map { it.toSerialized() })
         }
 
@@ -704,7 +706,20 @@ class ServerGameManager(
         // 炸弹可以压任何非炸弹
         if (current.type == "BOMB" && last.type != "BOMB") return true
 
-        // 相同类型相同数量才能比
+        // 上家是炸弹时，必须用炸弹才能压
+        if (last.type == "BOMB" && current.type != "BOMB") return false
+
+        // 炸弹之间比较：先比张数，张数相同再比点数
+        // （之前严格要求 size 相同导致 5+ 张大炸弹被错误拒绝，AI出牌失败卡死游戏）
+        if (last.type == "BOMB" && current.type == "BOMB") {
+            return if (current.cards.size != last.cards.size) {
+                current.cards.size > last.cards.size
+            } else {
+                getRankValue(current.primaryRank) > getRankValue(last.primaryRank)
+            }
+        }
+
+        // 非炸弹牌型：相同类型相同数量才能比
         if (current.type != last.type) return false
         if (current.cards.size != last.cards.size) return false
 
