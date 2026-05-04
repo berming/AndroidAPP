@@ -468,7 +468,7 @@ class ServerGameManager(
         val suits = listOf("SPADE", "HEART", "DIAMOND", "CLUB")
         val ranks = listOf("THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "JACK", "QUEEN", "KING", "ACE", "TWO")
 
-        for (deck in 0 until 2) { // 两副牌
+        for (deck in 0 until 4) { // 四副牌 (216张)
             for (suit in suits) {
                 for (rank in ranks) {
                     cards.add(ServerCard(rank, suit, deck))

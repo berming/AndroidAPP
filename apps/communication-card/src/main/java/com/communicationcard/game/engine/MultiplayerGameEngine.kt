@@ -177,6 +177,10 @@ class MultiplayerGameEngine(
             remoteId = sp.remoteId
         )
         player.setInitialHand(sp.hand.map { deserializeCard(it) })
+        // 对于远程玩家，使用服务器提供的状态覆盖（因为我们没有他们的手牌数据）
+        player.setHandSizeOverride(sp.handSize)
+        player.setHasFinishedOverride(sp.hasFinished)
+        player.setCollectedScoreOverride(sp.collectedScore)
         return player
     }
 

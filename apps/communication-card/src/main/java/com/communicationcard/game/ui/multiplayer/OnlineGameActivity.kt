@@ -69,6 +69,7 @@ class OnlineGameActivity : AppCompatActivity() {
     private lateinit var btnPlayAgain: Button
     private lateinit var btnBackMenu: Button
     private lateinit var btnShowHistory: Button
+    private lateinit var tvPlayerName: TextView
     private lateinit var tvPlayerCardCount: TextView
     private lateinit var tvPlayerScore: TextView
 
@@ -174,6 +175,7 @@ class OnlineGameActivity : AppCompatActivity() {
         btnPlayAgain = findViewById(R.id.btnPlayAgain)
         btnBackMenu = findViewById(R.id.btnBackMenu)
         btnShowHistory = findViewById(R.id.btnShowHistory)
+        tvPlayerName = findViewById(R.id.tvPlayerName)
         tvPlayerCardCount = findViewById(R.id.tvPlayerCardCount)
         tvPlayerScore = findViewById(R.id.tvPlayerScore)
 
@@ -226,6 +228,12 @@ class OnlineGameActivity : AppCompatActivity() {
 
         multiplayerEngine.addEventListener { event ->
             runOnUiThread { handleGameEvent(event) }
+        }
+
+        // 设置本地玩家名称显示为 "你 (昵称)"
+        val localPlayer = state.players.find { it.id == localSeatIndex }
+        localPlayer?.let {
+            tvPlayerName.text = "你 (${it.name})"
         }
 
         // 初始化UI
