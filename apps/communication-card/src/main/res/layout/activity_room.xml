@@ -219,14 +219,16 @@
 
     </LinearLayout>
 
-    <!-- 聊天按钮 -->
+    <!-- 聊天按钮 - 可拖动，半透明 -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabChat"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_margin="12dp"
+        android:alpha="0.6"
         android:src="@android:drawable/ic_dialog_email"
         app:backgroundTint="@color/accent"
+        app:fabSize="mini"
         app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:tint="@color/text_primary" />

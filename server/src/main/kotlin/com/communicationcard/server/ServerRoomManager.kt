@@ -208,7 +208,7 @@ class ServerRoomManager {
     fun canStartGame(room: ServerRoom): Boolean {
         val humanPlayers = room.players.count { !it.isAI }
         val allReady = room.players.all { it.isReady }
-        return humanPlayers >= 2 && allReady && room.players.size >= 4
+        return humanPlayers >= 1 && allReady && room.players.size >= 4
     }
 
     /**

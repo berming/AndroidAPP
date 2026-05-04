@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.communicationcard.game.R
 import com.communicationcard.game.network.*
 import com.communicationcard.game.util.DebugLogManager
+import com.communicationcard.game.util.DraggableTouchListener
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -225,9 +226,7 @@ class RoomActivity : AppCompatActivity() {
             networkManager?.send(AddAI(roomId))
         }
 
-        fabChat?.setOnClickListener {
-            toggleChat()
-        }
+        fabChat?.setOnTouchListener(DraggableTouchListener { toggleChat() })
 
         btnCloseChat?.setOnClickListener {
             hideChat()

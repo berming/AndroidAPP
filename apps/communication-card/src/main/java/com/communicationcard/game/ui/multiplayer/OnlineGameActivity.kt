@@ -19,6 +19,7 @@ import com.communicationcard.game.model.*
 import com.communicationcard.game.network.*
 import com.communicationcard.game.ui.SoundManager
 import com.communicationcard.game.util.DebugLogManager
+import com.communicationcard.game.util.DraggableTouchListener
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -232,9 +233,7 @@ class OnlineGameActivity : AppCompatActivity() {
             showLeaveConfirmDialog()
         }
 
-        fabChat.setOnClickListener {
-            toggleChat()
-        }
+        fabChat.setOnTouchListener(DraggableTouchListener { toggleChat() })
 
         chatPanel.findViewById<View>(R.id.btnCloseChat)?.setOnClickListener {
             hideChat()

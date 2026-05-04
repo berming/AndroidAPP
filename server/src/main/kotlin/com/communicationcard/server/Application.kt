@@ -170,7 +170,7 @@ private suspend fun handleStartGame(
     }
 
     if (!roomManager.canStartGame(room)) {
-        session.send(ErrorMessage(400, "无法开始游戏：需要至少2名玩家且全部准备"))
+        session.send(ErrorMessage(400, "无法开始游戏：需要至少1名真人玩家且全部准备"))
         return
     }
 
