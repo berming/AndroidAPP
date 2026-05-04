@@ -1,6 +1,8 @@
 package com.communicationcard.server
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
@@ -30,6 +32,11 @@ class ServerGameManager(
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val turnTimers = ConcurrentHashMap<String, Job>()
+    // 每个房间的动作互斥锁，确保同一房间的动作不会并发执行（防止 hand/state 竞态）
+    private val roomMutexes = ConcurrentHashMap<String, Mutex>()
+
+    private fun mutexFor(room: ServerRoom): Mutex =
+        roomMutexes.getOrPut(room.roomId) { Mutex() }
 
     /**
      * 开始游戏
@@ -84,7 +91,7 @@ class ServerGameManager(
     /**
      * 处理玩家动作
      */
-    fun handleAction(session: GameSession, action: PlayerAction): ActionResult {
+    suspend fun handleAction(session: GameSession, action: PlayerAction): ActionResult {
         val room = roomManager.getRoom(session.roomId ?: "")
             ?: return ActionResult(false, "房间不存在")
 
@@ -92,26 +99,29 @@ class ServerGameManager(
             return ActionResult(false, "游戏未在进行中")
         }
 
-        val gameState = room.gameState
-            ?: return ActionResult(false, "游戏未开始")
+        // 通过互斥锁串行化每个房间的动作，避免并发的 PlayCards/Pass + AI 行动相互踩踏
+        return mutexFor(room).withLock {
+            val gameState = room.gameState
+                ?: return@withLock ActionResult(false, "游戏未开始")
 
-        // 验证是否轮到该玩家
-        if (session.seatIndex != gameState.currentPlayerIndex) {
-            return ActionResult(false, "还没轮到你")
-        }
+            // 验证是否轮到该玩家
+            if (session.seatIndex != gameState.currentPlayerIndex) {
+                return@withLock ActionResult(false, "还没轮到你")
+            }
 
-        // 防止客户端伪造 playerId
-        val actionPlayerId = when (action) {
-            is PlayerAction.PlayCards -> action.playerId
-            is PlayerAction.Pass -> action.playerId
-        }
-        if (actionPlayerId != session.seatIndex) {
-            return ActionResult(false, "动作的座位号不匹配")
-        }
+            // 防止客户端伪造 playerId
+            val actionPlayerId = when (action) {
+                is PlayerAction.PlayCards -> action.playerId
+                is PlayerAction.Pass -> action.playerId
+            }
+            if (actionPlayerId != session.seatIndex) {
+                return@withLock ActionResult(false, "动作的座位号不匹配")
+            }
 
-        return when (action) {
-            is PlayerAction.PlayCards -> handlePlayCards(room, action)
-            is PlayerAction.Pass -> handlePass(room, action)
+            when (action) {
+                is PlayerAction.PlayCards -> handlePlayCards(room, action)
+                is PlayerAction.Pass -> handlePass(room, action)
+            }
         }
     }
 
@@ -434,46 +444,78 @@ class ServerGameManager(
 
     private suspend fun processAITurn(room: ServerRoom, playerIndex: Int) {
         if (room.status != RoomStatus.IN_GAME) return
-        val state = room.gameState ?: return
-        if (state.phase != "PLAYING") return
-        if (state.currentPlayerIndex != playerIndex) return
+        val state0 = room.gameState ?: return
+        if (state0.phase != "PLAYING") return
+        if (state0.currentPlayerIndex != playerIndex) return
 
-        val hand = state.hands[playerIndex] ?: return
-        if (hand.isEmpty()) return
+        val hand0 = state0.hands[playerIndex] ?: return
+        if (hand0.isEmpty()) return
 
         delay(AI_DELAY_MS)
 
-        // 再次校验（异步等待期间状态可能已变化）
-        if (room.status != RoomStatus.IN_GAME) return
-        if (room.gameState?.currentPlayerIndex != playerIndex) return
+        // 在临界区内决策并修改状态；广播放在锁外执行，避免慢的网络发送阻塞其他玩家动作
+        var resultToBroadcast: ActionResult? = null
+        var forceAdvance = false
+        mutexFor(room).withLock {
+            if (room.status != RoomStatus.IN_GAME) return@withLock
+            val state = room.gameState ?: return@withLock
+            if (state.phase != "PLAYING") return@withLock
+            if (state.currentPlayerIndex != playerIndex) return@withLock
+            val hand = state.hands[playerIndex] ?: return@withLock
+            if (hand.isEmpty()) return@withLock
 
-        val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
-        var result = when (action) {
-            is PlayerAction.PlayCards -> handlePlayCards(room, action)
-            is PlayerAction.Pass -> handlePass(room, action)
+            val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
+            var result = when (action) {
+                is PlayerAction.PlayCards -> handlePlayCards(room, action)
+                is PlayerAction.Pass -> handlePass(room, action)
+            }
+
+            if (!result.success) {
+                println("AI action failed for seat $playerIndex: ${result.error}; trying fallback")
+                if (state.lastPlayedGroup != null) {
+                    result = handlePass(room, PlayerAction.Pass(playerIndex))
+                }
+                if (!result.success && hand.isNotEmpty()) {
+                    val smallest = hand.minByOrNull { getRankValue(it.rank) }!!
+                    result = handlePlayCards(
+                        room,
+                        PlayerAction.PlayCards(playerIndex, listOf(smallest.toSerialized()))
+                    )
+                }
+            }
+
+            if (result.success) {
+                resultToBroadcast = result
+            } else {
+                println("AI fallback also failed for seat $playerIndex: ${result.error}; will force-advance")
+                forceAdvance = true
+                moveToNextPlayer(room)
+                state.version++
+                resetTurnTimer(room)
+            }
         }
 
-        // 容错：如果AI首选动作失败，尝试备用动作以避免游戏卡住
-        if (!result.success) {
-            println("AI action failed for seat $playerIndex: ${result.error}; trying fallback")
-            // 备选 1：能过则过
-            if (state.lastPlayedGroup != null) {
-                result = handlePass(room, PlayerAction.Pass(playerIndex))
-            }
-            // 备选 2：出最小的单张
-            if (!result.success && hand.isNotEmpty()) {
-                val smallest = hand.minByOrNull { getRankValue(it.rank) }!!
-                result = handlePlayCards(
-                    room,
-                    PlayerAction.PlayCards(playerIndex, listOf(smallest.toSerialized()))
-                )
-            }
+        resultToBroadcast?.let { broadcastActionResult(room, it) }
+        if (forceAdvance) {
+            broadcastForceAdvance(room)
         }
+    }
 
-        if (result.success) {
-            broadcastActionResult(room, result)
-        } else {
-            println("AI fallback also failed for seat $playerIndex: ${result.error}")
+    /**
+     * 极端兜底广播：所有AI动作都失败时，发送当前同步状态并触发下一回合
+     */
+    private suspend fun broadcastForceAdvance(room: ServerRoom) {
+        room.players.forEach { player ->
+            val playerState = getStateForPlayer(room, player.seatIndex)
+            player.session?.send(GameSync(playerState))
+        }
+        val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+        room.players.forEach { player ->
+            player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
+        }
+        scope.launch {
+            delay(AI_DELAY_MS)
+            checkAndProcessAITurn(room)
         }
     }
 
@@ -629,6 +671,7 @@ class ServerGameManager(
     fun cleanupRoom(roomId: String) {
         turnTimers[roomId]?.cancel()
         turnTimers.remove(roomId)
+        roomMutexes.remove(roomId)
     }
 
     private suspend fun handleTurnTimeout(room: ServerRoom) {
