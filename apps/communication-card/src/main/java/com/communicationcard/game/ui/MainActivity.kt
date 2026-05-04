@@ -23,11 +23,11 @@ import com.communicationcard.game.R
 import com.communicationcard.game.ai.AIDifficulty
 import com.communicationcard.game.network.ConnectionState
 import com.communicationcard.game.network.NetworkManager
-import com.communicationcard.game.network.NetworkManagerHolder
 import com.communicationcard.game.network.RoomEvent
 import com.communicationcard.game.network.RoomManager
-import com.communicationcard.game.network.RoomManagerHolder
+import com.communicationcard.game.ui.multiplayer.NetworkManagerHolder
 import com.communicationcard.game.ui.multiplayer.RoomActivity
+import com.communicationcard.game.ui.multiplayer.RoomManagerHolder
 import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
