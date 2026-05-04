@@ -82,7 +82,7 @@ class LogViewerActivity : AppCompatActivity() {
     }
 
     private fun refreshLogs() {
-        val logs = DebugLogManager.getLogsAsString()
+        val logs = DebugLogManager.getFullLogsFromFile()
         tvLogs.text = if (logs.isEmpty()) "暂无日志" else logs
         scrollView.post {
             scrollView.fullScroll(ScrollView.FOCUS_DOWN)
@@ -90,7 +90,7 @@ class LogViewerActivity : AppCompatActivity() {
     }
 
     private fun copyLogs() {
-        val logs = DebugLogManager.getLogsAsString()
+        val logs = DebugLogManager.getFullLogsFromFile()
         if (logs.isEmpty()) {
             Toast.makeText(this, "暂无日志可复制", Toast.LENGTH_SHORT).show()
             return
