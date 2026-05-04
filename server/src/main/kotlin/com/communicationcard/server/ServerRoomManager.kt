@@ -208,7 +208,7 @@ class ServerRoomManager {
     fun canStartGame(room: ServerRoom): Boolean {
         val humanPlayers = room.players.count { !it.isAI }
         val allReady = room.players.all { it.isReady }
-        return humanPlayers >= 2 && allReady && room.players.size >= 4
+        return humanPlayers >= 1 && allReady && room.players.size >= 4
     }
 
     /**
@@ -241,6 +241,15 @@ class ServerRoomManager {
     fun getRoom(roomId: String): ServerRoom? = rooms[roomId]
 
     fun getRoomByCode(code: String): ServerRoom? = roomsByCode[code]
+
+    /**
+     * 列出所有等待中的房间
+     */
+    fun listWaitingRooms(): List<RoomInfo> {
+        return rooms.values
+            .filter { it.status == RoomStatus.WAITING }
+            .map { it.toRoomInfo() }
+    }
 
     fun getRoomByPlayer(playerId: String): ServerRoom? {
         val roomId = playerToRoom[playerId] ?: return null
@@ -312,7 +321,7 @@ data class ServerPlayer(
     val seatIndex: Int,
     val team: String
 ) {
-    var isConnected: Boolean = !isAI
+    var isConnected: Boolean = true  // AI players are always "connected"
     var isAISubstitute: Boolean = false
 
     fun toRoomPlayer(): RoomPlayer {

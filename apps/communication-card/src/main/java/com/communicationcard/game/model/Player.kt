@@ -36,17 +36,32 @@ data class Player(
 
     // 已收分（赢得的牌中的分值）
     private var _collectedScore: Int = 0
-    val collectedScore: Int get() = _collectedScore
+    private var _collectedScoreOverride: Int? = null
+    val collectedScore: Int get() = _collectedScoreOverride ?: _collectedScore
+
+    fun setCollectedScoreOverride(score: Int) {
+        _collectedScoreOverride = score
+    }
 
     // 已收的牌（赢得的牌）
     private val _collectedCards = mutableListOf<Card>()
     val collectedCards: List<Card> get() = _collectedCards.toList()
 
     // 是否已走完（出完所有手牌）
-    val hasFinished: Boolean get() = _hand.isEmpty()
+    private var _hasFinishedOverride: Boolean? = null
+    val hasFinished: Boolean get() = _hasFinishedOverride ?: _hand.isEmpty()
 
-    // 手牌数量
-    val handSize: Int get() = _hand.size
+    fun setHasFinishedOverride(finished: Boolean) {
+        _hasFinishedOverride = finished
+    }
+
+    // 手牌数量（可被覆盖，用于多人模式显示远程玩家牌数）
+    private var _handSizeOverride: Int? = null
+    val handSize: Int get() = _handSizeOverride ?: _hand.size
+
+    fun setHandSizeOverride(size: Int) {
+        _handSizeOverride = size
+    }
 
     // 手牌总分值
     val handScore: Int get() = _hand.sumOf { it.scoreValue }

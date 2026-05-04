@@ -68,10 +68,16 @@ class GameActivity : AppCompatActivity() {
     private lateinit var tvPlayerCardCount: TextView
     private lateinit var tvPlayerScore: TextView
 
-    // History overlay
+    // History overlay (分页)
     private lateinit var historyOverlay: FrameLayout
-    private lateinit var tvHistoryContent: TextView
+    private lateinit var tvHistoryColumn1: TextView
+    private lateinit var tvHistoryColumn2: TextView
+    private lateinit var tvHistoryPageInfo: TextView
     private lateinit var btnCloseHistory: Button
+    private lateinit var btnHistoryPrev: Button
+    private lateinit var btnHistoryNext: Button
+    private var historyCurrentPage = 0
+    private val historyLinesPerColumn = 15
 
     // Current round display
     private lateinit var tvCurrentLeader: TextView
@@ -184,10 +190,14 @@ class GameActivity : AppCompatActivity() {
         tvPlayerCardCount = findViewById(R.id.tvPlayerCardCount)
         tvPlayerScore = findViewById(R.id.tvPlayerScore)
 
-        // History overlay
+        // History overlay (分页)
         historyOverlay = findViewById(R.id.historyOverlay)
-        tvHistoryContent = findViewById(R.id.tvHistoryContent)
+        tvHistoryColumn1 = findViewById(R.id.tvHistoryColumn1)
+        tvHistoryColumn2 = findViewById(R.id.tvHistoryColumn2)
+        tvHistoryPageInfo = findViewById(R.id.tvHistoryPageInfo)
         btnCloseHistory = findViewById(R.id.btnCloseHistory)
+        btnHistoryPrev = findViewById(R.id.btnHistoryPrev)
+        btnHistoryNext = findViewById(R.id.btnHistoryNext)
 
         // Current round display
         tvCurrentLeader = findViewById(R.id.tvCurrentLeader)
@@ -273,6 +283,9 @@ class GameActivity : AppCompatActivity() {
         btnCloseHistory.setOnClickListener {
             historyOverlay.visibility = View.GONE
         }
+
+        btnHistoryPrev.setOnClickListener { showHistoryPage(historyCurrentPage - 1) }
+        btnHistoryNext.setOnClickListener { showHistoryPage(historyCurrentPage + 1) }
 
         btnPlayAgain.setOnClickListener {
             restartGame()
@@ -518,6 +531,10 @@ class GameActivity : AppCompatActivity() {
 
             is GameEvent.AICommunication -> {
                 // AI communication now shown via played cards
+            }
+
+            is GameEvent.StateRefresh -> {
+                // 仅多人模式使用，单人模式忽略
             }
         }
     }
@@ -1128,8 +1145,39 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showHistory() {
-        tvHistoryContent.text = gameHistory.joinToString("\n")
+        historyCurrentPage = 0
+        showHistoryPage(0)
         historyOverlay.visibility = View.VISIBLE
+    }
+
+    private fun showHistoryPage(page: Int) {
+        val linesPerPage = historyLinesPerColumn * 2  // 两栏
+        val totalPages = (gameHistory.size + linesPerPage - 1) / linesPerPage
+        val safePage = page.coerceIn(0, maxOf(0, totalPages - 1))
+        historyCurrentPage = safePage
+
+        val startIndex = safePage * linesPerPage
+        val endIndex = minOf(startIndex + linesPerPage, gameHistory.size)
+        val pageLines = if (startIndex < gameHistory.size) {
+            gameHistory.subList(startIndex, endIndex)
+        } else {
+            emptyList()
+        }
+
+        // 分配到两栏
+        val midPoint = (pageLines.size + 1) / 2
+        val column1Lines = pageLines.take(midPoint)
+        val column2Lines = pageLines.drop(midPoint)
+
+        tvHistoryColumn1.text = column1Lines.joinToString("\n")
+        tvHistoryColumn2.text = column2Lines.joinToString("\n")
+        tvHistoryPageInfo.text = "${safePage + 1}/$totalPages"
+
+        // 更新按钮状态
+        btnHistoryPrev.isEnabled = safePage > 0
+        btnHistoryNext.isEnabled = safePage < totalPages - 1
+        btnHistoryPrev.alpha = if (safePage > 0) 1f else 0.5f
+        btnHistoryNext.alpha = if (safePage < totalPages - 1) 1f else 0.5f
     }
 
     private fun recordFinalScore(result: GameResult) {

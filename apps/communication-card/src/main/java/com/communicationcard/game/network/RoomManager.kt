@@ -78,8 +78,18 @@ class RoomManager(
             is ErrorMessage -> {
                 _roomEvents.emit(RoomEvent.Error(message.code, message.message))
             }
+            is RoomListResult -> {
+                _roomList.value = message.rooms
+            }
             else -> { /* 其他消息由其他管理器处理 */ }
         }
+    }
+
+    /**
+     * 刷新房间列表
+     */
+    fun refreshRoomList(): Boolean {
+        return networkManager.send(ListRooms())
     }
 
     /**
@@ -169,11 +179,11 @@ class RoomManager(
      */
     fun canStartGame(): Boolean {
         val room = _currentRoom.value ?: return false
-        // 房主才能开始，且至少2个真人玩家
+        // 房主才能开始，至少1个真人玩家（其余可由AI填充）
         if (room.hostId != _localPlayerId) return false
         val humanPlayers = room.players.filter { !it.isAI }
-        if (humanPlayers.size < 2) return false
-        // 所有真人玩家都准备好了
+        if (humanPlayers.isEmpty()) return false
+        // 所有真人玩家都准备好了（房主自动算准备）
         return humanPlayers.all { it.isReady || it.id == room.hostId }
     }
 

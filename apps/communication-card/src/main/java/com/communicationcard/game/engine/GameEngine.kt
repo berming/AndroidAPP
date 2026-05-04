@@ -57,6 +57,7 @@ sealed class GameEvent {
     data class ScoreUpdate(val teamAScore: Int, val teamBScore: Int) : GameEvent()
     data class GameEnded(val result: GameResult) : GameEvent()
     data class AICommunication(val player: Player, val message: String) : GameEvent()
+    data object StateRefresh : GameEvent()  // 状态刷新（多人模式用于强制UI更新）
 }
 
 /**

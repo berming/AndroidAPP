@@ -50,7 +50,7 @@ class ServerGameManager(
 
         // 找黑桃3的玩家先出
         val firstPlayer = hands.entries.find { entry ->
-            entry.value.any { it.suit == "SPADES" && it.rank == "THREE" }
+            entry.value.any { it.suit == "SPADE" && it.rank == "THREE" }
         }?.key ?: 0
 
         val gameState = ServerGameState(
@@ -398,6 +398,14 @@ class ServerGameManager(
                 }
             }
 
+            // 广播回合开始事件（除非游戏结束）
+            if (result.gameResult == null) {
+                val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+                room.players.forEach { player ->
+                    player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
+                }
+            }
+
             result.gameResult?.let { gameResult ->
                 room.status = RoomStatus.FINISHED
                 room.players.forEach { player ->
@@ -409,8 +417,30 @@ class ServerGameManager(
 
     private fun decideAIAction(hand: List<ServerCard>, lastPlay: ServerCardGroup?, playerId: Int): PlayerAction {
         if (lastPlay == null) {
-            // 自由出牌：出最小的单张
-            val smallest = hand.minByOrNull { getRankValue(it.rank) }!!
+            // 自由出牌：优先出对子/三张，其次出最小的单张
+            val grouped = hand.groupBy { it.rank }
+
+            // 找最小的对子
+            val smallestPair = grouped.entries
+                .filter { it.value.size == 2 }
+                .minByOrNull { getRankValue(it.key) }
+            if (smallestPair != null) {
+                return PlayerAction.PlayCards(playerId, smallestPair.value.map { it.toSerialized() })
+            }
+
+            // 找最小的三张
+            val smallestTriple = grouped.entries
+                .filter { it.value.size == 3 }
+                .minByOrNull { getRankValue(it.key) }
+            if (smallestTriple != null) {
+                return PlayerAction.PlayCards(playerId, smallestTriple.value.map { it.toSerialized() })
+            }
+
+            // 出最小的单张（避免拆炸弹）
+            val nonBombCards = hand.filter { card ->
+                grouped[card.rank]?.size?.let { it < 4 } ?: true
+            }
+            val smallest = (nonBombCards.ifEmpty { hand }).minByOrNull { getRankValue(it.rank) }!!
             return PlayerAction.PlayCards(playerId, listOf(smallest.toSerialized()))
         }
 
@@ -420,12 +450,39 @@ class ServerGameManager(
             return PlayerAction.Pass(playerId)
         }
 
-        // 选择最小的能压过的牌
-        val bestPlay = validPlays.minByOrNull { group ->
-            group.cards.sumOf { getRankValue(it.rank) }
-        }!!
+        // 优先选择同类型的牌（不用炸弹）
+        val sameTypePlays = validPlays.filter { it.type == lastPlay.type }
+        if (sameTypePlays.isNotEmpty()) {
+            // 选择最小的同类型牌
+            val bestPlay = sameTypePlays.minByOrNull { getRankValue(it.primaryRank) }!!
+            return PlayerAction.PlayCards(playerId, bestPlay.cards.map { it.toSerialized() })
+        }
 
-        return PlayerAction.PlayCards(playerId, bestPlay.cards.map { it.toSerialized() })
+        // 只剩炸弹可用
+        val bombs = validPlays.filter { it.type == "BOMB" }
+        if (bombs.isEmpty()) {
+            return PlayerAction.Pass(playerId)
+        }
+
+        // 判断是否值得用炸弹
+        val lastPlayValue = getRankValue(lastPlay.primaryRank)
+        val smallestBomb = bombs.minByOrNull { it.cards.size * 100 + getRankValue(it.primaryRank) }!!
+
+        // 如果上家牌太小（小于10），一般不值得用炸弹压
+        // 除非：手牌很少（小于10张）或者炸弹很小（4张3/4/5）
+        val shouldUseBomb = when {
+            hand.size <= 10 -> true  // 手牌少，积极出牌
+            lastPlayValue >= 7 -> true  // 上家牌大（10及以上），值得压
+            lastPlay.type == "BOMB" -> true  // 上家是炸弹，必须用炸弹压
+            smallestBomb.cards.size == 4 && getRankValue(smallestBomb.primaryRank) <= 2 -> true  // 小炸弹（4张3/4/5）可以用
+            else -> false
+        }
+
+        return if (shouldUseBomb) {
+            PlayerAction.PlayCards(playerId, smallestBomb.cards.map { it.toSerialized() })
+        } else {
+            PlayerAction.Pass(playerId)
+        }
     }
 
     // ========== 回合计时器 ==========
@@ -465,10 +522,10 @@ class ServerGameManager(
 
     private fun createDeck(): List<ServerCard> {
         val cards = mutableListOf<ServerCard>()
-        val suits = listOf("SPADES", "HEARTS", "DIAMONDS", "CLUBS")
+        val suits = listOf("SPADE", "HEART", "DIAMOND", "CLUB")
         val ranks = listOf("THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "JACK", "QUEEN", "KING", "ACE", "TWO")
 
-        for (deck in 0 until 2) { // 两副牌
+        for (deck in 0 until 4) { // 四副牌 (216张)
             for (suit in suits) {
                 for (rank in ranks) {
                     cards.add(ServerCard(rank, suit, deck))

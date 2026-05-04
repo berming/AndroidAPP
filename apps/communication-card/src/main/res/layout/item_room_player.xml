@@ -72,4 +72,18 @@
         android:visibility="gone"
         tools:visibility="visible" />
 
+    <!-- 踢人按钮（仅房主可见） -->
+    <ImageView
+        android:id="@+id/btnKick"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:padding="4dp"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:visibility="gone"
+        app:tint="@color/text_secondary"
+        tools:visibility="visible"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
 </LinearLayout>
