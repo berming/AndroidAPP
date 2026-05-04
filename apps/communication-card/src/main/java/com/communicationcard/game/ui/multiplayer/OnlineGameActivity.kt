@@ -18,6 +18,7 @@ import com.communicationcard.game.engine.*
 import com.communicationcard.game.model.*
 import com.communicationcard.game.network.*
 import com.communicationcard.game.ui.SoundManager
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -39,6 +40,7 @@ import kotlinx.coroutines.launch
 class OnlineGameActivity : AppCompatActivity() {
 
     companion object {
+        private const val TAG = "OnlineGameActivity"
         const val EXTRA_GAME_STATE = "game_state"
         const val EXTRA_LOCAL_SEAT_INDEX = "local_seat_index"
     }
@@ -101,16 +103,35 @@ class OnlineGameActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableImmersiveMode()
-        setContentView(R.layout.activity_online_game)
+        DebugLogManager.i(TAG, "=== OnlineGameActivity onCreate START ===")
 
-        soundManager = SoundManager(this)
+        try {
+            enableImmersiveMode()
+            setContentView(R.layout.activity_online_game)
 
-        initManagers()
-        initViews()
-        setupListeners()
-        initGameFromIntent()
-        observeState()
+            soundManager = SoundManager(this)
+
+            DebugLogManager.i(TAG, "Step 1: initManagers")
+            initManagers()
+
+            DebugLogManager.i(TAG, "Step 2: initViews")
+            initViews()
+
+            DebugLogManager.i(TAG, "Step 3: setupListeners")
+            setupListeners()
+
+            DebugLogManager.i(TAG, "Step 4: initGameFromIntent")
+            initGameFromIntent()
+
+            DebugLogManager.i(TAG, "Step 5: observeState")
+            observeState()
+
+            DebugLogManager.i(TAG, "=== OnlineGameActivity onCreate SUCCESS ===")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "OnlineGameActivity onCreate FAILED", e)
+            Toast.makeText(this, "初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     private fun enableImmersiveMode() {
@@ -128,10 +149,17 @@ class OnlineGameActivity : AppCompatActivity() {
     }
 
     private fun initManagers() {
-        networkManager = NetworkManagerHolder.instance
-            ?: throw IllegalStateException("NetworkManager not initialized")
-        roomManager = RoomManagerHolder.instance
-            ?: throw IllegalStateException("RoomManager not initialized")
+        val nm = NetworkManagerHolder.instance
+        val rm = RoomManagerHolder.instance
+
+        DebugLogManager.i(TAG, "initManagers: NetworkManager=${nm != null}, RoomManager=${rm != null}")
+
+        if (nm == null || rm == null) {
+            throw IllegalStateException("NetworkManager或RoomManager未初始化")
+        }
+
+        networkManager = nm
+        roomManager = rm
         gameSyncManager = GameSyncManager(networkManager)
         textChatManager = TextChatManager(networkManager, roomManager)
     }
@@ -231,36 +259,41 @@ class OnlineGameActivity : AppCompatActivity() {
         val stateJson = intent.getStringExtra(EXTRA_GAME_STATE)
         localSeatIndex = intent.getIntExtra(EXTRA_LOCAL_SEAT_INDEX, -1)
 
-        if (stateJson != null && localSeatIndex >= 0) {
-            try {
-                val state = GameMessage.json.decodeFromString(
-                    SerializedGameState.serializer(),
-                    stateJson
-                )
-                gameSyncManager.setInitialState(state, localSeatIndex)
-                multiplayerEngine = MultiplayerGameEngine(gameSyncManager, localSeatIndex)
+        DebugLogManager.i(TAG, "initGameFromIntent: stateJson=${stateJson?.take(100)}, localSeatIndex=$localSeatIndex")
 
-                // Setup event listener
-                multiplayerEngine.addEventListener { event ->
-                    runOnUiThread {
-                        handleGameEvent(event)
-                    }
-                }
-
-                // Initial UI update
-                updateAllPlayerViews()
-                updatePlayerHand()
-                updateScores()
-                updateCurrentRoundDisplay()
-
-            } catch (e: Exception) {
-                Toast.makeText(this, "加载游戏状态失败", Toast.LENGTH_SHORT).show()
-                finish()
-            }
-        } else {
-            Toast.makeText(this, "无效的游戏状态", Toast.LENGTH_SHORT).show()
-            finish()
+        if (stateJson == null) {
+            throw IllegalStateException("游戏状态为空")
         }
+
+        if (localSeatIndex < 0) {
+            throw IllegalStateException("无效的座位号: $localSeatIndex")
+        }
+
+        val state = GameMessage.json.decodeFromString(
+            SerializedGameState.serializer(),
+            stateJson
+        )
+        DebugLogManager.i(TAG, "Parsed state: phase=${state.phase}, players=${state.players.size}")
+
+        gameSyncManager.setInitialState(state, localSeatIndex)
+        multiplayerEngine = MultiplayerGameEngine(gameSyncManager, localSeatIndex)
+
+        multiplayerEngine.addEventListener { event ->
+            runOnUiThread {
+                try {
+                    handleGameEvent(event)
+                } catch (e: Exception) {
+                    DebugLogManager.e(TAG, "Error handling game event", e)
+                }
+            }
+        }
+
+        DebugLogManager.i(TAG, "Initial UI update...")
+        updateAllPlayerViews()
+        updatePlayerHand()
+        updateScores()
+        updateCurrentRoundDisplay()
+        DebugLogManager.i(TAG, "initGameFromIntent complete")
     }
 
     private fun observeState() {

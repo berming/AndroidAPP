@@ -378,12 +378,15 @@ class RoomActivity : AppCompatActivity() {
             ivReadyStatus.visibility = View.GONE
         }
 
-        // 点击踢人（仅房主）
-        if (roomManager?.isHost() == true && player.id != hostId && !player.isAI) {
-            view.setOnLongClickListener {
+        // 踢人按钮（仅房主可见，对非房主玩家）
+        val btnKick = view.findViewById<ImageView>(R.id.btnKick)
+        if (roomManager?.isHost() == true && player.id != hostId) {
+            btnKick.visibility = View.VISIBLE
+            btnKick.setOnClickListener {
                 showKickConfirmDialog(player)
-                true
             }
+        } else {
+            btnKick.visibility = View.GONE
         }
 
         val params = LinearLayout.LayoutParams(
@@ -514,9 +517,12 @@ class RoomActivity : AppCompatActivity() {
     }
 
     private fun showKickConfirmDialog(player: RoomPlayer) {
+        val title = if (player.isAI) "移除电脑" else "踢出玩家"
+        val message = if (player.isAI) "确定要移除 ${player.name} 吗？" else "确定要踢出 ${player.name} 吗？"
+
         AlertDialog.Builder(this)
-            .setTitle("踢出玩家")
-            .setMessage("确定要踢出 ${player.name} 吗？")
+            .setTitle(title)
+            .setMessage(message)
             .setPositiveButton("确定") { _, _ ->
                 roomManager?.kickPlayer(player.id)
             }

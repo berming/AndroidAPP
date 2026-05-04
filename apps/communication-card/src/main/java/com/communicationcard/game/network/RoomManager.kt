@@ -78,8 +78,18 @@ class RoomManager(
             is ErrorMessage -> {
                 _roomEvents.emit(RoomEvent.Error(message.code, message.message))
             }
+            is RoomListResult -> {
+                _roomList.value = message.rooms
+            }
             else -> { /* 其他消息由其他管理器处理 */ }
         }
+    }
+
+    /**
+     * 刷新房间列表
+     */
+    fun refreshRoomList(): Boolean {
+        return networkManager.send(ListRooms())
     }
 
     /**

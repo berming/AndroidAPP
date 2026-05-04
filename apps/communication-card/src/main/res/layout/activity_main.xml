@@ -16,7 +16,7 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="24dp"
-        android:paddingVertical="16dp"
+        android:paddingVertical="12dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:text="@string/title_main"
             android:textColor="@color/text_primary"
-            android:textSize="32sp"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
         <View
@@ -35,11 +35,50 @@
             android:layout_height="1dp"
             android:layout_weight="1" />
 
+        <!-- 玩家昵称 -->
+        <TextView
+            android:id="@+id/tvTopPlayerName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:drawableStart="@android:drawable/ic_menu_my_calendar"
+            android:drawablePadding="4dp"
+            android:drawableTint="@color/text_secondary"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- 连接状态 -->
+        <LinearLayout
+            android:id="@+id/connectionStatusBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/topStatusIndicator"
+                android:layout_width="6dp"
+                android:layout_height="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/circle_indicator" />
+
+            <TextView
+                android:id="@+id/tvTopConnectionStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
         <!-- 关闭按钮 -->
         <ImageButton
             android:id="@+id/btnClose"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="关闭"
             android:src="@android:drawable/ic_menu_close_clear_cancel"

@@ -96,6 +96,7 @@ private suspend fun handleMessage(
         is StartGameRequest -> handleStartGame(session, roomManager, gameManager)
         is KickPlayer -> handleKickPlayer(session, message, roomManager)
         is AddAI -> handleAddAI(session, roomManager)
+        is ListRooms -> handleListRooms(session, roomManager)
         is GameAction -> handleGameAction(session, message, gameManager)
         is TextChatMessage -> handleTextChat(session, message, roomManager)
         is QuickChatMessage -> handleQuickChat(session, message, roomManager)
@@ -217,6 +218,14 @@ private suspend fun handleAddAI(
             session.send(ErrorMessage(400, error.message ?: "添加AI失败"))
         }
     )
+}
+
+private suspend fun handleListRooms(
+    session: GameSession,
+    roomManager: ServerRoomManager
+) {
+    val rooms = roomManager.listWaitingRooms()
+    session.send(RoomListResult(rooms))
 }
 
 private suspend fun handleGameAction(

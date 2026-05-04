@@ -91,6 +91,16 @@ data class AddAI(
     val roomId: String
 ) : GameMessage()
 
+@Serializable
+@SerialName("room.list")
+class ListRooms : GameMessage()
+
+@Serializable
+@SerialName("room.list_result")
+data class RoomListResult(
+    val rooms: List<RoomInfo>
+) : GameMessage()
+
 // ==================== 游戏消息 ====================
 
 @Serializable

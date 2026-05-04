@@ -19,14 +19,18 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.communicationcard.game.R
 import com.communicationcard.game.ai.AIDifficulty
 import com.communicationcard.game.network.ConnectionState
 import com.communicationcard.game.network.NetworkManager
 import com.communicationcard.game.network.RoomEvent
+import com.communicationcard.game.network.RoomInfo
 import com.communicationcard.game.network.RoomManager
 import com.communicationcard.game.ui.multiplayer.NetworkManagerHolder
 import com.communicationcard.game.ui.multiplayer.RoomActivity
+import com.communicationcard.game.ui.multiplayer.RoomListAdapter
 import com.communicationcard.game.ui.multiplayer.RoomManagerHolder
 import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
@@ -50,12 +54,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rgDifficulty: RadioGroup
     private lateinit var rgPlayerCount: RadioGroup
 
+    // 顶部状态栏
+    private lateinit var tvTopPlayerName: TextView
+    private lateinit var connectionStatusBar: View
+    private lateinit var topStatusIndicator: View
+    private lateinit var tvTopConnectionStatus: TextView
+
     // 多人游戏面板
     private var networkManager: NetworkManager? = null
     private var roomManager: RoomManager? = null
     private var multiplayerInited = false
     private var playerName: String = ""
     private lateinit var multiplayerPanel: View
+    private lateinit var roomListAdapter: RoomListAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +99,12 @@ class MainActivity : AppCompatActivity() {
     private fun initViews() {
         findViewById<ImageButton>(R.id.btnClose).setOnClickListener { finish() }
 
+        // 顶部状态栏
+        tvTopPlayerName = findViewById(R.id.tvTopPlayerName)
+        connectionStatusBar = findViewById(R.id.connectionStatusBar)
+        topStatusIndicator = findViewById(R.id.topStatusIndicator)
+        tvTopConnectionStatus = findViewById(R.id.tvTopConnectionStatus)
+
         menuItems = listOf(
             findViewById(R.id.menuSinglePlayer),
             findViewById(R.id.menuMultiplayer),
@@ -104,6 +121,12 @@ class MainActivity : AppCompatActivity() {
 
         rgDifficulty = panelSinglePlayer.findViewById(R.id.rgDifficulty)
         rgPlayerCount = panelSinglePlayer.findViewById(R.id.rgPlayerCount)
+
+        // 房间列表
+        val rvRoomList = multiplayerPanel.findViewById<RecyclerView>(R.id.rvRoomList)
+        roomListAdapter = RoomListAdapter { room -> onRoomClick(room) }
+        rvRoomList.layoutManager = LinearLayoutManager(this)
+        rvRoomList.adapter = roomListAdapter
     }
 
     private fun restoreLastSelections() {
@@ -124,6 +147,9 @@ class MainActivity : AppCompatActivity() {
         panelSettings.findViewById<Switch>(R.id.switchSound)?.isChecked = preferences.isSoundEnabled
         panelSettings.findViewById<Switch>(R.id.switchVibration)?.isChecked = preferences.isVibrationEnabled
         panelSettings.findViewById<Switch>(R.id.switchAnimation)?.isChecked = preferences.isAnimationEnabled
+
+        // 设置面板中的昵称
+        updateSettingsNickname()
     }
 
     private fun setupListeners() {
@@ -150,6 +176,12 @@ class MainActivity : AppCompatActivity() {
         }
         panelSettings.findViewById<Switch>(R.id.switchAnimation)?.setOnCheckedChangeListener { _, c ->
             preferences.isAnimationEnabled = c
+        }
+        panelSettings.findViewById<View>(R.id.nicknameBar)?.setOnClickListener {
+            showNameDialog(firstTime = false)
+        }
+        panelSettings.findViewById<View>(R.id.btnEditNickname)?.setOnClickListener {
+            showNameDialog(firstTime = false)
         }
 
         // 帮助面板
@@ -203,8 +235,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun initMultiplayer() {
         if (multiplayerInited) {
-            // 已初始化，刷新昵称
-            refreshPlayerName()
+            // 已初始化，刷新房间列表
+            roomManager?.refreshRoomList()
             return
         }
 
@@ -223,11 +255,14 @@ class MainActivity : AppCompatActivity() {
                     handleRoomEvent(event)
                 }
             }
+            lifecycleScope.launch {
+                roomManager!!.roomList.collectLatest { rooms ->
+                    updateRoomList(rooms)
+                }
+            }
 
             networkManager!!.connect()
             multiplayerInited = true
-
-            refreshPlayerName()
 
             // 首次进入：如果没有昵称，提示输入
             if (playerName.isEmpty()) {
@@ -240,28 +275,54 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupMultiplayerListeners() {
-        multiplayerPanel.findViewById<View>(R.id.playerInfoBar).setOnClickListener {
-            showNameDialog(firstTime = false)
-        }
-        multiplayerPanel.findViewById<TextView>(R.id.btnEditName).setOnClickListener {
-            showNameDialog(firstTime = false)
-        }
         multiplayerPanel.findViewById<Button>(R.id.btnCreateRoom).setOnClickListener {
             createRoom()
         }
         multiplayerPanel.findViewById<Button>(R.id.btnJoinRoom).setOnClickListener {
             joinRoom()
         }
+        multiplayerPanel.findViewById<TextView>(R.id.btnRefreshRooms).setOnClickListener {
+            roomManager?.refreshRoomList()
+            Toast.makeText(this, "正在刷新房间列表...", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun refreshPlayerName() {
-        val tv = multiplayerPanel.findViewById<TextView>(R.id.tvPlayerName)
-        if (playerName.isEmpty()) {
-            tv.text = "未设置（点击设置）"
-            tv.alpha = 0.6f
+    private fun updateRoomList(rooms: List<RoomInfo>) {
+        val tvNoRooms = multiplayerPanel.findViewById<TextView>(R.id.tvNoRooms)
+        val rvRoomList = multiplayerPanel.findViewById<RecyclerView>(R.id.rvRoomList)
+
+        if (rooms.isEmpty()) {
+            tvNoRooms.visibility = View.VISIBLE
+            rvRoomList.visibility = View.GONE
         } else {
-            tv.text = playerName
-            tv.alpha = 1f
+            tvNoRooms.visibility = View.GONE
+            rvRoomList.visibility = View.VISIBLE
+            roomListAdapter.submitList(rooms)
+        }
+    }
+
+    private fun onRoomClick(room: RoomInfo) {
+        if (playerName.isEmpty()) {
+            showNameDialog(firstTime = true)
+            return
+        }
+        showMultiplayerLoading("正在加入房间...")
+        val sent = roomManager?.joinRoom(room.roomCode, playerName) ?: false
+        if (!sent) {
+            hideMultiplayerLoading()
+            Toast.makeText(this, "未连接到服务器", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateSettingsNickname() {
+        val panelSettings = panels.getOrNull(2) ?: return
+        val tvNickname = panelSettings.findViewById<TextView>(R.id.tvNickname) ?: return
+        if (playerName.isEmpty()) {
+            tvNickname.text = "未设置"
+            tvNickname.alpha = 0.6f
+        } else {
+            tvNickname.text = playerName
+            tvNickname.alpha = 1f
         }
     }
 
@@ -289,7 +350,8 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     playerName = name
                     preferences.lastPlayerName = name
-                    refreshPlayerName()
+                    updateTopBarPlayerName()
+                    updateSettingsNickname()
                 }
             }
         if (!firstTime) builder.setNegativeButton("取消", null)
@@ -297,41 +359,55 @@ class MainActivity : AppCompatActivity() {
         builder.show()
     }
 
+    private fun updateTopBarPlayerName() {
+        if (playerName.isNotEmpty()) {
+            tvTopPlayerName.text = playerName
+            tvTopPlayerName.visibility = View.VISIBLE
+        } else {
+            tvTopPlayerName.visibility = View.GONE
+        }
+    }
+
     private fun updateConnectionUI(state: ConnectionState) {
-        val statusIndicator = multiplayerPanel.findViewById<View>(R.id.statusIndicator)
-        val tvStatus = multiplayerPanel.findViewById<TextView>(R.id.tvConnectionStatus)
-        val loading = multiplayerPanel.findViewById<View>(R.id.loadingOverlay)
+        // 更新顶部状态栏
+        connectionStatusBar.visibility = View.VISIBLE
+        updateTopBarPlayerName()
+
         when (state) {
             is ConnectionState.Disconnected -> {
-                statusIndicator.setBackgroundColor(Color.GRAY)
-                tvStatus.text = "未连接"
-                if (loading.visibility == View.VISIBLE) {
-                    loading.visibility = View.GONE
-                    Toast.makeText(this, "连接已断开，请重试", Toast.LENGTH_SHORT).show()
-                }
+                topStatusIndicator.setBackgroundColor(Color.GRAY)
+                tvTopConnectionStatus.text = "离线"
             }
             is ConnectionState.Connecting -> {
-                statusIndicator.setBackgroundColor(Color.YELLOW)
-                tvStatus.text = "正在连接..."
+                topStatusIndicator.setBackgroundColor(Color.YELLOW)
+                tvTopConnectionStatus.text = "连接中..."
             }
             is ConnectionState.Connected -> {
-                statusIndicator.setBackgroundColor(Color.GREEN)
-                tvStatus.text = "已连接"
+                topStatusIndicator.setBackgroundColor(Color.GREEN)
+                tvTopConnectionStatus.text = "在线"
+                // 连接成功后刷新房间列表
+                roomManager?.refreshRoomList()
             }
             is ConnectionState.Reconnecting -> {
-                statusIndicator.setBackgroundColor(Color.YELLOW)
-                tvStatus.text = "重连中(${state.attempt})..."
-                if (loading.visibility == View.VISIBLE) {
-                    loading.visibility = View.GONE
-                    Toast.makeText(this, "连接中断，正在重连...", Toast.LENGTH_SHORT).show()
-                }
+                topStatusIndicator.setBackgroundColor(Color.YELLOW)
+                tvTopConnectionStatus.text = "重连(${state.attempt})..."
             }
             is ConnectionState.Error -> {
-                statusIndicator.setBackgroundColor(Color.RED)
-                tvStatus.text = "连接错误"
-                loading.visibility = View.GONE
-                Toast.makeText(this, "连接失败: ${state.reason}", Toast.LENGTH_SHORT).show()
+                topStatusIndicator.setBackgroundColor(Color.RED)
+                tvTopConnectionStatus.text = "错误"
             }
+        }
+
+        // 处理loading状态
+        val loading = multiplayerPanel.findViewById<View>(R.id.loadingOverlay)
+        if (state is ConnectionState.Disconnected || state is ConnectionState.Reconnecting) {
+            if (loading.visibility == View.VISIBLE) {
+                loading.visibility = View.GONE
+                Toast.makeText(this, "连接中断", Toast.LENGTH_SHORT).show()
+            }
+        } else if (state is ConnectionState.Error) {
+            loading.visibility = View.GONE
+            Toast.makeText(this, "连接失败: ${state.reason}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -403,11 +479,7 @@ class MainActivity : AppCompatActivity() {
         val etRoomCode = multiplayerPanel.findViewById<EditText>(R.id.etRoomCode)
         val code = etRoomCode.text.toString().trim().uppercase()
         if (code.isEmpty()) {
-            Toast.makeText(this, "请输入房间码", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (code.length < 4) {
-            Toast.makeText(this, "房间码格式错误", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "请输入房间码或名称", Toast.LENGTH_SHORT).show()
             return
         }
         val rm = roomManager ?: return
@@ -459,8 +531,10 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // 从房间返回时刷新昵称
         playerName = preferences.lastPlayerName
+        updateTopBarPlayerName()
+        updateSettingsNickname()
         if (multiplayerInited) {
-            refreshPlayerName()
+            roomManager?.refreshRoomList()
         }
     }
 

@@ -50,7 +50,7 @@ class ServerGameManager(
 
         // 找黑桃3的玩家先出
         val firstPlayer = hands.entries.find { entry ->
-            entry.value.any { it.suit == "SPADES" && it.rank == "THREE" }
+            entry.value.any { it.suit == "SPADE" && it.rank == "THREE" }
         }?.key ?: 0
 
         val gameState = ServerGameState(
@@ -465,7 +465,7 @@ class ServerGameManager(
 
     private fun createDeck(): List<ServerCard> {
         val cards = mutableListOf<ServerCard>()
-        val suits = listOf("SPADES", "HEARTS", "DIAMONDS", "CLUBS")
+        val suits = listOf("SPADE", "HEART", "DIAMOND", "CLUB")
         val ranks = listOf("THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "JACK", "QUEEN", "KING", "ACE", "TWO")
 
         for (deck in 0 until 2) { // 两副牌
