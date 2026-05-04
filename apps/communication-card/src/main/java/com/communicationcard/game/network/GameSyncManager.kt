@@ -86,7 +86,9 @@ class GameSyncManager(
             is GameActionResult -> {
                 _actionResults.emit(message)
                 if (message.success && message.state != null) {
-                    _gameState.value = message.state
+                    val newState = message.state
+                    println("DEBUG GameActionResult: currentPlayerIndex=${newState.currentPlayerIndex}, localSeatIndex=$localSeatIndex")
+                    _gameState.value = newState
                     resetTurnTimer()
                 }
             }
@@ -146,7 +148,14 @@ class GameSyncManager(
      * 检查是否轮到本地玩家
      */
     fun isMyTurn(): Boolean {
-        return _gameState.value?.currentPlayerIndex == localSeatIndex
+        val state = _gameState.value
+        val currentIdx = state?.currentPlayerIndex
+        val result = currentIdx == localSeatIndex
+        // 调试：如果返回false但看起来应该是自己的回合
+        if (!result && localSeatIndex >= 0) {
+            println("DEBUG isMyTurn: currentPlayerIndex=$currentIdx, localSeatIndex=$localSeatIndex, result=$result")
+        }
+        return result
     }
 
     /**
