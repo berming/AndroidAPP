@@ -88,12 +88,25 @@ class ServerGameManager(
         val room = roomManager.getRoom(session.roomId ?: "")
             ?: return ActionResult(false, "房间不存在")
 
+        if (room.status != RoomStatus.IN_GAME) {
+            return ActionResult(false, "游戏未在进行中")
+        }
+
         val gameState = room.gameState
             ?: return ActionResult(false, "游戏未开始")
 
         // 验证是否轮到该玩家
         if (session.seatIndex != gameState.currentPlayerIndex) {
             return ActionResult(false, "还没轮到你")
+        }
+
+        // 防止客户端伪造 playerId
+        val actionPlayerId = when (action) {
+            is PlayerAction.PlayCards -> action.playerId
+            is PlayerAction.Pass -> action.playerId
+        }
+        if (actionPlayerId != session.seatIndex) {
+            return ActionResult(false, "动作的座位号不匹配")
         }
 
         return when (action) {
@@ -272,17 +285,21 @@ class ServerGameManager(
     private fun moveToNextPlayer(room: ServerRoom) {
         val state = room.gameState ?: return
 
-        var next = (state.currentPlayerIndex + 1) % room.players.size
-        var attempts = 0
+        // 使用游戏开始时确定的座位列表（hands 的所有键），按座位号排序
+        // 这样即便 room.players 中有玩家被移除，回合推进仍然准确
+        val seats = state.hands.keys.sorted()
+        if (seats.isEmpty()) return
 
-        while (attempts < room.players.size) {
-            val hand = state.hands[next]
-            if (hand != null && hand.isNotEmpty()) {
-                state.currentPlayerIndex = next
+        val currentIdx = seats.indexOf(state.currentPlayerIndex)
+        val startOffset = if (currentIdx >= 0) 1 else 0
+        val baseIdx = if (currentIdx >= 0) currentIdx else 0
+
+        for (offset in startOffset..seats.size) {
+            val nextSeat = seats[(baseIdx + offset) % seats.size]
+            if (state.hands[nextSeat]?.isNotEmpty() == true) {
+                state.currentPlayerIndex = nextSeat
                 return
             }
-            next = (next + 1) % room.players.size
-            attempts++
         }
     }
 
@@ -293,8 +310,11 @@ class ServerGameManager(
         val teamAPlayers = room.players.filter { it.team == "TEAM_A" }
         val teamBPlayers = room.players.filter { it.team == "TEAM_B" }
 
-        val teamAFinished = teamAPlayers.all { state.hands[it.seatIndex]?.isEmpty() == true }
-        val teamBFinished = teamBPlayers.all { state.hands[it.seatIndex]?.isEmpty() == true }
+        // 注意：空队不能判定为"全部出完"（vacuous truth），必须至少有一个玩家
+        val teamAFinished = teamAPlayers.isNotEmpty() &&
+            teamAPlayers.all { state.hands[it.seatIndex]?.isEmpty() == true }
+        val teamBFinished = teamBPlayers.isNotEmpty() &&
+            teamBPlayers.all { state.hands[it.seatIndex]?.isEmpty() == true }
 
         if (teamAFinished) {
             // A队获胜，计算最终得分
@@ -428,15 +448,32 @@ class ServerGameManager(
         if (room.gameState?.currentPlayerIndex != playerIndex) return
 
         val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
-        val result = when (action) {
+        var result = when (action) {
             is PlayerAction.PlayCards -> handlePlayCards(room, action)
             is PlayerAction.Pass -> handlePass(room, action)
+        }
+
+        // 容错：如果AI首选动作失败，尝试备用动作以避免游戏卡住
+        if (!result.success) {
+            println("AI action failed for seat $playerIndex: ${result.error}; trying fallback")
+            // 备选 1：能过则过
+            if (state.lastPlayedGroup != null) {
+                result = handlePass(room, PlayerAction.Pass(playerIndex))
+            }
+            // 备选 2：出最小的单张
+            if (!result.success && hand.isNotEmpty()) {
+                val smallest = hand.minByOrNull { getRankValue(it.rank) }!!
+                result = handlePlayCards(
+                    room,
+                    PlayerAction.PlayCards(playerIndex, listOf(smallest.toSerialized()))
+                )
+            }
         }
 
         if (result.success) {
             broadcastActionResult(room, result)
         } else {
-            println("AI action failed for seat $playerIndex: ${result.error}")
+            println("AI fallback also failed for seat $playerIndex: ${result.error}")
         }
     }
 

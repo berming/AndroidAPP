@@ -138,9 +138,26 @@ private suspend fun handleLeaveRoom(
     gameManager: ServerGameManager
 ) {
     val roomId = session.roomId
-    val room = roomManager.leaveRoom(session)
-    if (room != null) {
-        broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+    val room = roomId?.let { roomManager.getRoom(it) }
+
+    if (room != null && room.status == RoomStatus.IN_GAME) {
+        // 游戏中：等同于断线（AI接管），不实际从房间删除以避免座位错乱
+        val player = room.players.find { it.id == session.id }
+        if (player != null) {
+            player.isConnected = false
+            player.session = null
+            player.isAISubstitute = true
+            broadcastToRoom(room, PlayerDisconnected(player.id, player.name))
+            gameManager.handlePlayerDisconnect(room, player)
+            // 玩家选择主动离开，不再保留房间映射，禁止重连回此房间
+            session.roomId = null
+        }
+        return
+    }
+
+    val updatedRoom = roomManager.leaveRoom(session)
+    if (updatedRoom != null) {
+        broadcastToRoom(updatedRoom, RoomUpdate(updatedRoom.toRoomInfo()))
     } else if (roomId != null) {
         // 房间已删除，清理游戏管理器中的资源
         gameManager.cleanupRoom(roomId)
@@ -210,13 +227,19 @@ private suspend fun handleKickPlayer(
     message: KickPlayer,
     roomManager: ServerRoomManager
 ) {
+    val room = roomManager.getRoom(session.roomId ?: "")
+    if (room != null && room.status != RoomStatus.WAITING) {
+        session.send(ErrorMessage(400, "游戏已开始，无法踢人"))
+        return
+    }
+
     val result = roomManager.kickPlayer(session, message.playerId)
     result.fold(
-        onSuccess = { room ->
-            val kickedPlayer = room.players.find { it.id == message.playerId }
+        onSuccess = { updatedRoom ->
+            val kickedPlayer = updatedRoom.players.find { it.id == message.playerId }
             kickedPlayer?.session?.send(ErrorMessage(403, "你已被踢出房间"))
             kickedPlayer?.session?.close("Kicked from room")
-            broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+            broadcastToRoom(updatedRoom, RoomUpdate(updatedRoom.toRoomInfo()))
         },
         onFailure = { error ->
             session.send(ErrorMessage(400, error.message ?: "踢人失败"))
@@ -228,10 +251,16 @@ private suspend fun handleAddAI(
     session: GameSession,
     roomManager: ServerRoomManager
 ) {
+    val room = roomManager.getRoom(session.roomId ?: "")
+    if (room != null && room.status != RoomStatus.WAITING) {
+        session.send(ErrorMessage(400, "游戏已开始，无法添加AI"))
+        return
+    }
+
     val result = roomManager.addAI(session)
     result.fold(
-        onSuccess = { room ->
-            broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+        onSuccess = { updatedRoom ->
+            broadcastToRoom(updatedRoom, RoomUpdate(updatedRoom.toRoomInfo()))
         },
         onFailure = { error ->
             session.send(ErrorMessage(400, error.message ?: "添加AI失败"))
@@ -269,18 +298,22 @@ private suspend fun handleTextChat(
 ) {
     val room = roomManager.getRoom(session.roomId ?: "") ?: return
 
+    // 通过当前session引用查找玩家，避免重连后session.id改变导致找不到
+    val senderPlayer = room.players.find { it.session === session }
+        ?: room.players.find { it.id == session.id }
+        ?: return
+
     val chatMessage = TextChatMessage(
-        senderId = session.id,
-        senderName = session.playerName,
+        senderId = senderPlayer.id,        // 使用稳定的 player.id 而非 session.id
+        senderName = senderPlayer.name,
         text = message.text,
         timestamp = System.currentTimeMillis(),
         isTeamOnly = message.isTeamOnly
     )
 
     if (message.isTeamOnly) {
-        val senderPlayer = room.players.find { it.id == session.id }
         room.players
-            .filter { it.team == senderPlayer?.team }
+            .filter { it.team == senderPlayer.team }
             .forEach { it.session?.send(chatMessage) }
     } else {
         broadcastToRoom(room, chatMessage)
@@ -294,9 +327,13 @@ private suspend fun handleQuickChat(
 ) {
     val room = roomManager.getRoom(session.roomId ?: "") ?: return
 
+    val senderPlayer = room.players.find { it.session === session }
+        ?: room.players.find { it.id == session.id }
+        ?: return
+
     val chatMessage = QuickChatMessage(
-        senderId = session.id,
-        senderName = session.playerName,
+        senderId = senderPlayer.id,
+        senderName = senderPlayer.name,
         quickType = message.quickType,
         timestamp = System.currentTimeMillis()
     )
@@ -336,7 +373,8 @@ private suspend fun handleReconnect(
             session.send(ReconnectSuccess(state))
             // 重新发送当前房间信息，确保客户端 UI 同步
             session.send(RoomUpdate(room.toRoomInfo()))
-            broadcastToRoom(room, PlayerReconnected(player.id, player.name), excludeId = session.id)
+            // excludeId 用 player.id（broadcastToRoom 比较的是 player.id 而非 session.id）
+            broadcastToRoom(room, PlayerReconnected(player.id, player.name), excludeId = player.id)
 
             println("Player ${player.name} reconnected to room ${room.roomCode}")
             return

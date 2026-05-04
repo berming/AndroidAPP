@@ -251,6 +251,9 @@ class OnlineGameActivity : AppCompatActivity() {
         updatePlayerHand()
         updateScores()
         updateCurrentRoundDisplay()
+        // 显示首位玩家的回合提示（避免 SharedFlow replay=0 错过初始 TurnStart）
+        multiplayerEngine.getCurrentPlayer()?.let { updateTurnIndicator(it) }
+        updateButtonStates()
 
         gameHistory.add("=== 联网游戏开始 ===")
         roundNumber = 1
