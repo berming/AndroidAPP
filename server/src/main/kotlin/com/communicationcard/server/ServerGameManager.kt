@@ -523,6 +523,11 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEnd(gameResult))
             }
+            // 如果游戏结束时已无连接的真人玩家，立即清理房间避免泄漏
+            if (room.players.none { it.session != null && !it.isAI }) {
+                roomManager.deleteRoom(room.roomId)
+                cleanupRoom(room.roomId)
+            }
         }
     }
 

@@ -411,7 +411,15 @@ class OnlineGameActivity : AppCompatActivity() {
             }
 
             is GameEvent.StateRefresh -> {
-                // 状态刷新：只更新必要的UI元素（不重建手牌，避免清空选中）
+                // 状态刷新：默认情况下不重建手牌（避免清空选中）
+                // 但若手牌内容变了（重连后、AI代打、超时托管等），必须重建以保持一致
+                val currentHand = multiplayerEngine.getMyHand()
+                val displayedHand = cardViewMap.keys
+                val handChanged = currentHand.size != displayedHand.size ||
+                    currentHand.toSet() != displayedHand
+                if (handChanged) {
+                    updatePlayerHand()
+                }
                 updateAllPlayerViews()
                 updateScores()
                 updateCurrentRoundDisplay()

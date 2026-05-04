@@ -111,6 +111,10 @@ private suspend fun handleCreateRoom(
     message: CreateRoom,
     roomManager: ServerRoomManager
 ) {
+    if (session.roomId != null) {
+        session.send(ErrorMessage(400, "你已在房间中，请先离开"))
+        return
+    }
     val room = roomManager.createRoom(session, message.playerName, message.roomName, message.maxPlayers)
     session.send(RoomCreated(room.toRoomInfo()))
 }
@@ -120,6 +124,10 @@ private suspend fun handleJoinRoom(
     message: JoinRoom,
     roomManager: ServerRoomManager
 ) {
+    if (session.roomId != null) {
+        session.send(ErrorMessage(400, "你已在房间中，请先离开"))
+        return
+    }
     val result = roomManager.joinRoom(session, message.roomCode.uppercase(), message.playerName)
     result.fold(
         onSuccess = { room ->
@@ -182,6 +190,11 @@ private suspend fun handleStartGame(
 ) {
     val room = roomManager.getRoom(session.roomId ?: "") ?: run {
         session.send(ErrorMessage(404, "房间不存在"))
+        return
+    }
+
+    if (room.status != RoomStatus.WAITING) {
+        session.send(ErrorMessage(400, "房间已开始或结束，无法重新开始"))
         return
     }
 
@@ -403,8 +416,8 @@ private suspend fun handleDisconnect(
     if (room.status == RoomStatus.IN_GAME) {
         player.isAISubstitute = true
         gameManager.handlePlayerDisconnect(room, player)
-    } else if (room.status == RoomStatus.WAITING) {
-        // 等待状态下，断线即视为离开
+    } else {
+        // 等待中或已结束：断线即视为离开（清理玩家记录，避免房间无法回收）
         val updatedRoom = roomManager.leaveRoom(session)
         if (updatedRoom != null) {
             broadcastToRoom(updatedRoom, RoomUpdate(updatedRoom.toRoomInfo()))
