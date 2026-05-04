@@ -772,9 +772,15 @@ class OnlineGameActivity : AppCompatActivity() {
 
     private fun updateButtonStates() {
         val isMyTurn = multiplayerEngine.isMyTurn()
-        btnPlay.isEnabled = isMyTurn && selectedCards.isNotEmpty()
+        val hasSelection = selectedCards.isNotEmpty()
+        btnPlay.isEnabled = isMyTurn && hasSelection
         btnPass.isEnabled = isMyTurn && multiplayerEngine.canHumanPass()
         btnHint.isEnabled = isMyTurn
+
+        // 调试：如果是自己的回合但出牌按钮禁用
+        if (isMyTurn && !hasSelection && btnPlay.isEnabled != (isMyTurn && hasSelection)) {
+            DebugLogManager.d(TAG, "出牌按钮状态: isMyTurn=$isMyTurn, selectedCards=${selectedCards.size}")
+        }
     }
 
     private fun updateScores() {
@@ -799,6 +805,11 @@ class OnlineGameActivity : AppCompatActivity() {
 
         val validPlays = multiplayerEngine.getValidPlaysForHuman()
         if (validPlays.isEmpty()) {
+            // 调试：如果手牌不为空但没有有效出牌，记录详情
+            val myHand = multiplayerEngine.getMyHand()
+            val lastPlay = multiplayerEngine.getLastPlay()
+            val debugInfo = "手牌:${myHand.size}张, 上家:${lastPlay?.toString() ?: "无"}"
+            DebugLogManager.w(TAG, "提示无有效出牌 - $debugInfo")
             showMessage("没有能出的牌，请过牌")
             return
         }
