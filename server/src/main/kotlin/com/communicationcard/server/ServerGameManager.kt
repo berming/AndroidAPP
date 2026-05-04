@@ -15,7 +15,7 @@ import kotlin.random.Random
  * - 回合计时：超时自动过牌
  *
  * 游戏规则：
- * - 使用两副牌（108张）
+ * - 使用四副牌（216张）
  * - 黑桃3先出
  * - 支持单张、对子、三张、炸弹、顺子
  * - 一队全部出完或达到200分结束
@@ -48,10 +48,10 @@ class ServerGameManager(
             hands[player.seatIndex] = shuffled.subList(start, end).toMutableList()
         }
 
-        // 找黑桃3的玩家先出
+        // 找黑桃3的玩家先出（使用任意有黑桃3的座位号；找不到则取最小座位号）
         val firstPlayer = hands.entries.find { entry ->
             entry.value.any { it.suit == "SPADE" && it.rank == "THREE" }
-        }?.key ?: 0
+        }?.key ?: hands.keys.minOrNull() ?: 0
 
         val gameState = ServerGameState(
             phase = "PLAYING",
@@ -108,10 +108,27 @@ class ServerGameManager(
         val hand = state.hands[action.playerId]
             ?: return ActionResult(false, "玩家手牌不存在")
 
-        // 验证牌是否在手中
-        val playedCards = action.cards.map { c ->
-            hand.find { it.rank == c.rank && it.suit == c.suit }
-                ?: return ActionResult(false, "你没有这张牌")
+        if (action.cards.isEmpty()) {
+            return ActionResult(false, "未选中任何牌")
+        }
+
+        // 验证牌是否在手中（包含 deckIndex 匹配，避免多副牌中重复匹配同一张）
+        val handCopy = hand.toMutableList()
+        val playedCards = mutableListOf<ServerCard>()
+        for (c in action.cards) {
+            val idx = handCopy.indexOfFirst {
+                it.rank == c.rank && it.suit == c.suit && it.deckIndex == c.deckIndex
+            }
+            if (idx == -1) {
+                // 兼容客户端 deckIndex 不准时退化匹配 rank+suit
+                val fallbackIdx = handCopy.indexOfFirst {
+                    it.rank == c.rank && it.suit == c.suit
+                }
+                if (fallbackIdx == -1) return ActionResult(false, "你没有这张牌")
+                playedCards.add(handCopy.removeAt(fallbackIdx))
+            } else {
+                playedCards.add(handCopy.removeAt(idx))
+            }
         }
 
         // 验证牌型
@@ -125,8 +142,9 @@ class ServerGameManager(
             }
         }
 
-        // 执行出牌
-        playedCards.forEach { card -> hand.remove(card) }
+        // 执行出牌：用已扣除后的 handCopy 替换 hand 内容
+        hand.clear()
+        hand.addAll(handCopy)
 
         // 计算本轮得分
         val playScore = playedCards.sumOf { getCardScore(it) }
@@ -137,8 +155,8 @@ class ServerGameManager(
         state.consecutivePasses = 0
 
         // 检查玩家是否出完
-        var finishEvent: SerializedGameEvent? = null
-        if (hand.isEmpty()) {
+        var finishEvent: SerializedGameEvent.PlayerFinished? = null
+        if (hand.isEmpty() && !state.finishOrder.contains(action.playerId)) {
             state.finishOrder.add(action.playerId)
             finishEvent = SerializedGameEvent.PlayerFinished(
                 action.playerId,
@@ -161,13 +179,17 @@ class ServerGameManager(
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
 
-        // 触发AI回合
-        scope.launch {
-            delay(AI_DELAY_MS)
-            checkAndProcessAITurn(room)
+        // 触发AI回合（仅在游戏未结束时）
+        if (gameResult == null) {
+            scope.launch {
+                delay(AI_DELAY_MS)
+                checkAndProcessAITurn(room)
+            }
+        } else {
+            stopTurnTimer(room)
         }
 
-        return ActionResult(true, null, event, gameResult)
+        return ActionResult(true, null, event, gameResult, finishEvent = finishEvent)
     }
 
     private fun handlePass(room: ServerRoom, action: PlayerAction.Pass): ActionResult {
@@ -185,49 +207,66 @@ class ServerGameManager(
             state.hands[player.seatIndex]?.isNotEmpty() == true
         }
 
+        val passEvent = SerializedGameEvent.PlayerPassed(action.playerId)
+        var roundEndEvent: SerializedGameEvent.RoundWon? = null
+
         // 如果所有其他人都过了，本轮结束
         if (state.consecutivePasses >= activePlayers - 1) {
-            handleRoundEnd(room)
+            roundEndEvent = handleRoundEnd(room)
+            // handleRoundEnd 已将 currentPlayerIndex 设置为赢家
+            // 如果赢家已走完，跳到下一位仍在打的玩家
+            if (state.hands[state.currentPlayerIndex]?.isEmpty() != false) {
+                moveToNextPlayer(room)
+            }
+        } else {
+            moveToNextPlayer(room)
         }
 
-        moveToNextPlayer(room)
         state.version++
 
         // 重置回合计时器
         resetTurnTimer(room)
 
-        val event = SerializedGameEvent.PlayerPassed(action.playerId)
-
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
 
-        // 触发AI回合
-        scope.launch {
-            delay(AI_DELAY_MS)
-            checkAndProcessAITurn(room)
+        // 触发AI回合（仅在游戏未结束时）
+        if (gameResult == null) {
+            scope.launch {
+                delay(AI_DELAY_MS)
+                checkAndProcessAITurn(room)
+            }
+        } else {
+            stopTurnTimer(room)
         }
 
-        return ActionResult(true, null, event, gameResult)
+        return ActionResult(true, null, passEvent, gameResult, roundEndEvent)
     }
 
-    private fun handleRoundEnd(room: ServerRoom) {
-        val state = room.gameState ?: return
+    private fun handleRoundEnd(room: ServerRoom): SerializedGameEvent.RoundWon? {
+        val state = room.gameState ?: return null
 
         // 赢家收走本轮分数
-        val winnerId = state.lastPlayerId ?: return
+        val winnerId = state.lastPlayerId ?: return null
         val winnerTeam = room.players.find { it.seatIndex == winnerId }?.team
+        val score = state.currentRoundScore
 
         if (winnerTeam == "TEAM_A") {
-            state.teamAScore += state.currentRoundScore
+            state.teamAScore += score
         } else {
-            state.teamBScore += state.currentRoundScore
+            state.teamBScore += score
         }
+
+        // 赢家成为下一轮首家
+        state.currentPlayerIndex = winnerId
 
         // 重置本轮
         state.currentRoundScore = 0
         state.lastPlayedGroup = null
         state.lastPlayerId = null
         state.consecutivePasses = 0
+
+        return SerializedGameEvent.RoundWon(winnerId, score)
     }
 
     private fun moveToNextPlayer(room: ServerRoom) {
@@ -363,7 +402,9 @@ class ServerGameManager(
     // ========== AI逻辑 ==========
 
     private suspend fun checkAndProcessAITurn(room: ServerRoom) {
+        if (room.status != RoomStatus.IN_GAME) return
         val state = room.gameState ?: return
+        if (state.phase != "PLAYING") return
         val currentPlayer = room.players.find { it.seatIndex == state.currentPlayerIndex } ?: return
 
         if (currentPlayer.isAI || currentPlayer.isAISubstitute || !currentPlayer.isConnected) {
@@ -372,12 +413,19 @@ class ServerGameManager(
     }
 
     private suspend fun processAITurn(room: ServerRoom, playerIndex: Int) {
+        if (room.status != RoomStatus.IN_GAME) return
         val state = room.gameState ?: return
-        val hand = state.hands[playerIndex] ?: return
+        if (state.phase != "PLAYING") return
+        if (state.currentPlayerIndex != playerIndex) return
 
+        val hand = state.hands[playerIndex] ?: return
         if (hand.isEmpty()) return
 
         delay(AI_DELAY_MS)
+
+        // 再次校验（异步等待期间状态可能已变化）
+        if (room.status != RoomStatus.IN_GAME) return
+        if (room.gameState?.currentPlayerIndex != playerIndex) return
 
         val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
         val result = when (action) {
@@ -386,31 +434,57 @@ class ServerGameManager(
         }
 
         if (result.success) {
-            // 广播给所有玩家
+            broadcastActionResult(room, result)
+        } else {
+            println("AI action failed for seat $playerIndex: ${result.error}")
+        }
+    }
+
+    /**
+     * 广播动作结果给所有玩家（公共逻辑）
+     */
+    suspend fun broadcastActionResult(room: ServerRoom, result: ActionResult) {
+        // 1. 广播状态更新
+        room.players.forEach { player ->
+            val playerState = getStateForPlayer(room, player.seatIndex)
+            player.session?.send(GameActionResult(true, null, playerState))
+        }
+
+        // 2. 广播动作事件
+        result.event?.let { event ->
             room.players.forEach { player ->
-                val playerState = getStateForPlayer(room, player.seatIndex)
-                player.session?.send(GameActionResult(true, null, playerState))
+                player.session?.send(GameEventMessage(event))
             }
+        }
 
-            result.event?.let { event ->
-                room.players.forEach { player ->
-                    player.session?.send(GameEventMessage(event))
-                }
+        // 3. 广播玩家走完事件（如有）
+        result.finishEvent?.let { event ->
+            room.players.forEach { player ->
+                player.session?.send(GameEventMessage(event))
             }
+        }
 
-            // 广播回合开始事件（除非游戏结束）
-            if (result.gameResult == null) {
-                val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
-                room.players.forEach { player ->
-                    player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
-                }
+        // 4. 广播本轮结束事件（如有）
+        result.roundEndEvent?.let { event ->
+            room.players.forEach { player ->
+                player.session?.send(GameEventMessage(event))
             }
+        }
 
-            result.gameResult?.let { gameResult ->
-                room.status = RoomStatus.FINISHED
-                room.players.forEach { player ->
-                    player.session?.send(GameEnd(gameResult))
-                }
+        // 4. 广播回合开始事件（除非游戏结束）
+        if (result.gameResult == null) {
+            val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+            room.players.forEach { player ->
+                player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
+            }
+        }
+
+        // 5. 广播游戏结束
+        result.gameResult?.let { gameResult ->
+            room.status = RoomStatus.FINISHED
+            stopTurnTimer(room)
+            room.players.forEach { player ->
+                player.session?.send(GameEnd(gameResult))
             }
         }
     }
@@ -503,6 +577,14 @@ class ServerGameManager(
     private fun stopTurnTimer(room: ServerRoom) {
         turnTimers[room.roomId]?.cancel()
         turnTimers.remove(room.roomId)
+    }
+
+    /**
+     * 清理房间相关的游戏资源
+     */
+    fun cleanupRoom(roomId: String) {
+        turnTimers[roomId]?.cancel()
+        turnTimers.remove(roomId)
     }
 
     private suspend fun handleTurnTimeout(room: ServerRoom) {
@@ -708,5 +790,7 @@ data class ActionResult(
     val success: Boolean,
     val error: String? = null,
     val event: SerializedGameEvent? = null,
-    val gameResult: SerializedGameResult? = null
+    val gameResult: SerializedGameResult? = null,
+    val roundEndEvent: SerializedGameEvent.RoundWon? = null,
+    val finishEvent: SerializedGameEvent.PlayerFinished? = null
 )

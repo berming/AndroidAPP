@@ -297,6 +297,16 @@ class RoomActivity : AppCompatActivity() {
             // 更新按钮状态
             updateHostControls()
             btnStart?.isEnabled = roomManager?.canStartGame() == true
+
+            // 从服务器状态同步本地玩家的"准备"按钮文本
+            val localPlayer = roomManager?.getLocalPlayer()
+            if (localPlayer != null) {
+                isReady = localPlayer.isReady
+                btnReady?.text = if (isReady) "取消准备" else "准备"
+                btnReady?.setBackgroundResource(
+                    if (isReady) R.drawable.button_primary else R.drawable.button_secondary
+                )
+            }
         } catch (e: Exception) {
             DebugLogManager.e(TAG, "Error updating room UI", e)
         }
@@ -309,8 +319,13 @@ class RoomActivity : AppCompatActivity() {
         teamAContainer.removeAllViews()
         teamBContainer.removeAllViews()
 
-        val teamA = room.players.filter { it.team == "TEAM_A" || (it.seatIndex % 2 == 0) }
-        val teamB = room.players.filter { it.team == "TEAM_B" || (it.seatIndex % 2 == 1) }
+        // 优先使用 team 字段；仅在 team 为空时根据座位号兜底
+        val teamA = room.players.filter {
+            it.team == "TEAM_A" || (it.team.isNullOrEmpty() && it.seatIndex % 2 == 0)
+        }.sortedBy { it.seatIndex }
+        val teamB = room.players.filter {
+            it.team == "TEAM_B" || (it.team.isNullOrEmpty() && it.seatIndex % 2 == 1)
+        }.sortedBy { it.seatIndex }
 
         teamA.forEach { player ->
             addPlayerView(teamAContainer, player, room.hostId)
@@ -452,11 +467,14 @@ class RoomActivity : AppCompatActivity() {
     }
 
     private fun toggleReady() {
-        isReady = !isReady
-        roomManager?.setReady(isReady)
-        btnReady?.text = if (isReady) "取消准备" else "准备"
+        // 基于服务器当前状态翻转，而非本地缓存（避免发送/服务器状态不一致）
+        val currentReady = roomManager?.getLocalPlayer()?.isReady ?: false
+        val target = !currentReady
+        roomManager?.setReady(target)
+        // UI 在 RoomUpdate 到达时更新；这里只做一个乐观提示
+        btnReady?.text = if (target) "取消准备" else "准备"
         btnReady?.setBackgroundResource(
-            if (isReady) R.drawable.button_primary else R.drawable.button_secondary
+            if (target) R.drawable.button_primary else R.drawable.button_secondary
         )
     }
 
@@ -567,6 +585,7 @@ class RoomActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         textChatManager?.release()
+        // RoomActivity 不负责销毁 NetworkManager / RoomManager（由 LobbyActivity 创建并保留）
     }
 }
 

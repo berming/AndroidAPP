@@ -53,6 +53,8 @@ class RoomManager(
                 DebugLogManager.i(TAG, "RoomCreated: roomCode=${message.room.roomCode}, hostId=${message.room.hostId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.room.hostId
+                // 保存为重连令牌
+                networkManager.setSessionToken(message.room.hostId)
                 DebugLogManager.i(TAG, "Emitting RoomEvent.RoomCreated")
                 _roomEvents.emit(RoomEvent.RoomCreated(message.room))
             }
@@ -60,6 +62,8 @@ class RoomManager(
                 DebugLogManager.i(TAG, "RoomJoined: roomCode=${message.room.roomCode}, playerId=${message.playerId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.playerId
+                // 保存为重连令牌
+                networkManager.setSessionToken(message.playerId)
                 _roomEvents.emit(RoomEvent.JoinedRoom(message.room))
             }
             is RoomUpdate -> {

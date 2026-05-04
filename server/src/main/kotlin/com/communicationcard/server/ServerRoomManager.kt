@@ -204,11 +204,13 @@ class ServerRoomManager {
 
     /**
      * 检查是否可以开始游戏
+     * 至少1名真人玩家，所有真人玩家都已准备（房主自动算准备）
+     * 服务端会自动用AI补足到6人
      */
     fun canStartGame(room: ServerRoom): Boolean {
-        val humanPlayers = room.players.count { !it.isAI }
-        val allReady = room.players.all { it.isReady }
-        return humanPlayers >= 1 && allReady && room.players.size >= 4
+        val humanPlayers = room.players.filter { !it.isAI }
+        if (humanPlayers.isEmpty()) return false
+        return humanPlayers.all { it.isReady || it.id == room.hostId }
     }
 
     /**

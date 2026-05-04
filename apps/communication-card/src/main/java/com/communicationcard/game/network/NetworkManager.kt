@@ -154,6 +154,8 @@ class NetworkManager(
             is ReconnectSuccess -> {
                 DebugLogManager.d(TAG, "Reconnection successful")
                 _connectionEvents.emit(ConnectionEvent.Reconnected)
+                // 仍需转发给 GameSyncManager 等订阅者，以便恢复状态
+                _messages.emit(message)
             }
             is ErrorMessage -> {
                 DebugLogManager.e(TAG, "Server error: ${message.code} - ${message.message}")

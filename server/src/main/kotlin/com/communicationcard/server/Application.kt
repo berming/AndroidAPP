@@ -137,9 +137,13 @@ private suspend fun handleLeaveRoom(
     roomManager: ServerRoomManager,
     gameManager: ServerGameManager
 ) {
+    val roomId = session.roomId
     val room = roomManager.leaveRoom(session)
     if (room != null) {
         broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+    } else if (roomId != null) {
+        // 房间已删除，清理游戏管理器中的资源
+        gameManager.cleanupRoom(roomId)
     }
 }
 
@@ -174,9 +178,20 @@ private suspend fun handleStartGame(
         return
     }
 
+    // 先用AI填满到6人，再开始游戏
     roomManager.fillWithAI(room, 6)
+
+    // 填充后再次校验（最少6人才能玩）
+    if (room.players.size < 6) {
+        session.send(ErrorMessage(400, "玩家数量不足，无法开始游戏"))
+        return
+    }
+
     room.status = RoomStatus.IN_GAME
     val gameState = gameManager.startGame(room)
+
+    // 先广播房间状态变化（IN_GAME），让客户端看到队伍信息
+    broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
 
     room.players.forEach { player ->
         val playerState = gameManager.getStateForPlayer(room, player.seatIndex)
@@ -241,28 +256,7 @@ private suspend fun handleGameAction(
 
     if (result.success) {
         val room = gameManager.roomManager.getRoom(session.roomId ?: "") ?: return
-
-        // 先广播状态更新
-        room.players.forEach { player ->
-            val playerState = gameManager.getStateForPlayer(room, player.seatIndex)
-            player.session?.send(GameActionResult(true, null, playerState))
-        }
-
-        // 广播动作事件
-        result.event?.let { event ->
-            broadcastToRoom(room, GameEventMessage(event))
-        }
-
-        // 广播回合开始事件（除非游戏结束）
-        if (result.gameResult == null) {
-            val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
-            broadcastToRoom(room, GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
-        }
-
-        result.gameResult?.let { gameResult ->
-            room.status = RoomStatus.FINISHED
-            broadcastToRoom(room, GameEnd(gameResult))
-        }
+        gameManager.broadcastActionResult(room, result)
     } else {
         session.send(GameActionResult(false, result.error))
     }
@@ -325,11 +319,14 @@ private suspend fun handleReconnect(
         if (player != null) {
             player.session = session
             player.isConnected = true
+            // 重连后人类玩家不再是AI代打
+            player.isAISubstitute = false
             session.roomId = room.roomId
             session.playerName = player.name
             session.seatIndex = player.seatIndex
 
-            sessions.remove(oldSessionId)
+            // 注意：保持 player.id 不变（与原session一致），sessions 里两个键都映射到新 session
+            // 这样 playerToRoom (key=player.id) 仍然有效
             sessions[session.id] = session
 
             val state = if (room.status == RoomStatus.IN_GAME) {
@@ -337,6 +334,8 @@ private suspend fun handleReconnect(
             } else null
 
             session.send(ReconnectSuccess(state))
+            // 重新发送当前房间信息，确保客户端 UI 同步
+            session.send(RoomUpdate(room.toRoomInfo()))
             broadcastToRoom(room, PlayerReconnected(player.id, player.name), excludeId = session.id)
 
             println("Player ${player.name} reconnected to room ${room.roomCode}")
@@ -366,6 +365,15 @@ private suspend fun handleDisconnect(
     if (room.status == RoomStatus.IN_GAME) {
         player.isAISubstitute = true
         gameManager.handlePlayerDisconnect(room, player)
+    } else if (room.status == RoomStatus.WAITING) {
+        // 等待状态下，断线即视为离开
+        val updatedRoom = roomManager.leaveRoom(session)
+        if (updatedRoom != null) {
+            broadcastToRoom(updatedRoom, RoomUpdate(updatedRoom.toRoomInfo()))
+        } else {
+            // 房间已清理
+            gameManager.cleanupRoom(room.roomId)
+        }
     }
 
     println("Player ${player.name} disconnected from room ${room.roomCode}")

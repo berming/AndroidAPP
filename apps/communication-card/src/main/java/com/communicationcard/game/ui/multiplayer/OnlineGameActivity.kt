@@ -977,9 +977,11 @@ class OnlineGameActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
-        multiplayerEngine.release()
-        gameSyncManager.release()
-        soundManager.release()
+        if (::multiplayerEngine.isInitialized) multiplayerEngine.release()
+        if (::gameSyncManager.isInitialized) gameSyncManager.release()
+        if (::soundManager.isInitialized) soundManager.release()
+        // 注意：不在此处断开 NetworkManager / 清空 holder，
+        // 因为 LobbyActivity 共享同一连接，断开会破坏返回大厅后的体验
     }
 
     private fun Int.dpToPx(): Int {
