@@ -35,6 +35,10 @@ class MultiplayerGameEngine(
     private var cachedLastPlay: CardGroup? = null
 
     init {
+        // 立即从初始状态同步（避免异步延迟导致UI显示空数据）
+        gameSyncManager.gameState.value?.let { state ->
+            updateFromState(state)
+        }
         observeState()
         observeEvents()
     }
