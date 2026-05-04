@@ -1,238 +1,185 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_dark"
-    android:fillViewport="true">
+    tools:context=".ui.MainActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <!-- 顶部标题栏 -->
+    <LinearLayout
+        android:id="@+id/titleBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="24dp"
-        tools:context=".ui.MainActivity">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <!-- 标题 -->
         <TextView
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/title_main"
             android:textColor="@color/text_primary"
-            android:textSize="42sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            android:textSize="32sp"
+            android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvSubtitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/subtitle"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvTitle" />
-
-        <!-- 设置区域 -->
-        <androidx.cardview.widget.CardView
-            android:id="@+id/settingsCard"
+        <View
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardBackgroundColor="#2A2A40"
-            app:cardCornerRadius="16dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvSubtitle"
-            app:layout_constraintWidth_max="450dp">
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
-            <LinearLayout
+        <!-- 关闭按钮 -->
+        <ImageButton
+            android:id="@+id/btnClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="关闭"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            app:tint="@color/text_secondary" />
+
+    </LinearLayout>
+
+    <!-- 主内容区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="24dp"
+        android:layout_marginBottom="24dp"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/titleBar">
+
+        <!-- 左侧菜单 -->
+        <LinearLayout
+            android:id="@+id/menuContainer"
+            android:layout_width="160dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/menu_background"
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:id="@+id/menuSinglePlayer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:background="@drawable/menu_item_selector"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="16dp"
+                android:text="单人游戏"
+                android:textColor="@color/menu_item_text"
+                android:textSize="16sp" />
 
-                <!-- 难度选择 -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/difficulty"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
+            <TextView
+                android:id="@+id/menuMultiplayer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/menu_item_selector"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="16dp"
+                android:text="联网对抗"
+                android:textColor="@color/menu_item_text"
+                android:textSize="16sp" />
 
-                <RadioGroup
-                    android:id="@+id/rgDifficulty"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
+            <TextView
+                android:id="@+id/menuSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/menu_item_selector"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="16dp"
+                android:text="游戏设置"
+                android:textColor="@color/menu_item_text"
+                android:textSize="16sp" />
 
-                    <RadioButton
-                        android:id="@+id/rbEasy"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:buttonTint="@color/accent"
-                        android:text="@string/difficulty_easy"
-                        android:textColor="@color/text_secondary" />
+            <TextView
+                android:id="@+id/menuStats"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/menu_item_selector"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="16dp"
+                android:text="统计回看"
+                android:textColor="@color/menu_item_text"
+                android:textSize="16sp" />
 
-                    <RadioButton
-                        android:id="@+id/rbMedium"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:buttonTint="@color/accent"
-                        android:checked="true"
-                        android:text="@string/difficulty_medium"
-                        android:textColor="@color/text_secondary" />
-
-                    <RadioButton
-                        android:id="@+id/rbHard"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:buttonTint="@color/accent"
-                        android:text="@string/difficulty_hard"
-                        android:textColor="@color/text_secondary" />
-
-                </RadioGroup>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="12dp"
-                    android:background="#40FFFFFF" />
-
-                <!-- 人数选择 -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/player_count"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-                <RadioGroup
-                    android:id="@+id/rgPlayerCount"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:orientation="horizontal">
-
-                    <RadioButton
-                        android:id="@+id/rb6Players"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:buttonTint="@color/accent"
-                        android:checked="true"
-                        android:text="@string/players_6"
-                        android:textColor="@color/text_secondary" />
-
-                    <RadioButton
-                        android:id="@+id/rb8Players"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:buttonTint="@color/accent"
-                        android:text="@string/players_8"
-                        android:textColor="@color/text_secondary" />
-
-                </RadioGroup>
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- 游戏模式按钮 -->
-        <LinearLayout
-            android:id="@+id/gameModeButtons"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:orientation="horizontal"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/settingsCard">
-
-            <!-- 单人游戏按钮 -->
-            <Button
-                android:id="@+id/btnStartGame"
-                android:layout_width="160dp"
-                android:layout_height="56dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/button_primary"
-                android:text="@string/btn_start_game"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <!-- 多人游戏按钮 -->
-            <Button
-                android:id="@+id/btnMultiplayer"
-                android:layout_width="160dp"
-                android:layout_height="56dp"
-                android:background="@drawable/button_multiplayer"
-                android:text="多人游戏"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/menuHelp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/menu_item_selector"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingVertical="16dp"
+                android:text="帮助"
+                android:textColor="@color/menu_item_text"
+                android:textSize="16sp" />
 
         </LinearLayout>
 
-        <!-- 底部按钮区 -->
-        <LinearLayout
-            android:id="@+id/bottomButtons"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"
-            android:orientation="horizontal"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/gameModeButtons"
-            app:layout_constraintVertical_bias="0">
+        <!-- 右侧内容区域 -->
+        <FrameLayout
+            android:id="@+id/contentContainer"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:background="@drawable/content_background">
 
-            <!-- 规则按钮 -->
-            <Button
-                android:id="@+id/btnRules"
-                android:layout_width="140dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/button_secondary"
-                android:text="@string/btn_rules"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+            <!-- 单人游戏面板 -->
+            <include
+                android:id="@+id/panelSinglePlayer"
+                layout="@layout/panel_single_player"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
-            <!-- 设置按钮 -->
-            <Button
-                android:id="@+id/btnSettings"
-                android:layout_width="140dp"
-                android:layout_height="44dp"
-                android:layout_marginEnd="12dp"
-                android:background="@drawable/button_secondary"
-                android:text="设置"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+            <!-- 联网对抗面板 -->
+            <include
+                android:id="@+id/panelMultiplayer"
+                layout="@layout/panel_multiplayer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
-            <!-- 调试日志按钮 -->
-            <Button
-                android:id="@+id/btnDebugLogs"
-                android:layout_width="100dp"
-                android:layout_height="44dp"
-                android:background="@drawable/button_secondary"
-                android:text="日志"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+            <!-- 游戏设置面板 -->
+            <include
+                android:id="@+id/panelSettings"
+                layout="@layout/panel_settings"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
-        </LinearLayout>
+            <!-- 统计回看面板 -->
+            <include
+                android:id="@+id/panelStats"
+                layout="@layout/panel_stats"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+            <!-- 帮助面板 -->
+            <include
+                android:id="@+id/panelHelp"
+                layout="@layout/panel_help"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
 
-</ScrollView>
+        </FrameLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

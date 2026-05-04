@@ -16,6 +16,7 @@ class GamePreferences(context: Context) {
         // 设置键
         private const val KEY_SOUND_ENABLED = "sound_enabled"
         private const val KEY_VIBRATION_ENABLED = "vibration_enabled"
+        private const val KEY_ANIMATION_ENABLED = "animation_enabled"
         private const val KEY_GAME_SPEED = "game_speed"
         private const val KEY_LAST_DIFFICULTY = "last_difficulty"
         private const val KEY_LAST_PLAYER_COUNT = "last_player_count"
@@ -45,6 +46,10 @@ class GamePreferences(context: Context) {
     var isVibrationEnabled: Boolean
         get() = prefs.getBoolean(KEY_VIBRATION_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_VIBRATION_ENABLED, value).apply()
+
+    var isAnimationEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ANIMATION_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_ANIMATION_ENABLED, value).apply()
 
     var gameSpeed: Int
         get() = prefs.getInt(KEY_GAME_SPEED, SPEED_NORMAL)

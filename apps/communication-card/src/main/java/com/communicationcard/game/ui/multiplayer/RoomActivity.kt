@@ -59,37 +59,75 @@ class RoomActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        DebugLogManager.i(TAG, "=== RoomActivity onCreate START ===")
+
+        // 步骤1：沉浸模式
         try {
-            DebugLogManager.i(TAG, "=== RoomActivity onCreate START ===")
-
             enableImmersiveMode()
-            setContentView(R.layout.activity_room)
+            DebugLogManager.i(TAG, "Step 1: enableImmersiveMode OK")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Step 1 FAILED: enableImmersiveMode", e)
+        }
 
-            DebugLogManager.i(TAG, "Checking holders...")
-            DebugLogManager.i(TAG, "NetworkManagerHolder.instance = ${NetworkManagerHolder.instance}")
-            DebugLogManager.i(TAG, "RoomManagerHolder.instance = ${RoomManagerHolder.instance}")
-            DebugLogManager.i(TAG, "currentRoom = ${RoomManagerHolder.instance?.currentRoom?.value}")
+        // 步骤2：设置布局
+        try {
+            setContentView(R.layout.activity_room)
+            DebugLogManager.i(TAG, "Step 2: setContentView OK")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Step 2 FAILED: setContentView", e)
+            showErrorDialog("布局加载失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(800)}")
+            return
+        }
+
+        // 步骤3：检查 holders
+        try {
+            DebugLogManager.i(TAG, "Step 3: NetworkManagerHolder.instance = ${NetworkManagerHolder.instance}")
+            DebugLogManager.i(TAG, "Step 3: RoomManagerHolder.instance = ${RoomManagerHolder.instance}")
+            DebugLogManager.i(TAG, "Step 3: currentRoom = ${RoomManagerHolder.instance?.currentRoom?.value}")
 
             if (!initManagers()) {
-                DebugLogManager.e(TAG, "initManagers returned false")
+                DebugLogManager.e(TAG, "Step 3 FAILED: initManagers returned false")
                 showErrorDialog("初始化失败", "未找到房间数据，请重新创建房间")
                 return
             }
-
-            DebugLogManager.i(TAG, "initManagers success, calling initViews...")
-            initViews()
-
-            DebugLogManager.i(TAG, "initViews success, calling setupListeners...")
-            setupListeners()
-
-            DebugLogManager.i(TAG, "setupListeners success, calling observeState...")
-            observeState()
-
-            DebugLogManager.i(TAG, "=== RoomActivity onCreate SUCCESS ===")
+            DebugLogManager.i(TAG, "Step 3: initManagers OK")
         } catch (e: Exception) {
-            DebugLogManager.e(TAG, "=== RoomActivity onCreate FAILED ===", e)
-            showErrorDialog("房间加载失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(500)}")
+            DebugLogManager.e(TAG, "Step 3 FAILED: initManagers", e)
+            showErrorDialog("初始化失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(800)}")
+            return
         }
+
+        // 步骤4：初始化视图
+        try {
+            initViews()
+            DebugLogManager.i(TAG, "Step 4: initViews OK")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Step 4 FAILED: initViews", e)
+            showErrorDialog("视图初始化失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(800)}")
+            return
+        }
+
+        // 步骤5：设置监听器
+        try {
+            setupListeners()
+            DebugLogManager.i(TAG, "Step 5: setupListeners OK")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Step 5 FAILED: setupListeners", e)
+            showErrorDialog("监听器设置失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(800)}")
+            return
+        }
+
+        // 步骤6：观察状态
+        try {
+            observeState()
+            DebugLogManager.i(TAG, "Step 6: observeState OK")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Step 6 FAILED: observeState", e)
+            showErrorDialog("状态观察失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(800)}")
+            return
+        }
+
+        DebugLogManager.i(TAG, "=== RoomActivity onCreate SUCCESS ===")
     }
 
     private fun showErrorDialog(title: String, message: String) {
