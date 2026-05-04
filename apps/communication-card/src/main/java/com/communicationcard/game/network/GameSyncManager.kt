@@ -70,7 +70,11 @@ class GameSyncManager(
         when (message) {
             is GameStart -> {
                 _gameState.value = message.state
-                findLocalSeatIndex(message.state)
+                // 仅在 localSeatIndex 尚未设置时才自动查找
+                // (setInitialState 已设置正确值时不覆盖)
+                if (localSeatIndex < 0) {
+                    findLocalSeatIndex(message.state)
+                }
                 startTurnTimer()
             }
 
