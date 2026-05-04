@@ -23,9 +23,7 @@ object MessageSerializer {
  * 网络消息协议 (与客户端保持一致)
  */
 @Serializable
-sealed class GameMessage {
-    abstract val type: String
-}
+sealed class GameMessage
 
 // ==================== 房间消息 ====================
 
@@ -35,83 +33,63 @@ data class CreateRoom(
     val playerName: String,
     val roomName: String = "",
     val maxPlayers: Int = 6
-) : GameMessage() {
-    override val type = "room.create"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.created")
 data class RoomCreated(
     val room: RoomInfo
-) : GameMessage() {
-    override val type = "room.created"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.join")
 data class JoinRoom(
     val roomCode: String,
     val playerName: String
-) : GameMessage() {
-    override val type = "room.join"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.joined")
 data class RoomJoined(
     val room: RoomInfo,
     val playerId: String
-) : GameMessage() {
-    override val type = "room.joined"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.leave")
 data class LeaveRoom(
     val roomId: String
-) : GameMessage() {
-    override val type = "room.leave"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.update")
 data class RoomUpdate(
     val room: RoomInfo
-) : GameMessage() {
-    override val type = "room.update"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.ready")
 data class PlayerReady(
     val isReady: Boolean
-) : GameMessage() {
-    override val type = "room.ready"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.start")
 data class StartGameRequest(
     val roomId: String
-) : GameMessage() {
-    override val type = "room.start"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.kick")
 data class KickPlayer(
     val playerId: String
-) : GameMessage() {
-    override val type = "room.kick"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("room.add_ai")
 data class AddAI(
     val roomId: String
-) : GameMessage() {
-    override val type = "room.add_ai"
-}
+) : GameMessage()
 
 // ==================== 游戏消息 ====================
 
@@ -119,17 +97,13 @@ data class AddAI(
 @SerialName("game.start")
 data class GameStart(
     val state: SerializedGameState
-) : GameMessage() {
-    override val type = "game.start"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.action")
 data class GameAction(
     val action: PlayerAction
-) : GameMessage() {
-    override val type = "game.action"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.action_result")
@@ -137,41 +111,31 @@ data class GameActionResult(
     val success: Boolean,
     val error: String? = null,
     val state: SerializedGameState? = null
-) : GameMessage() {
-    override val type = "game.action_result"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.event")
 data class GameEventMessage(
     val event: SerializedGameEvent
-) : GameMessage() {
-    override val type = "game.event"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.sync")
 data class GameSync(
     val state: SerializedGameState
-) : GameMessage() {
-    override val type = "game.sync"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.turn_timeout")
 data class TurnTimeout(
     val playerId: Int
-) : GameMessage() {
-    override val type = "game.turn_timeout"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("game.end")
 data class GameEnd(
     val result: SerializedGameResult
-) : GameMessage() {
-    override val type = "game.end"
-}
+) : GameMessage()
 
 // ==================== 聊天消息 ====================
 
@@ -183,9 +147,7 @@ data class TextChatMessage(
     val text: String,
     val timestamp: Long,
     val isTeamOnly: Boolean = false
-) : GameMessage() {
-    override val type = "chat.text"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("chat.quick")
@@ -194,9 +156,7 @@ data class QuickChatMessage(
     val senderName: String,
     val quickType: QuickMessageType,
     val timestamp: Long
-) : GameMessage() {
-    override val type = "chat.quick"
-}
+) : GameMessage()
 
 // ==================== 系统消息 ====================
 
@@ -204,52 +164,40 @@ data class QuickChatMessage(
 @SerialName("sys.heartbeat")
 data class Heartbeat(
     val timestamp: Long
-) : GameMessage() {
-    override val type = "sys.heartbeat"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("sys.reconnect")
 data class Reconnect(
     val sessionToken: String
-) : GameMessage() {
-    override val type = "sys.reconnect"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("sys.reconnect_success")
 data class ReconnectSuccess(
     val state: SerializedGameState?
-) : GameMessage() {
-    override val type = "sys.reconnect_success"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("sys.error")
 data class ErrorMessage(
     val code: Int,
     val message: String
-) : GameMessage() {
-    override val type = "sys.error"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("sys.player_disconnected")
 data class PlayerDisconnected(
     val playerId: String,
     val playerName: String
-) : GameMessage() {
-    override val type = "sys.player_disconnected"
-}
+) : GameMessage()
 
 @Serializable
 @SerialName("sys.player_reconnected")
 data class PlayerReconnected(
     val playerId: String,
     val playerName: String
-) : GameMessage() {
-    override val type = "sys.player_reconnected"
-}
+) : GameMessage()
 
 // ==================== 数据类 ====================
 
