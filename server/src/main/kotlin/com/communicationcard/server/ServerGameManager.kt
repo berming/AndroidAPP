@@ -398,6 +398,14 @@ class ServerGameManager(
                 }
             }
 
+            // 广播回合开始事件（除非游戏结束）
+            if (result.gameResult == null) {
+                val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+                room.players.forEach { player ->
+                    player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
+                }
+            }
+
             result.gameResult?.let { gameResult ->
                 room.status = RoomStatus.FINISHED
                 room.players.forEach { player ->

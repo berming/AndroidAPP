@@ -10,15 +10,8 @@ import kotlinx.coroutines.flow.*
  *
  * 设计原则：与GameEngine提供相同的公共API，使UI代码可以无缝切换
  *
- * 主要功能：
- * - 维护本地游戏状态缓存（从服务器同步）
- * - humanPlay()/humanPass() 发送动作到服务器（不本地验证）
- * - 通过addEventListener()接收游戏事件
- * - 提供状态查询：玩家列表、分数、当前出牌等
- *
- * 与GameEngine的区别：
- * - GameEngine: 本地执行游戏逻辑
- * - MultiplayerGameEngine: 服务器执行，本地只缓存和展示
+ * 重要：所有状态读取都直接从 gameSyncManager.gameState 获取，
+ * 避免缓存导致的竞态条件问题。
  */
 class MultiplayerGameEngine(
     private val gameSyncManager: GameSyncManager,
@@ -29,31 +22,14 @@ class MultiplayerGameEngine(
     // 事件监听器
     private val eventListeners = mutableListOf<(GameEvent) -> Unit>()
 
-    // 本地状态缓存
-    private var cachedPlayers: List<Player> = emptyList()
-    private var cachedGamePhase: GamePhase = GamePhase.NOT_STARTED
-    private var cachedLastPlay: CardGroup? = null
-
     init {
-        // 立即从初始状态同步（避免异步延迟导致UI显示空数据）
-        gameSyncManager.gameState.value?.let { state ->
-            updateFromState(state)
-        }
-        observeState()
         observeEvents()
-    }
-
-    private fun observeState() {
-        scope.launch {
-            gameSyncManager.gameState.filterNotNull().collect { state ->
-                updateFromState(state)
-            }
-        }
     }
 
     private fun observeEvents() {
         scope.launch {
             gameSyncManager.gameEvents.collect { event ->
+                // 直接从当前状态构建事件，避免使用缓存
                 val gameEvent = deserializeEvent(event)
                 eventListeners.forEach { it(gameEvent) }
             }
@@ -78,27 +54,30 @@ class MultiplayerGameEngine(
                 eventListeners.forEach { it(GameEvent.GameEnded(gameResult)) }
             }
         }
-    }
 
-    private fun updateFromState(state: SerializedGameState) {
-        cachedPlayers = state.players.map { deserializePlayer(it) }
-        cachedGamePhase = GamePhase.valueOf(state.phase)
-        cachedLastPlay = state.lastPlayedGroup?.let { deserializeCardGroup(it) }
+        // 监听状态变化，通知UI刷新
+        scope.launch {
+            gameSyncManager.gameState.filterNotNull().collect { _ ->
+                // 状态变化时通知监听器刷新（通过发送一个刷新事件）
+                eventListeners.forEach { it(GameEvent.StateRefresh) }
+            }
+        }
     }
 
     // ========== 公共API (与GameEngine兼容) ==========
 
+    // 直接从当前状态读取玩家列表
     val players: List<Player>
-        get() = cachedPlayers
+        get() = gameSyncManager.gameState.value?.players?.map { deserializePlayer(it) } ?: emptyList()
 
     val gamePhase: GamePhase
-        get() = cachedGamePhase
+        get() = gameSyncManager.gameState.value?.phase?.let { GamePhase.valueOf(it) } ?: GamePhase.NOT_STARTED
 
     val teamA: TeamInfo
-        get() = TeamInfo(Team.TEAM_A, cachedPlayers.filter { it.team == Team.TEAM_A })
+        get() = TeamInfo(Team.TEAM_A, players.filter { it.team == Team.TEAM_A })
 
     val teamB: TeamInfo
-        get() = TeamInfo(Team.TEAM_B, cachedPlayers.filter { it.team == Team.TEAM_B })
+        get() = TeamInfo(Team.TEAM_B, players.filter { it.team == Team.TEAM_B })
 
     fun addEventListener(listener: (GameEvent) -> Unit) {
         eventListeners.add(listener)
@@ -110,10 +89,12 @@ class MultiplayerGameEngine(
 
     fun getCurrentPlayer(): Player? {
         val state = gameSyncManager.gameState.value ?: return null
-        return cachedPlayers.find { it.id == state.currentPlayerIndex }
+        return players.find { it.id == state.currentPlayerIndex }
     }
 
-    fun getLastPlay(): CardGroup? = cachedLastPlay
+    fun getLastPlay(): CardGroup? {
+        return gameSyncManager.gameState.value?.lastPlayedGroup?.let { deserializeCardGroup(it) }
+    }
 
     fun isMyTurn(): Boolean = gameSyncManager.isMyTurn()
 
@@ -181,7 +162,6 @@ class MultiplayerGameEngine(
             remoteId = sp.remoteId
         )
         player.setInitialHand(sp.hand.map { deserializeCard(it) })
-        // 对于远程玩家，使用服务器提供的状态覆盖（因为我们没有他们的手牌数据）
         player.setHandSizeOverride(sp.handSize)
         player.setHasFinishedOverride(sp.hasFinished)
         player.setCollectedScoreOverride(sp.collectedScore)
@@ -204,26 +184,29 @@ class MultiplayerGameEngine(
     }
 
     private fun deserializeEvent(event: SerializedGameEvent): GameEvent {
+        // 直接从当前状态获取玩家列表，确保数据最新
+        val currentPlayers = players
+
         return when (event) {
             is SerializedGameEvent.CardsDealt -> GameEvent.CardsDealt(event.playerCount)
             is SerializedGameEvent.TurnStart -> {
-                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
+                val player = currentPlayers.find { it.id == event.playerId } ?: currentPlayers.first()
                 GameEvent.TurnStart(player)
             }
             is SerializedGameEvent.CardsPlayed -> {
-                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
+                val player = currentPlayers.find { it.id == event.playerId } ?: currentPlayers.first()
                 GameEvent.CardsPlayed(player, deserializeCardGroup(event.cardGroup))
             }
             is SerializedGameEvent.PlayerPassed -> {
-                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
+                val player = currentPlayers.find { it.id == event.playerId } ?: currentPlayers.first()
                 GameEvent.PlayerPassed(player)
             }
             is SerializedGameEvent.RoundWon -> {
-                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
+                val player = currentPlayers.find { it.id == event.playerId } ?: currentPlayers.first()
                 GameEvent.RoundWon(player, emptyList(), event.score)
             }
             is SerializedGameEvent.PlayerFinished -> {
-                val player = cachedPlayers.find { it.id == event.playerId } ?: cachedPlayers.first()
+                val player = currentPlayers.find { it.id == event.playerId } ?: currentPlayers.first()
                 GameEvent.PlayerFinished(player, event.order)
             }
             is SerializedGameEvent.ScoreUpdate -> {

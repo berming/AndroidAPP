@@ -183,7 +183,11 @@ private suspend fun handleStartGame(
         player.session?.send(GameStart(playerState))
     }
 
-    println("Game started in room ${room.roomCode}")
+    // 广播初始回合开始
+    val firstPlayerId = gameState.currentPlayerIndex
+    broadcastToRoom(room, GameEventMessage(SerializedGameEvent.TurnStart(firstPlayerId)))
+
+    println("Game started in room ${room.roomCode}, first player: $firstPlayerId")
 }
 
 private suspend fun handleKickPlayer(
@@ -238,13 +242,21 @@ private suspend fun handleGameAction(
     if (result.success) {
         val room = gameManager.roomManager.getRoom(session.roomId ?: "") ?: return
 
+        // 先广播状态更新
         room.players.forEach { player ->
             val playerState = gameManager.getStateForPlayer(room, player.seatIndex)
             player.session?.send(GameActionResult(true, null, playerState))
         }
 
+        // 广播动作事件
         result.event?.let { event ->
             broadcastToRoom(room, GameEventMessage(event))
+        }
+
+        // 广播回合开始事件（除非游戏结束）
+        if (result.gameResult == null) {
+            val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+            broadcastToRoom(room, GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
         }
 
         result.gameResult?.let { gameResult ->

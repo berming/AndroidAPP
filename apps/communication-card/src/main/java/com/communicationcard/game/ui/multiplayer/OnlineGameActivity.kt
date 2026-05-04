@@ -395,6 +395,15 @@ class OnlineGameActivity : AppCompatActivity() {
                 showGameOver(event.result)
             }
 
+            is GameEvent.StateRefresh -> {
+                // 状态刷新：更新所有UI元素
+                updateAllPlayerViews()
+                updatePlayerHand()
+                updateScores()
+                updateCurrentRoundDisplay()
+                updateButtonStates()
+            }
+
             else -> {}
         }
     }
