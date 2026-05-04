@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.communicationcard.game.R
 import com.communicationcard.game.network.*
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -24,41 +25,85 @@ import kotlinx.coroutines.launch
  */
 class RoomActivity : AppCompatActivity() {
 
-    private lateinit var networkManager: NetworkManager
-    private lateinit var roomManager: RoomManager
-    private lateinit var textChatManager: TextChatManager
+    companion object {
+        private const val TAG = "RoomActivity"
+    }
+
+    private var networkManager: NetworkManager? = null
+    private var roomManager: RoomManager? = null
+    private var textChatManager: TextChatManager? = null
 
     // UI
-    private lateinit var tvRoomCode: TextView
-    private lateinit var tvPlayerCount: TextView
-    private lateinit var btnLeave: Button
-    private lateinit var btnReady: Button
-    private lateinit var btnStart: Button
-    private lateinit var btnAddAI: Button
-    private lateinit var teamAPlayers: LinearLayout
-    private lateinit var teamBPlayers: LinearLayout
-    private lateinit var fabChat: View
-    private lateinit var tvUnreadCount: TextView
-    private lateinit var chatPanel: View
+    private var tvRoomName: TextView? = null
+    private var tvRoomCode: TextView? = null
+    private var tvPlayerCount: TextView? = null
+    private var btnLeave: Button? = null
+    private var btnReady: Button? = null
+    private var btnStart: Button? = null
+    private var btnAddAI: Button? = null
+    private var teamAPlayers: LinearLayout? = null
+    private var teamBPlayers: LinearLayout? = null
+    private var fabChat: View? = null
+    private var tvUnreadCount: TextView? = null
+    private var chatPanel: View? = null
 
     // 聊天相关
-    private lateinit var rvMessages: RecyclerView
-    private lateinit var etMessage: EditText
-    private lateinit var btnSend: Button
-    private lateinit var btnCloseChat: View
+    private var rvMessages: RecyclerView? = null
+    private var etMessage: EditText? = null
+    private var btnSend: Button? = null
+    private var btnCloseChat: View? = null
     private var isChatVisible = false
 
     private var isReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableImmersiveMode()
-        setContentView(R.layout.activity_room)
 
-        initManagers()
-        initViews()
-        setupListeners()
-        observeState()
+        try {
+            DebugLogManager.i(TAG, "=== RoomActivity onCreate START ===")
+
+            enableImmersiveMode()
+            setContentView(R.layout.activity_room)
+
+            DebugLogManager.i(TAG, "Checking holders...")
+            DebugLogManager.i(TAG, "NetworkManagerHolder.instance = ${NetworkManagerHolder.instance}")
+            DebugLogManager.i(TAG, "RoomManagerHolder.instance = ${RoomManagerHolder.instance}")
+            DebugLogManager.i(TAG, "currentRoom = ${RoomManagerHolder.instance?.currentRoom?.value}")
+
+            if (!initManagers()) {
+                DebugLogManager.e(TAG, "initManagers returned false")
+                showErrorDialog("初始化失败", "未找到房间数据，请重新创建房间")
+                return
+            }
+
+            DebugLogManager.i(TAG, "initManagers success, calling initViews...")
+            initViews()
+
+            DebugLogManager.i(TAG, "initViews success, calling setupListeners...")
+            setupListeners()
+
+            DebugLogManager.i(TAG, "setupListeners success, calling observeState...")
+            observeState()
+
+            DebugLogManager.i(TAG, "=== RoomActivity onCreate SUCCESS ===")
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "=== RoomActivity onCreate FAILED ===", e)
+            showErrorDialog("房间加载失败", "错误: ${e.message}\n\n${e.stackTraceToString().take(500)}")
+        }
+    }
+
+    private fun showErrorDialog(title: String, message: String) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setCancelable(false)
+            .setPositiveButton("返回") { _, _ -> finish() }
+            .show()
+    }
+
+    private fun showErrorAndFinish(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        finish()
     }
 
     private fun enableImmersiveMode() {
@@ -75,17 +120,29 @@ class RoomActivity : AppCompatActivity() {
         }
     }
 
-    private fun initManagers() {
-        // 获取共享的NetworkManager和RoomManager实例
-        // 在实际应用中，这些应该通过依赖注入或Application级别单例管理
-        networkManager = NetworkManagerHolder.instance
-            ?: throw IllegalStateException("NetworkManager not initialized")
-        roomManager = RoomManagerHolder.instance
-            ?: throw IllegalStateException("RoomManager not initialized")
-        textChatManager = TextChatManager(networkManager, roomManager)
+    private fun initManagers(): Boolean {
+        val nm = NetworkManagerHolder.instance
+        val rm = RoomManagerHolder.instance
+
+        if (nm == null || rm == null) {
+            DebugLogManager.e(TAG, "Holders are null: NetworkManager=$nm, RoomManager=$rm")
+            return false
+        }
+
+        if (rm.currentRoom.value == null) {
+            DebugLogManager.e(TAG, "currentRoom is null")
+            return false
+        }
+
+        DebugLogManager.i(TAG, "initManagers: room=${rm.currentRoom.value?.roomCode}")
+        networkManager = nm
+        roomManager = rm
+        textChatManager = TextChatManager(nm, rm)
+        return true
     }
 
     private fun initViews() {
+        tvRoomName = findViewById(R.id.tvRoomName)
         tvRoomCode = findViewById(R.id.tvRoomCode)
         tvPlayerCount = findViewById(R.id.tvPlayerCount)
         btnLeave = findViewById(R.id.btnLeave)
@@ -99,117 +156,131 @@ class RoomActivity : AppCompatActivity() {
         chatPanel = findViewById(R.id.chatPanel)
 
         // 聊天面板
-        rvMessages = chatPanel.findViewById(R.id.rvMessages)
-        etMessage = chatPanel.findViewById(R.id.etMessage)
-        btnSend = chatPanel.findViewById(R.id.btnSend)
-        btnCloseChat = chatPanel.findViewById(R.id.btnCloseChat)
+        chatPanel?.let { panel ->
+            rvMessages = panel.findViewById(R.id.rvMessages)
+            etMessage = panel.findViewById(R.id.etMessage)
+            btnSend = panel.findViewById(R.id.btnSend)
+            btnCloseChat = panel.findViewById(R.id.btnCloseChat)
+        }
 
-        rvMessages.layoutManager = LinearLayoutManager(this)
+        rvMessages?.layoutManager = LinearLayoutManager(this)
 
         // 根据是否房主显示不同按钮
         updateHostControls()
     }
 
     private fun setupListeners() {
-        btnLeave.setOnClickListener {
+        btnLeave?.setOnClickListener {
             showLeaveConfirmDialog()
         }
 
-        btnReady.setOnClickListener {
+        btnReady?.setOnClickListener {
             toggleReady()
         }
 
-        btnStart.setOnClickListener {
+        btnStart?.setOnClickListener {
             startGame()
         }
 
-        btnAddAI.setOnClickListener {
-            val roomId = roomManager.currentRoom.value?.roomId ?: return@setOnClickListener
-            networkManager.send(AddAI(roomId))
+        btnAddAI?.setOnClickListener {
+            val roomId = roomManager?.currentRoom?.value?.roomId ?: return@setOnClickListener
+            networkManager?.send(AddAI(roomId))
         }
 
-        fabChat.setOnClickListener {
+        fabChat?.setOnClickListener {
             toggleChat()
         }
 
-        btnCloseChat.setOnClickListener {
+        btnCloseChat?.setOnClickListener {
             hideChat()
         }
 
-        btnSend.setOnClickListener {
+        btnSend?.setOnClickListener {
             sendMessage()
         }
 
         // 快捷消息
-        chatPanel.findViewById<View>(R.id.btnQuick1)?.setOnClickListener {
-            textChatManager.sendQuickMessage(QuickMessageType.NICE_PLAY)
+        chatPanel?.findViewById<View>(R.id.btnQuick1)?.setOnClickListener {
+            textChatManager?.sendQuickMessage(QuickMessageType.NICE_PLAY)
         }
-        chatPanel.findViewById<View>(R.id.btnQuick2)?.setOnClickListener {
-            textChatManager.sendQuickMessage(QuickMessageType.PASS)
+        chatPanel?.findViewById<View>(R.id.btnQuick2)?.setOnClickListener {
+            textChatManager?.sendQuickMessage(QuickMessageType.PASS)
         }
-        chatPanel.findViewById<View>(R.id.btnQuick3)?.setOnClickListener {
-            textChatManager.sendQuickMessage(QuickMessageType.HELP_TEAMMATE)
+        chatPanel?.findViewById<View>(R.id.btnQuick3)?.setOnClickListener {
+            textChatManager?.sendQuickMessage(QuickMessageType.HELP_TEAMMATE)
         }
-        chatPanel.findViewById<View>(R.id.btnQuick4)?.setOnClickListener {
-            textChatManager.sendQuickMessage(QuickMessageType.GOOD_GAME)
+        chatPanel?.findViewById<View>(R.id.btnQuick4)?.setOnClickListener {
+            textChatManager?.sendQuickMessage(QuickMessageType.GOOD_GAME)
         }
     }
 
     private fun observeState() {
+        val rm = roomManager ?: return
+
         // 监听房间状态
         lifecycleScope.launch {
-            roomManager.currentRoom.collectLatest { room ->
+            rm.currentRoom.collectLatest { room ->
                 room?.let { updateRoomUI(it) }
             }
         }
 
         // 监听房间事件
         lifecycleScope.launch {
-            roomManager.roomEvents.collectLatest { event ->
+            rm.roomEvents.collectLatest { event ->
                 handleRoomEvent(event)
             }
         }
 
         // 监听聊天消息
+        val tcm = textChatManager ?: return
         lifecycleScope.launch {
-            textChatManager.messages.collectLatest { messages ->
+            tcm.messages.collectLatest { messages ->
                 updateChatList(messages)
             }
         }
 
         // 监听未读数
         lifecycleScope.launch {
-            textChatManager.unreadCount.collectLatest { count ->
+            tcm.unreadCount.collectLatest { count ->
                 updateUnreadBadge(count)
             }
         }
     }
 
     private fun updateRoomUI(room: RoomInfo) {
-        tvRoomCode.text = room.roomCode
-        tvPlayerCount.text = "${room.players.size}/${room.maxPlayers} 玩家"
+        try {
+            DebugLogManager.d(TAG, "updateRoomUI: ${room.roomCode}, players=${room.players.size}")
+            tvRoomName?.text = room.roomName.ifEmpty { "房间" }
+            tvRoomCode?.text = room.roomCode
+            tvPlayerCount?.text = "${room.players.size}/${room.maxPlayers} 玩家"
 
-        // 更新玩家列表
-        updatePlayerLists(room)
+            // 更新玩家列表
+            updatePlayerLists(room)
 
-        // 更新按钮状态
-        updateHostControls()
-        btnStart.isEnabled = roomManager.canStartGame()
+            // 更新按钮状态
+            updateHostControls()
+            btnStart?.isEnabled = roomManager?.canStartGame() == true
+        } catch (e: Exception) {
+            DebugLogManager.e(TAG, "Error updating room UI", e)
+        }
     }
 
     private fun updatePlayerLists(room: RoomInfo) {
-        teamAPlayers.removeAllViews()
-        teamBPlayers.removeAllViews()
+        val teamAContainer = teamAPlayers ?: return
+        val teamBContainer = teamBPlayers ?: return
+
+        teamAContainer.removeAllViews()
+        teamBContainer.removeAllViews()
 
         val teamA = room.players.filter { it.team == "TEAM_A" || (it.seatIndex % 2 == 0) }
         val teamB = room.players.filter { it.team == "TEAM_B" || (it.seatIndex % 2 == 1) }
 
         teamA.forEach { player ->
-            addPlayerView(teamAPlayers, player, room.hostId)
+            addPlayerView(teamAContainer, player, room.hostId)
         }
 
         teamB.forEach { player ->
-            addPlayerView(teamBPlayers, player, room.hostId)
+            addPlayerView(teamBContainer, player, room.hostId)
         }
 
         // 添加空位
@@ -217,10 +288,10 @@ class RoomActivity : AppCompatActivity() {
         val emptyB = (room.maxPlayers / 2) - teamB.size
 
         repeat(emptyA) {
-            addEmptySlot(teamAPlayers)
+            addEmptySlot(teamAContainer)
         }
         repeat(emptyB) {
-            addEmptySlot(teamBPlayers)
+            addEmptySlot(teamBContainer)
         }
     }
 
@@ -270,7 +341,7 @@ class RoomActivity : AppCompatActivity() {
         }
 
         // 点击踢人（仅房主）
-        if (roomManager.isHost() && player.id != hostId && !player.isAI) {
+        if (roomManager?.isHost() == true && player.id != hostId && !player.isAI) {
             view.setOnLongClickListener {
                 showKickConfirmDialog(player)
                 true
@@ -315,10 +386,10 @@ class RoomActivity : AppCompatActivity() {
     }
 
     private fun updateHostControls() {
-        val isHost = roomManager.isHost()
-        btnReady.visibility = if (isHost) View.GONE else View.VISIBLE
-        btnStart.visibility = if (isHost) View.VISIBLE else View.GONE
-        btnAddAI.visibility = if (isHost) View.VISIBLE else View.GONE
+        val isHost = roomManager?.isHost() == true
+        btnReady?.visibility = if (isHost) View.GONE else View.VISIBLE
+        btnStart?.visibility = if (isHost) View.VISIBLE else View.GONE
+        btnAddAI?.visibility = if (isHost) View.VISIBLE else View.GONE
     }
 
     private fun handleRoomEvent(event: RoomEvent) {
@@ -328,10 +399,10 @@ class RoomActivity : AppCompatActivity() {
                 navigateToGame(event.state)
             }
             is RoomEvent.PlayerLeft -> {
-                textChatManager.addSystemMessage("${event.playerName} 离开了房间")
+                textChatManager?.addSystemMessage("${event.playerName} 离开了房间")
             }
             is RoomEvent.PlayerRejoined -> {
-                textChatManager.addSystemMessage("${event.playerName} 重新加入了房间")
+                textChatManager?.addSystemMessage("${event.playerName} 重新加入了房间")
             }
             is RoomEvent.Error -> {
                 Toast.makeText(this, "错误: ${event.message}", Toast.LENGTH_SHORT).show()
@@ -342,19 +413,19 @@ class RoomActivity : AppCompatActivity() {
 
     private fun toggleReady() {
         isReady = !isReady
-        roomManager.setReady(isReady)
-        btnReady.text = if (isReady) "取消准备" else "准备"
-        btnReady.setBackgroundResource(
+        roomManager?.setReady(isReady)
+        btnReady?.text = if (isReady) "取消准备" else "准备"
+        btnReady?.setBackgroundResource(
             if (isReady) R.drawable.button_primary else R.drawable.button_secondary
         )
     }
 
     private fun startGame() {
-        if (!roomManager.canStartGame()) {
+        if (roomManager?.canStartGame() != true) {
             Toast.makeText(this, "等待所有玩家准备", Toast.LENGTH_SHORT).show()
             return
         }
-        roomManager.startGame()
+        roomManager?.startGame()
     }
 
     private fun toggleChat() {
@@ -366,30 +437,30 @@ class RoomActivity : AppCompatActivity() {
     }
 
     private fun showChat() {
-        chatPanel.visibility = View.VISIBLE
+        chatPanel?.visibility = View.VISIBLE
         isChatVisible = true
-        textChatManager.markAsRead()
+        textChatManager?.markAsRead()
     }
 
     private fun hideChat() {
-        chatPanel.visibility = View.GONE
+        chatPanel?.visibility = View.GONE
         isChatVisible = false
     }
 
     private fun updateUnreadBadge(count: Int) {
         if (count > 0 && !isChatVisible) {
-            tvUnreadCount.visibility = View.VISIBLE
-            tvUnreadCount.text = if (count > 99) "99+" else count.toString()
+            tvUnreadCount?.visibility = View.VISIBLE
+            tvUnreadCount?.text = if (count > 99) "99+" else count.toString()
         } else {
-            tvUnreadCount.visibility = View.GONE
+            tvUnreadCount?.visibility = View.GONE
         }
     }
 
     private fun sendMessage() {
-        val text = etMessage.text.toString().trim()
+        val text = etMessage?.text?.toString()?.trim() ?: return
         if (text.isNotEmpty()) {
-            textChatManager.sendMessage(text)
-            etMessage.text.clear()
+            textChatManager?.sendMessage(text)
+            etMessage?.text?.clear()
         }
     }
 
@@ -409,34 +480,36 @@ class RoomActivity : AppCompatActivity() {
             .setTitle("踢出玩家")
             .setMessage("确定要踢出 ${player.name} 吗？")
             .setPositiveButton("确定") { _, _ ->
-                roomManager.kickPlayer(player.id)
+                roomManager?.kickPlayer(player.id)
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
     private fun leaveRoom() {
-        roomManager.leaveRoom()
+        roomManager?.leaveRoom()
         finish()
     }
 
     private fun navigateToGame(state: SerializedGameState) {
+        val rm = roomManager ?: return
         val intent = Intent(this, OnlineGameActivity::class.java)
         intent.putExtra(OnlineGameActivity.EXTRA_GAME_STATE, GameMessage.json.encodeToString(SerializedGameState.serializer(), state))
-        intent.putExtra(OnlineGameActivity.EXTRA_LOCAL_SEAT_INDEX, roomManager.localSeatIndex)
+        intent.putExtra(OnlineGameActivity.EXTRA_LOCAL_SEAT_INDEX, rm.localSeatIndex)
         startActivity(intent)
         finish()
     }
 
     private fun updateChatList(messages: List<ChatMessage>) {
-        val adapter = rvMessages.adapter as? ChatAdapter
+        val rv = rvMessages ?: return
+        val adapter = rv.adapter as? ChatAdapter
         if (adapter == null) {
-            rvMessages.adapter = ChatAdapter(messages)
+            rv.adapter = ChatAdapter(messages)
         } else {
             adapter.updateMessages(messages)
         }
         if (messages.isNotEmpty()) {
-            rvMessages.scrollToPosition(messages.size - 1)
+            rv.scrollToPosition(messages.size - 1)
         }
     }
 
@@ -450,7 +523,7 @@ class RoomActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        textChatManager.release()
+        textChatManager?.release()
     }
 }
 

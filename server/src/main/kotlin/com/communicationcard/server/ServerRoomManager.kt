@@ -17,13 +17,15 @@ class ServerRoomManager {
     /**
      * 创建房间
      */
-    fun createRoom(session: GameSession, playerName: String, maxPlayers: Int): ServerRoom {
+    fun createRoom(session: GameSession, playerName: String, roomName: String, maxPlayers: Int): ServerRoom {
         val roomId = generateRoomId()
         val roomCode = generateRoomCode()
+        val finalRoomName = roomName.ifEmpty { "${playerName}的房间" }
 
         val room = ServerRoom(
             roomId = roomId,
             roomCode = roomCode,
+            roomName = finalRoomName,
             hostId = session.id,
             maxPlayers = maxPlayers.coerceIn(4, 12)
         )
@@ -277,6 +279,7 @@ class ServerRoomManager {
 class ServerRoom(
     val roomId: String,
     val roomCode: String,
+    val roomName: String,
     var hostId: String,
     val maxPlayers: Int
 ) {
@@ -288,6 +291,7 @@ class ServerRoom(
         return RoomInfo(
             roomId = roomId,
             roomCode = roomCode,
+            roomName = roomName,
             hostId = hostId,
             players = players.map { it.toRoomPlayer() },
             maxPlayers = maxPlayers,

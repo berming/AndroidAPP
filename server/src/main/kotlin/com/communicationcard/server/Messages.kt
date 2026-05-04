@@ -33,6 +33,7 @@ sealed class GameMessage {
 @SerialName("room.create")
 data class CreateRoom(
     val playerName: String,
+    val roomName: String = "",
     val maxPlayers: Int = 6
 ) : GameMessage() {
     override val type = "room.create"
@@ -256,6 +257,7 @@ data class PlayerReconnected(
 data class RoomInfo(
     val roomId: String,
     val roomCode: String,
+    val roomName: String = "",
     val hostId: String,
     val players: List<RoomPlayer>,
     val maxPlayers: Int,

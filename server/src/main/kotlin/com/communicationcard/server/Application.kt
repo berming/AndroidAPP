@@ -110,7 +110,7 @@ private suspend fun handleCreateRoom(
     message: CreateRoom,
     roomManager: ServerRoomManager
 ) {
-    val room = roomManager.createRoom(session, message.playerName, message.maxPlayers)
+    val room = roomManager.createRoom(session, message.playerName, message.roomName, message.maxPlayers)
     session.send(RoomCreated(room.toRoomInfo()))
 }
 

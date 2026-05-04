@@ -3,7 +3,7 @@ package com.communicationcard.game.network
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.util.Log
+import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.*
@@ -25,10 +25,10 @@ class NetworkManager(
     }
 
     init {
-        Log.w(TAG, "========================================")
-        Log.w(TAG, "NetworkManager initialized")
-        Log.w(TAG, "Server URL: $serverUrl")
-        Log.w(TAG, "========================================")
+        DebugLogManager.w(TAG, "========================================")
+        DebugLogManager.w(TAG, "NetworkManager initialized")
+        DebugLogManager.w(TAG, "Server URL: $serverUrl")
+        DebugLogManager.w(TAG, "========================================")
     }
 
     private val client = OkHttpClient.Builder()
@@ -60,13 +60,13 @@ class NetworkManager(
      * 连接到服务器
      */
     fun connect(token: String? = null): Job {
-        Log.w(TAG, ">>> connect() called, current state: ${_connectionState.value}")
-        Log.w(TAG, ">>> Network available: ${isNetworkAvailable()}")
+        DebugLogManager.w(TAG, ">>> connect() called, current state: ${_connectionState.value}")
+        DebugLogManager.w(TAG, ">>> Network available: ${isNetworkAvailable()}")
 
         return scope.launch {
             if (_connectionState.value == ConnectionState.Connected ||
                 _connectionState.value == ConnectionState.Connecting) {
-                Log.w(TAG, ">>> Already connected or connecting, skipping")
+                DebugLogManager.w(TAG, ">>> Already connected or connecting, skipping")
                 return@launch
             }
 
@@ -74,12 +74,12 @@ class NetworkManager(
             _connectionState.value = ConnectionState.Connecting
             reconnectAttempts = 0
 
-            Log.w(TAG, ">>> Starting connection to: $serverUrl")
+            DebugLogManager.w(TAG, ">>> Starting connection to: $serverUrl")
 
             try {
                 establishConnection()
             } catch (e: Exception) {
-                Log.e(TAG, ">>> Connection exception: ${e.javaClass.simpleName}: ${e.message}", e)
+                DebugLogManager.e(TAG, ">>> Connection exception: ${e.javaClass.simpleName}: ${e.message}", e)
                 _connectionState.value = ConnectionState.Error(e.message ?: "Connection failed")
                 _connectionEvents.emit(ConnectionEvent.ConnectionFailed(e.message ?: "Unknown error"))
             }
@@ -87,7 +87,7 @@ class NetworkManager(
     }
 
     private suspend fun establishConnection() {
-        Log.w(TAG, ">>> establishConnection() - Building request for: $serverUrl")
+        DebugLogManager.w(TAG, ">>> establishConnection() - Building request for: $serverUrl")
 
         val request = Request.Builder()
             .url(serverUrl)
@@ -96,11 +96,11 @@ class NetworkManager(
             }
             .build()
 
-        Log.w(TAG, ">>> Request built, creating WebSocket...")
+        DebugLogManager.w(TAG, ">>> Request built, creating WebSocket...")
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.w(TAG, ">>> onOpen() - WebSocket connected! Response: ${response.code}")
+                DebugLogManager.w(TAG, ">>> onOpen() - WebSocket connected! Response: ${response.code}")
                 scope.launch {
                     _connectionState.value = ConnectionState.Connected
                     reconnectAttempts = 0
@@ -110,32 +110,32 @@ class NetworkManager(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.d(TAG, ">>> onMessage(): $text")
+                DebugLogManager.d(TAG, ">>> onMessage(): $text")
                 scope.launch {
                     try {
                         val message = GameMessage.fromJson(text)
                         handleMessage(message)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to parse message: $text", e)
+                        DebugLogManager.e(TAG, "Failed to parse message: $text", e)
                     }
                 }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                Log.w(TAG, ">>> onClosing(): code=$code, reason=$reason")
+                DebugLogManager.w(TAG, ">>> onClosing(): code=$code, reason=$reason")
                 webSocket.close(1000, null)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.w(TAG, ">>> onClosed(): code=$code, reason=$reason")
+                DebugLogManager.w(TAG, ">>> onClosed(): code=$code, reason=$reason")
                 scope.launch {
                     handleDisconnection(code, reason)
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, ">>> onFailure(): ${t.javaClass.simpleName}: ${t.message}")
-                Log.e(TAG, ">>> Response: ${response?.code} ${response?.message}")
+                DebugLogManager.e(TAG, ">>> onFailure(): ${t.javaClass.simpleName}: ${t.message}")
+                DebugLogManager.e(TAG, ">>> Response: ${response?.code} ${response?.message}")
                 t.printStackTrace()
                 scope.launch {
                     handleDisconnection(-1, t.message ?: "Connection failed")
@@ -143,7 +143,7 @@ class NetworkManager(
             }
         })
 
-        Log.w(TAG, ">>> WebSocket created, waiting for callbacks...")
+        DebugLogManager.w(TAG, ">>> WebSocket created, waiting for callbacks...")
     }
 
     private suspend fun handleMessage(message: GameMessage) {
@@ -152,11 +152,11 @@ class NetworkManager(
                 // 服务器心跳响应，无需处理
             }
             is ReconnectSuccess -> {
-                Log.d(TAG, "Reconnection successful")
+                DebugLogManager.d(TAG, "Reconnection successful")
                 _connectionEvents.emit(ConnectionEvent.Reconnected)
             }
             is ErrorMessage -> {
-                Log.e(TAG, "Server error: ${message.code} - ${message.message}")
+                DebugLogManager.e(TAG, "Server error: ${message.code} - ${message.message}")
                 _connectionEvents.emit(ConnectionEvent.ServerError(message.code, message.message))
             }
             else -> {
@@ -187,7 +187,7 @@ class NetworkManager(
     private suspend fun attemptReconnect() {
         reconnectAttempts++
         val delay = RECONNECT_BASE_DELAY_MS * (1 shl (reconnectAttempts - 1))
-        Log.d(TAG, "Attempting reconnect $reconnectAttempts/$RECONNECT_MAX_ATTEMPTS in ${delay}ms")
+        DebugLogManager.d(TAG, "Attempting reconnect $reconnectAttempts/$RECONNECT_MAX_ATTEMPTS in ${delay}ms")
 
         _connectionState.value = ConnectionState.Reconnecting(reconnectAttempts)
         _connectionEvents.emit(ConnectionEvent.Reconnecting(reconnectAttempts))
@@ -202,7 +202,7 @@ class NetworkManager(
                     send(Reconnect(token))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Reconnect attempt failed", e)
+                DebugLogManager.e(TAG, "Reconnect attempt failed", e)
                 if (reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
                     attemptReconnect()
                 } else {
@@ -226,7 +226,7 @@ class NetworkManager(
     fun send(message: GameMessage): Boolean {
         val ws = webSocket ?: return false
         val json = message.toJson()
-        Log.d(TAG, "Sending: $json")
+        DebugLogManager.d(TAG, "Sending: $json")
         return ws.send(json)
     }
 

@@ -59,6 +59,12 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize" />
 
+        <activity
+            android:name=".ui.LogViewerActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize" />
+
     </application>
 
 </manifest>
