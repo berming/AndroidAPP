@@ -25,7 +25,7 @@
             android:layout_marginTop="4dp"
             android:background="@color/accent" />
 
-        <!-- 横向布局：左房间列表，右操作区 -->
+        <!-- 横向布局：左房间列表，右创建房间 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -33,7 +33,7 @@
             android:layout_weight="1"
             android:orientation="horizontal">
 
-            <!-- 左：房间列表 -->
+            <!-- 左：房间列表（点击直接加入） -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
@@ -53,7 +53,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="房间列表"
+                        android:text="房间列表（点击加入）"
                         android:textColor="@color/text_primary"
                         android:textSize="13sp" />
 
@@ -89,88 +89,75 @@
 
             </LinearLayout>
 
-            <!-- 右：创建/加入 -->
+            <!-- 右：创建房间（内嵌输入框） -->
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:background="@drawable/edit_text_background"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <!-- 创建房间 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/edit_text_background"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="12dp">
-
-                    <Button
-                        android:id="@+id/btnCreateRoom"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:background="@drawable/button_primary"
-                        android:text="创建房间"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:gravity="center"
-                        android:text="创建房间，邀请好友"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11sp" />
-
-                </LinearLayout>
+                    android:text="创建房间"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="10dp" />
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="8dp"
+                    android:background="#30FFFFFF" />
 
-                <!-- 加入房间 -->
-                <LinearLayout
+                <!-- 房间名称 -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="房间名称"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/etRoomName"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/edit_text_background"
+                    android:hint="留空则使用默认名称"
+                    android:maxLength="20"
+                    android:paddingHorizontal="10dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <!-- 占位符 - 让按钮靠下 -->
+                <View
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/edit_text_background"
-                    android:orientation="vertical"
-                    android:padding="12dp">
+                    android:layout_weight="1" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="输入房间码/房间名"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp" />
+                <!-- 创建按钮 -->
+                <Button
+                    android:id="@+id/btnCreateRoom"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/button_primary"
+                    android:text="创建房间"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
 
-                    <EditText
-                        android:id="@+id/etRoomCode"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="6dp"
-                        android:background="@drawable/edit_text_background"
-                        android:hint="房间码或名称"
-                        android:inputType="textCapCharacters"
-                        android:maxLength="20"
-                        android:paddingHorizontal="10dp"
-                        android:textColor="@color/text_primary"
-                        android:textColorHint="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <Button
-                        android:id="@+id/btnJoinRoom"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="8dp"
-                        android:background="@drawable/button_secondary"
-                        android:text="加入"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp" />
-
-                </LinearLayout>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="创建后可邀请好友或添加AI"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
 
             </LinearLayout>
 

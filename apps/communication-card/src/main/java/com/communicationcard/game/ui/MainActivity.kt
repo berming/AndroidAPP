@@ -278,9 +278,6 @@ class MainActivity : AppCompatActivity() {
         multiplayerPanel.findViewById<Button>(R.id.btnCreateRoom).setOnClickListener {
             createRoom()
         }
-        multiplayerPanel.findViewById<Button>(R.id.btnJoinRoom).setOnClickListener {
-            joinRoom()
-        }
         multiplayerPanel.findViewById<TextView>(R.id.btnRefreshRooms).setOnClickListener {
             roomManager?.refreshRoomList()
             Toast.makeText(this, "正在刷新房间列表...", Toast.LENGTH_SHORT).show()
@@ -438,53 +435,11 @@ class MainActivity : AppCompatActivity() {
             showNameDialog(firstTime = true)
             return
         }
-        showCreateRoomDialog()
-    }
-
-    private fun showCreateRoomDialog() {
-        val input = EditText(this).apply {
-            hint = "房间名称（可选）"
-            filters = arrayOf(InputFilter.LengthFilter(20))
-        }
-        val container = FrameLayout(this).apply {
-            val pad = (resources.displayMetrics.density * 16).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(input)
-        }
-        AlertDialog.Builder(this)
-            .setTitle("创建房间")
-            .setView(container)
-            .setPositiveButton("创建") { _, _ ->
-                doCreateRoom(input.text.toString().trim())
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun doCreateRoom(roomName: String) {
         val rm = roomManager ?: return
+        val etRoomName = multiplayerPanel.findViewById<EditText>(R.id.etRoomName)
+        val roomName = etRoomName.text.toString().trim()
         showMultiplayerLoading("正在创建房间...")
         val sent = rm.createRoom(playerName, roomName, 6)
-        if (!sent) {
-            hideMultiplayerLoading()
-            Toast.makeText(this, "未连接到服务器", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun joinRoom() {
-        if (playerName.isEmpty()) {
-            showNameDialog(firstTime = true)
-            return
-        }
-        val etRoomCode = multiplayerPanel.findViewById<EditText>(R.id.etRoomCode)
-        val code = etRoomCode.text.toString().trim().uppercase()
-        if (code.isEmpty()) {
-            Toast.makeText(this, "请输入房间码或名称", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val rm = roomManager ?: return
-        showMultiplayerLoading("正在加入房间...")
-        val sent = rm.joinRoom(code, playerName)
         if (!sent) {
             hideMultiplayerLoading()
             Toast.makeText(this, "未连接到服务器", Toast.LENGTH_SHORT).show()
