@@ -519,6 +519,10 @@ class GameActivity : AppCompatActivity() {
             is GameEvent.AICommunication -> {
                 // AI communication now shown via played cards
             }
+
+            is GameEvent.StateRefresh -> {
+                // 仅多人模式使用，单人模式忽略
+            }
         }
     }
 
