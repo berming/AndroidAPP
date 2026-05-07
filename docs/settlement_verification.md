@@ -1,5 +1,9 @@
 # 沟通牌结算逻辑验证报告
 
+> 本文档既是单机版 `SettlementCalculator` 的验证用例，也定义了**多人联网服务端的结算公式**。
+> 服务端 `ServerGameManager.checkGameEnd` / `computeAllFinishedScores` 实现与本文一致；
+> 客户端 `SettlementCalculator.kt` 与 `SettlementCalculatorTest.kt` 的 15 个用例同时覆盖两端逻辑。
+
 ## 结算规则
 
 ### 触发方式1：全队走完
@@ -230,12 +234,12 @@
 
 ## 代码验证
 
-结算逻辑已实现在:
-- `SettlementCalculator.kt` - 独立的结算计算器
-- `SettlementCalculatorTest.kt` - 单元测试（15个用例）
-- `SettlementVerification.kt` - 验证程序（可直接运行）
+### 单机
+- `apps/communication-card/src/main/java/.../engine/SettlementCalculator.kt` - 独立的结算计算器
+- `apps/communication-card/src/test/.../engine/SettlementCalculatorTest.kt` - 单元测试（15 个用例）
+- `apps/communication-card/src/main/java/.../engine/SettlementVerification.kt` - 验证程序（可直接运行）
 
-关键代码逻辑:
+关键代码：
 ```kotlin
 // 全队走完时的得分计算
 if (teamA.allFinished) {
@@ -245,3 +249,32 @@ if (teamA.allFinished) {
     teamBScore = teamB.finishedPlayersScore        // 对方已走完已收分
 }
 ```
+
+### 服务端（联网模式）
+- `server/src/main/kotlin/.../ServerGameManager.kt`
+  - `state.playerScores: MutableMap<Int, Int>` 追踪每玩家"已收"
+  - `handleRoundEnd` 在累加队伍分时同时累加到 `state.playerScores[winnerId]`
+  - `getStateForPlayer` 返回 `collectedScore = state.playerScores[seat] ?: 0`
+  - `checkGameEnd` 与 `computeAllFinishedScores` 使用与上面**完全相同**的公式
+
+关键代码：
+```kotlin
+private fun computeAllFinishedScores(
+    state: ServerGameState,
+    winner: List<ServerPlayer>,
+    loser: List<ServerPlayer>
+): Pair<Int, Int> {
+    val winnerScore = winner.sumOf { state.playerScores[it.seatIndex] ?: 0 } +
+        loser.filter { state.hands[it.seatIndex]?.isNotEmpty() == true }
+            .sumOf { p ->
+                (state.playerScores[p.seatIndex] ?: 0) +
+                (state.hands[p.seatIndex]?.sumOf { c -> getCardScore(c) } ?: 0)
+            }
+    val loserScore = loser
+        .filter { state.hands[it.seatIndex]?.isEmpty() == true }
+        .sumOf { state.playerScores[it.seatIndex] ?: 0 }
+    return Pair(winnerScore, loserScore)
+}
+```
+
+> 单机与联网两套实现共用同一组用例，行为应保持一致。如发现联网模式与上述用例任一不符，按 bug 处理。
