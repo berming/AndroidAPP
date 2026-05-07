@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Generate dev_summary.pptx from the development summary content."""
+"""Generate dev_summary.pptx — compact 10-slide version."""
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.oxml.ns import qn
-from copy import deepcopy
 
 # Colors
-PRIMARY = RGBColor(0x1A, 0x73, 0xE8)   # Blue
+PRIMARY = RGBColor(0x1A, 0x73, 0xE8)
 DARK = RGBColor(0x20, 0x20, 0x20)
 GRAY = RGBColor(0x60, 0x60, 0x60)
 LIGHT_BG = RGBColor(0xF0, 0xF4, 0xFF)
@@ -20,6 +18,12 @@ WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 FONT_CN = "Microsoft YaHei"
 FONT_MONO = "Consolas"
+
+# Font sizes per spec
+TITLE_PT = 24
+BODY_LG = 16
+BODY_MD = 14
+BODY_SM = 12
 
 prs = Presentation()
 prs.slide_width = Inches(13.333)
@@ -35,8 +39,8 @@ def add_slide():
 
 
 def add_textbox(slide, left, top, width, height, text, *,
-                font_size=18, bold=False, color=DARK, align=PP_ALIGN.LEFT,
-                font_name=FONT_CN):
+                font_size=BODY_MD, bold=False, color=DARK,
+                align=PP_ALIGN.LEFT, font_name=FONT_CN):
     tb = slide.shapes.add_textbox(left, top, width, height)
     tf = tb.text_frame
     tf.word_wrap = True
@@ -52,68 +56,47 @@ def add_textbox(slide, left, top, width, height, text, *,
     run.font.size = Pt(font_size)
     run.font.bold = bold
     run.font.color.rgb = color
-    return tb, tf
+    return tb
 
 
-def add_paragraphs(tf, lines, *, font_size=14, color=DARK, font_name=FONT_CN, bold=False):
-    """Add multiple paragraphs to an existing text frame."""
-    for i, line in enumerate(lines):
-        p = tf.paragraphs[0] if i == 0 and tf.paragraphs[0].text == "" else tf.add_paragraph()
-        run = p.add_run()
-        run.text = line
-        run.font.name = font_name
-        run.font.size = Pt(font_size)
-        run.font.color.rgb = color
-        run.font.bold = bold
-
-
-def add_header(slide, title_text, subtitle_text=None):
-    """Add the standard slide header bar."""
-    # Title
-    add_textbox(slide, Inches(0.5), Inches(0.3), Inches(12.3), Inches(0.6),
-                title_text, font_size=28, bold=True, color=PRIMARY)
-    # Underline
+def add_header(slide, title_text):
+    add_textbox(slide, Inches(0.5), Inches(0.3), Inches(12.3), Inches(0.5),
+                title_text, font_size=TITLE_PT, bold=True, color=PRIMARY)
     line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE,
-                                    Inches(0.5), Inches(0.95),
+                                    Inches(0.5), Inches(0.85),
                                     Inches(12.3), Inches(0.04))
     line.fill.solid()
     line.fill.fore_color.rgb = PRIMARY
     line.line.fill.background()
-    if subtitle_text:
-        add_textbox(slide, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
-                    subtitle_text, font_size=14, color=GRAY)
 
 
 def add_page_number(slide, num, total):
-    add_textbox(slide, Inches(11.8), Inches(7.0), Inches(1.3), Inches(0.3),
+    add_textbox(slide, Inches(11.8), Inches(7.05), Inches(1.3), Inches(0.3),
                 f"{num} / {total}", font_size=10, color=GRAY,
                 align=PP_ALIGN.RIGHT)
 
 
 def add_table(slide, left, top, width, height, headers, rows,
               header_color=PRIMARY, alt_color=LIGHT_BG,
-              font_size=12, header_font_size=13,
+              font_size=BODY_SM, header_font_size=BODY_SM,
               col_widths=None):
-    """Add a styled table."""
     n_rows = len(rows) + 1
     n_cols = len(headers)
     tbl_shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
     table = tbl_shape.table
-
     if col_widths:
         for i, w in enumerate(col_widths):
             table.columns[i].width = w
 
-    # Header
     for i, h in enumerate(headers):
         cell = table.cell(0, i)
         cell.fill.solid()
         cell.fill.fore_color.rgb = header_color
         tf = cell.text_frame
-        tf.margin_left = Emu(50000)
-        tf.margin_right = Emu(50000)
-        tf.margin_top = Emu(20000)
-        tf.margin_bottom = Emu(20000)
+        tf.margin_left = Emu(40000)
+        tf.margin_right = Emu(40000)
+        tf.margin_top = Emu(15000)
+        tf.margin_bottom = Emu(15000)
         tf.text = ""
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
@@ -124,7 +107,6 @@ def add_table(slide, left, top, width, height, headers, rows,
         run.font.bold = True
         run.font.color.rgb = WHITE
 
-    # Body
     for r, row in enumerate(rows, start=1):
         for c, val in enumerate(row):
             cell = table.cell(r, c)
@@ -135,10 +117,10 @@ def add_table(slide, left, top, width, height, headers, rows,
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = WHITE
             tf = cell.text_frame
-            tf.margin_left = Emu(50000)
-            tf.margin_right = Emu(50000)
-            tf.margin_top = Emu(15000)
-            tf.margin_bottom = Emu(15000)
+            tf.margin_left = Emu(40000)
+            tf.margin_right = Emu(40000)
+            tf.margin_top = Emu(10000)
+            tf.margin_bottom = Emu(10000)
             tf.word_wrap = True
             tf.text = ""
             p = tf.paragraphs[0]
@@ -151,19 +133,17 @@ def add_table(slide, left, top, width, height, headers, rows,
     return table
 
 
-def add_code_block(slide, left, top, width, height, code, *, font_size=12):
-    """Add a monospace code block with light gray background."""
+def add_code_block(slide, left, top, width, height, code, *, font_size=BODY_SM):
     box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
     box.fill.solid()
     box.fill.fore_color.rgb = RGBColor(0xF4, 0xF4, 0xF4)
     box.line.color.rgb = RGBColor(0xD0, 0xD0, 0xD0)
-
     tf = box.text_frame
     tf.word_wrap = True
-    tf.margin_left = Emu(150000)
-    tf.margin_right = Emu(150000)
-    tf.margin_top = Emu(100000)
-    tf.margin_bottom = Emu(100000)
+    tf.margin_left = Emu(120000)
+    tf.margin_right = Emu(120000)
+    tf.margin_top = Emu(80000)
+    tf.margin_bottom = Emu(80000)
     lines = code.split("\n")
     for i, line in enumerate(lines):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
@@ -175,824 +155,510 @@ def add_code_block(slide, left, top, width, height, code, *, font_size=12):
         run.font.color.rgb = DARK
 
 
+def add_callout(slide, left, top, width, height, text, *,
+                bg=LIGHT_BG, border=PRIMARY, font_size=BODY_MD,
+                color=DARK, bold=False, align=PP_ALIGN.LEFT):
+    box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
+                                    left, top, width, height)
+    box.fill.solid()
+    box.fill.fore_color.rgb = bg
+    box.line.color.rgb = border
+    if not text:
+        return
+    tf = box.text_frame
+    tf.word_wrap = True
+    tf.margin_left = Emu(150000)
+    tf.margin_right = Emu(150000)
+    tf.text = ""
+    p = tf.paragraphs[0]
+    p.alignment = align
+    run = p.add_run()
+    run.text = text
+    run.font.name = FONT_CN
+    run.font.size = Pt(font_size)
+    run.font.bold = bold
+    run.font.color.rgb = color
+
+
 # =================================================================
-# Slide 1: Cover
+# Slide 1: Cover + Agenda
 # =================================================================
 s = add_slide()
-# Background bar
-bar = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, Inches(7.5))
-bar.fill.solid()
-bar.fill.fore_color.rgb = WHITE
-bar.line.fill.background()
-
-# Side accent bar
 accent = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.3), SLIDE_H)
 accent.fill.solid()
 accent.fill.fore_color.rgb = PRIMARY
 accent.line.fill.background()
 
-add_textbox(s, Inches(1.0), Inches(2.0), Inches(11.5), Inches(0.6),
-            "AI 辅助联网游戏开发", font_size=20, color=GRAY)
-add_textbox(s, Inches(1.0), Inches(2.6), Inches(11.5), Inches(1.2),
-            "完整实践总结", font_size=54, bold=True, color=PRIMARY)
-add_textbox(s, Inches(1.0), Inches(4.2), Inches(11.5), Inches(0.5),
-            "沟通牌 × Claude Code × 约 3 个月实践", font_size=22, color=DARK)
-add_textbox(s, Inches(1.0), Inches(5.5), Inches(11.5), Inches(0.4),
-            "技术架构  ·  问题全景  ·  人机协同模式  ·  工程经验",
-            font_size=16, color=GRAY)
+add_textbox(s, Inches(0.8), Inches(1.2), Inches(11.5), Inches(0.6),
+            "AI 辅助联网游戏开发", font_size=BODY_LG, color=GRAY)
+add_textbox(s, Inches(0.8), Inches(1.8), Inches(11.5), Inches(1.0),
+            "完整实践总结", font_size=44, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(3.0), Inches(11.5), Inches(0.5),
+            "沟通牌  ×  Claude Code  ×  约 3 个月实践",
+            font_size=BODY_LG, color=DARK)
+
+add_textbox(s, Inches(0.8), Inches(4.0), Inches(11.5), Inches(0.4),
+            "本次内容（约 20 分钟）",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+items = [
+    "①  项目背景与开发全貌    ②  架构设计与遗憾",
+    "③  问题全景：人工 vs AI    ④  人机协同模式",
+    "⑤  关键技术修复    ⑥  经验总结与后续行动",
+]
+y = 4.5
+for it in items:
+    add_textbox(s, Inches(1.0), Inches(y), Inches(11.0), Inches(0.4),
+                it, font_size=BODY_MD, color=DARK)
+    y += 0.5
 
 # =================================================================
-# Slide 2: Agenda
+# Slide 2: Background + Tech Stack + Code Volume + Timeline
 # =================================================================
 s = add_slide()
-add_header(s, "目录", "约 20 分钟")
+add_header(s, "一、项目背景与开发全貌")
 
-agenda = [
-    ("1", "项目背景", "技术栈 · 代码规模 · 开发全貌"),
-    ("2", "架构设计", "双模式架构 · 关键决策 · 妥协与遗憾"),
-    ("3", "问题全景", "人工 ~32 个 vs AI ~35 个，如何互补"),
-    ("4", "人机协同", "4 个层次 · 分工矩阵 · 反模式 · 最佳实践"),
-    ("5", "关键技术修复", "四层防卡死 · 重连时序 · 结算公式"),
-    ("6", "经验与行动", "核心结论 · 后续建议"),
-]
-y = 1.6
-for num, title, sub in agenda:
-    # Number circle
-    circ = s.shapes.add_shape(MSO_SHAPE.OVAL, Inches(0.8), Inches(y),
-                                Inches(0.7), Inches(0.7))
-    circ.fill.solid()
-    circ.fill.fore_color.rgb = PRIMARY
-    circ.line.fill.background()
-    tf = circ.text_frame
-    tf.text = ""
-    tf.margin_top = Emu(0)
-    tf.margin_bottom = Emu(0)
-    p = tf.paragraphs[0]
-    p.alignment = PP_ALIGN.CENTER
-    run = p.add_run()
-    run.text = num
-    run.font.name = FONT_CN
-    run.font.size = Pt(22)
-    run.font.bold = True
-    run.font.color.rgb = WHITE
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+            "沟通牌：4 副牌 216 张，6 人 3v3 卡牌游戏（单机 + 联网对抗）",
+            font_size=BODY_MD, color=DARK)
 
-    add_textbox(s, Inches(1.8), Inches(y), Inches(11.0), Inches(0.4),
-                title, font_size=22, bold=True, color=DARK)
-    add_textbox(s, Inches(1.8), Inches(y + 0.4), Inches(11.0), Inches(0.4),
-                sub, font_size=14, color=GRAY)
-    y += 0.85
-
-# =================================================================
-# Slide 3: Project Background — Tech Stack
-# =================================================================
-s = add_slide()
-add_header(s, "一、项目背景：产品 + 技术栈")
-
-# Left: Product description
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(6.0), Inches(0.5),
-            "产品简介", font_size=18, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.5), Inches(1.85), Inches(6.0), Inches(0.5),
-            "沟通牌：4 副牌 216 张，6 人 3v3 卡牌游戏", font_size=15, color=DARK)
-
-bullets_p = [
-    ("●  单机模式：本机 AI 对手", DARK),
-    ("●  联网对抗：WebSocket 实时对战  ← 本次重点", PRIMARY),
-]
-y = 2.4
-for txt, c in bullets_p:
-    add_textbox(s, Inches(0.7), Inches(y), Inches(6.0), Inches(0.4),
-                txt, font_size=14, color=c, bold=(c == PRIMARY))
-    y += 0.4
-
-# Right: Tech stack table
-add_textbox(s, Inches(7.0), Inches(1.3), Inches(6.0), Inches(0.5),
-            "技术栈", font_size=18, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.5), Inches(1.55), Inches(6.0), Inches(0.4),
+            "技术栈", font_size=BODY_LG, bold=True, color=PRIMARY)
 tech = [
-    ["客户端语言", "Kotlin + Coroutines + Flow"],
-    ["客户端 UI", "Android XML 布局（不使用 Compose）"],
-    ["客户端 WebSocket", "OkHttp"],
-    ["服务端框架", "Ktor + Netty + WebSockets"],
+    ["客户端", "Kotlin + Coroutines + OkHttp + XML 布局"],
+    ["服务端", "Ktor + Netty + WebSockets"],
     ["序列化", "kotlinx.serialization (JSON)"],
     ["构建", "AGP 8.5 / Gradle 8.14 + 8.4"],
 ]
-add_table(s, Inches(7.0), Inches(1.85), Inches(6.0), Inches(3.5),
-            ["层", "技术"], tech, font_size=12, header_font_size=13,
-            col_widths=[Inches(2.0), Inches(4.0)])
+add_table(s, Inches(0.5), Inches(2.0), Inches(6.0), Inches(1.9),
+            ["层", "技术"], tech, font_size=BODY_SM,
+            col_widths=[Inches(1.3), Inches(4.7)])
 
-# Bottom: Code volume
-add_textbox(s, Inches(0.5), Inches(5.5), Inches(12.3), Inches(0.5),
-            "代码规模：共 90 个文件 / ~14,865 行",
-            font_size=18, bold=True, color=PRIMARY)
-code_vol = [
-    ["客户端 Kotlin", "客户端 XML", "服务端 Kotlin", "测试"],
-    ["28 文件 · 8,909 行", "56 文件 · 3,279 行", "5 文件 · 2,161 行", "1 文件 · 516 行"],
+add_textbox(s, Inches(7.0), Inches(1.55), Inches(6.0), Inches(0.4),
+            "代码规模  ·  90 文件 / ~14,865 行",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+vol = [
+    ["客户端 Kotlin", "28 文件 · 8,909 行"],
+    ["客户端 XML 布局", "56 文件 · 3,279 行"],
+    ["服务端 Kotlin", "5 文件 · 2,161 行"],
+    ["测试", "1 文件 · 516 行"],
 ]
-add_table(s, Inches(0.5), Inches(6.05), Inches(12.3), Inches(1.0),
-            code_vol[0], [code_vol[1]], font_size=13, header_font_size=13)
+add_table(s, Inches(7.0), Inches(2.0), Inches(6.0), Inches(1.9),
+            ["模块", "规模"], vol, font_size=BODY_SM,
+            col_widths=[Inches(2.2), Inches(3.8)])
 
-# =================================================================
-# Slide 4: Development Timeline
-# =================================================================
-s = add_slide()
-add_header(s, "二、开发全貌：5 阶段 · 33 PR · 3 个月")
-
+add_textbox(s, Inches(0.5), Inches(4.1), Inches(12.3), Inches(0.4),
+            "5 阶段时间线  ·  33 PR  ·  123 commit  ·  3 个月",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
 phases = [
-    ("2026-02", "单机游戏开发", "PRs #1–14", "游戏引擎 / 牌型规则 / AI / 结算 / 单机UI · 约11轮人工 UI 反馈"),
-    ("2026-04-30", "联网模式首次完整实现", "PR #16", "服务端 + 客户端网络层 + 联网UI · 一次性 6,529 行新增"),
-    ("2026-05-01", "构建与编译修复", "PRs #17–21", "CI 失败 / Gradle 缺失 / 编译错误"),
-    ("2026-05-03", "部署与连通性修复", "PRs #22–31", "服务器URL / Android cleartext / 503 调试 / Lobby UI"),
-    ("2026-05-04~07", "游戏逻辑深度修复", "PRs #32–33 + 本次", "AI 全量审查×4轮 / 8 次 commit / 50+ Bug"),
+    ["2026-02", "单机游戏开发 (PRs #1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
+    ["2026-04-30", "联网模式首次完整实现 (#16)", "服务端 + 网络层 + 联网UI · 一次性 6,529 行"],
+    ["2026-05-01", "构建与编译修复 (#17–21)", "CI 失败 / Gradle 缺失 / 编译错误"],
+    ["2026-05-03", "部署与连通性修复 (#22–31)", "服务器URL / cleartext / 503 / Lobby UI"],
+    ["2026-05-04~07", "游戏逻辑深度修复 (#32–33+)", "AI 全量审查×4轮 / 8 commit / 50+ Bug"],
 ]
-
-y = 1.4
-for date, title, prs_, desc in phases:
-    # Date
-    add_textbox(s, Inches(0.5), Inches(y), Inches(2.0), Inches(0.4),
-                date, font_size=14, bold=True, color=PRIMARY)
-    # Title
-    add_textbox(s, Inches(2.6), Inches(y), Inches(7.0), Inches(0.4),
-                title, font_size=15, bold=True, color=DARK)
-    # PRs
-    add_textbox(s, Inches(10.0), Inches(y), Inches(2.5), Inches(0.4),
-                prs_, font_size=13, color=GRAY)
-    # Description
-    add_textbox(s, Inches(2.6), Inches(y + 0.45), Inches(10.0), Inches(0.45),
-                desc, font_size=12, color=GRAY)
-    y += 1.0
-
-# Footer summary
-total_box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                                Inches(0.5), Inches(6.6),
-                                Inches(12.3), Inches(0.7))
-total_box.fill.solid()
-total_box.fill.fore_color.rgb = LIGHT_BG
-total_box.line.color.rgb = PRIMARY
-tf = total_box.text_frame
-tf.text = ""
-p = tf.paragraphs[0]
-p.alignment = PP_ALIGN.CENTER
-run = p.add_run()
-run.text = "总计：33 PR  ·  123 commit  ·  修复约 67 个问题"
-run.font.name = FONT_CN
-run.font.size = Pt(18)
-run.font.bold = True
-run.font.color.rgb = PRIMARY
-
-# =================================================================
-# Slide 5: Architecture - Diagram
-# =================================================================
-s = add_slide()
-add_header(s, "三、架构设计：双模式共生")
-
-arch_code = """┌─────────────────────────────────────────────────────────────┐
-│  Android 客户端                                             │
-│                                                             │
-│   GameActivity (单机)  ←→  OnlineGameActivity (联网)        │
-│                                                             │
-│   engine/    CardRules · SettlementCalculator (共享规则)    │
-│              GameEngine (单机) · MultiplayerGameEngine      │
-│                                                             │
-│   network/   NetworkManager  · RoomManager                  │
-│              GameSyncManager (状态同步 / 版本号)            │
-└─────────────────────────────────────────────────────────────┘
-                       ▲   WebSocket /game (JSON)
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  服务端 (Ktor + Netty)                                      │
-│                                                             │
-│   ServerRoomManager   房间生命周期 / AI 填充                │
-│   ServerGameManager   权威状态 / AI 决策 / 30s 计时         │
-│        每房间一把 Mutex · 三级 AI 回退 · 兜底推进           │
-└─────────────────────────────────────────────────────────────┘"""
-add_code_block(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(5.3),
-                arch_code, font_size=12)
-
-# Footer principle
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(6.8),
-                            Inches(12.3), Inches(0.5))
-foot.fill.solid()
-foot.fill.fore_color.rgb = PRIMARY
-foot.line.fill.background()
-tf = foot.text_frame
-tf.text = ""
-p = tf.paragraphs[0]
-p.alignment = PP_ALIGN.CENTER
-run = p.add_run()
-run.text = "核心原则：服务端权威  ·  客户端乐观响应  ·  全量状态 + version 同步"
-run.font.name = FONT_CN
-run.font.size = Pt(14)
-run.font.bold = True
-run.font.color.rgb = WHITE
-
-# =================================================================
-# Slide 6: Architecture - Decisions & Compromises
-# =================================================================
-s = add_slide()
-add_header(s, "三、架构：关键决策 & 遗憾")
-
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
-            "关键架构决策", font_size=18, bold=True, color=PRIMARY)
-
-decisions = [
-    ["状态同步", "全量状态 + 单调 version", "比增量简单，天然支持重连"],
-    ["并发模型", "每房间 Mutex", "串行化修改，广播在锁外"],
-    ["重连机制", "sessionToken = playerId", "30s 内无缝恢复游戏"],
-    ["AI 替补", "isAISubstitute 标记", "不删玩家槽，重连仍有效"],
-]
-add_table(s, Inches(0.5), Inches(1.8), Inches(12.3), Inches(2.3),
-            ["决策", "选择", "理由"], decisions, font_size=12,
+add_table(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(2.4),
+            ["时间", "阶段", "主要内容"], phases, font_size=BODY_SM,
             col_widths=[Inches(2.0), Inches(4.0), Inches(6.3)])
 
-add_textbox(s, Inches(0.5), Inches(4.4), Inches(12.3), Inches(0.4),
-            "架构妥协与遗憾",
-            font_size=18, bold=True, color=RED)
+# =================================================================
+# Slide 3: Architecture (diagram + decisions + regrets)
+# =================================================================
+s = add_slide()
+add_header(s, "二、架构设计：双模式共生")
+
+arch_code = """┌──────────────────────────────────────┐
+│  Android 客户端                      │
+│   GameActivity (单机)                │
+│   OnlineGameActivity (联网)          │
+│                                      │
+│   engine/  CardRules                 │
+│            SettlementCalculator      │
+│            GameEngine /              │
+│            MultiplayerGameEngine     │
+│                                      │
+│   network/ NetworkManager            │
+│            RoomManager               │
+│            GameSyncManager           │
+└──────────────────────────────────────┘
+              ▲ WebSocket /game (JSON)
+              ▼
+┌──────────────────────────────────────┐
+│  服务端 (Ktor + Netty)               │
+│   ServerRoomManager  房间/AI填充     │
+│   ServerGameManager  权威状态        │
+│     · 每房间 Mutex                   │
+│     · 三级 AI 回退 + 兜底推进        │
+│     · 30s 回合超时                   │
+└──────────────────────────────────────┘"""
+add_code_block(s, Inches(0.5), Inches(1.05), Inches(6.0), Inches(5.2),
+                arch_code, font_size=BODY_SM)
+
+add_textbox(s, Inches(6.8), Inches(1.05), Inches(6.2), Inches(0.4),
+            "关键架构决策", font_size=BODY_LG, bold=True, color=PRIMARY)
+decisions = [
+    ["状态同步", "全量状态 + 单调 version"],
+    ["并发模型", "每房间 Mutex（修改在锁内）"],
+    ["重连机制", "sessionToken=playerId · 30s 内恢复"],
+    ["AI 替补", "isAISubstitute 标记，不删玩家槽"],
+]
+add_table(s, Inches(6.8), Inches(1.5), Inches(6.2), Inches(2.3),
+            ["决策", "选择"], decisions, font_size=BODY_SM,
+            col_widths=[Inches(1.5), Inches(4.7)])
+
+add_textbox(s, Inches(6.8), Inches(4.0), Inches(6.2), Inches(0.4),
+            "架构遗憾（后期成本）", font_size=BODY_LG, bold=True, color=RED)
 regrets = [
-    ["⚠ 未提取 KMP 共享规则模块",
-     "CardRules 与服务端 canBeat 双份  →  后期出现 3 处不一致"],
-    ["⚠ 无协议版本号", "客户端/服务端协议演进时无强制兼容检查"],
-    ["⚠ 无事件溯源", "全量状态同步，历史行为无法追溯，调试困难"],
+    ["未提取 KMP 共享规则", "导致两端 3 处不一致"],
+    ["无协议版本号", "演进时无强制兼容检查"],
+    ["无事件溯源", "历史行为无法追溯，调试难"],
 ]
-add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
-            ["遗憾", "影响"], regrets, font_size=12,
-            header_color=RED,
-            col_widths=[Inches(4.5), Inches(7.8)])
+add_table(s, Inches(6.8), Inches(4.45), Inches(6.2), Inches(1.7),
+            ["遗憾", "影响"], regrets, font_size=BODY_SM,
+            header_color=RED, col_widths=[Inches(2.5), Inches(3.7)])
+
+add_callout(s, Inches(0.5), Inches(6.4), Inches(12.5), Inches(0.6),
+            "核心原则：服务端权威  ·  客户端乐观响应  ·  全量状态 + version 同步",
+            bg=PRIMARY, border=PRIMARY,
+            font_size=BODY_MD, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
-# Slide 7: Problem Discovery Overview
-# =================================================================
-s = add_slide()
-add_header(s, "四、问题全景：人工 vs AI")
-
-# Big numbers row
-y = 1.5
-# Human box
-hb = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                         Inches(0.5), Inches(y),
-                         Inches(4.0), Inches(2.5))
-hb.fill.solid()
-hb.fill.fore_color.rgb = RED
-hb.line.fill.background()
-add_textbox(s, Inches(0.5), Inches(y + 0.2), Inches(4.0), Inches(0.4),
-            "🔴 人工测试 / 反馈", font_size=18, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(0.5), Inches(y + 0.8), Inches(4.0), Inches(0.9),
-            "~32 个", font_size=54, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(0.5), Inches(y + 1.85), Inches(4.0), Inches(0.5),
-            "UI体验  ·  部署环境  ·  运行时崩溃",
-            font_size=12, color=WHITE, align=PP_ALIGN.CENTER)
-
-# AI box
-ab = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                         Inches(4.7), Inches(y),
-                         Inches(4.0), Inches(2.5))
-ab.fill.solid()
-ab.fill.fore_color.rgb = PRIMARY
-ab.line.fill.background()
-add_textbox(s, Inches(4.7), Inches(y + 0.2), Inches(4.0), Inches(0.4),
-            "🔵 AI 静态审查", font_size=18, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(4.7), Inches(y + 0.8), Inches(4.0), Inches(0.9),
-            "~35 个", font_size=54, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(4.7), Inches(y + 1.85), Inches(4.0), Inches(0.5),
-            "逻辑错误  ·  并发  ·  协议细节",
-            font_size=12, color=WHITE, align=PP_ALIGN.CENTER)
-
-# Bot box
-bb = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                         Inches(8.9), Inches(y),
-                         Inches(4.0), Inches(2.5))
-bb.fill.solid()
-bb.fill.fore_color.rgb = ORANGE
-bb.line.fill.background()
-add_textbox(s, Inches(8.9), Inches(y + 0.2), Inches(4.0), Inches(0.4),
-            "🟡 Code Review Bot", font_size=18, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(8.9), Inches(y + 0.8), Inches(4.0), Inches(0.9),
-            "2 个", font_size=54, bold=True, color=WHITE,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(8.9), Inches(y + 1.85), Inches(4.0), Inches(0.5),
-            "PR 自动审查额外发现",
-            font_size=12, color=WHITE, align=PP_ALIGN.CENTER)
-
-# Conclusion
-cb = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                          Inches(0.5), Inches(4.5),
-                          Inches(12.4), Inches(2.4))
-cb.fill.solid()
-cb.fill.fore_color.rgb = LIGHT_BG
-cb.line.color.rgb = PRIMARY
-add_textbox(s, Inches(0.8), Inches(4.7), Inches(12.0), Inches(0.5),
-            "核心发现",
-            font_size=20, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(5.3), Inches(12.0), Inches(0.6),
-            "人工看见「症状」，AI 挖出「根因」",
-            font_size=24, bold=True, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.95), Inches(12.0), Inches(0.6),
-            "两者几乎不重叠，而是互补关系",
-            font_size=18, color=GRAY)
-add_textbox(s, Inches(0.8), Inches(6.45), Inches(12.0), Inches(0.4),
-            "→ 接下来逐阶段展开详情",
-            font_size=14, color=GRAY)
-
-# =================================================================
-# Slide 8: Human Issues - Single Player Phase
+# Slide 4: Problem Discovery Overview
 # =================================================================
 s = add_slide()
-add_header(s, "四、人工发现 (1/3)：单机阶段（11 个）")
+add_header(s, "三、问题全景：人工 vs AI")
 
-issues_sp = [
-    ["1", "看不到每个玩家打出的牌", "重新设计 UI，每玩家槽显示出牌"],
-    ["2", "玩家 ID 映射错位，玩家2 不显示", "修正 ID 偏移（从 1 而非 2 开始）"],
-    ["3", "队伍积分只显示个人，非全队合计", "改为 totalCollectedScore"],
-    ["4", "炸弹牌重叠比例不对，显示拥挤", "调整为 20% 重叠"],
-    ["5", "AI 动不动打炸弹，太激进", "炸弹作为最后手段策略"],
-    ["6", "手牌顺序乱，炸弹应排在前面", "按炸弹优先排序"],
-    ["7", "更新 APK 提示签名不匹配", "添加固定 debug keystore"],
-    ["8", "重构后卡片圆角消失", "恢复 10dp 圆角"],
-    ["9", "五子棋图标在旧 Android 崩溃", "修复 API < 26 矢量图兼容性"],
-    ["10", "字体大小不统一", "统一为 14sp"],
-    ["11", "布局太拥挤，信息看不清", "两行手牌 / 水平玩家排列"],
+y = 1.3
+cards = [
+    ("🔴 人工测试 / 反馈", "~32 个", "UI体验 · 部署环境 · 运行时崩溃", RED),
+    ("🔵 AI 静态审查", "~35 个", "逻辑错误 · 并发 · 协议细节", PRIMARY),
+    ("🟡 Code Review Bot", "2 个", "PR 自动审查额外发现", ORANGE),
 ]
-add_table(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(5.6),
-            ["#", "症状 / 反馈", "对应修复"], issues_sp, font_size=12,
-            col_widths=[Inches(0.6), Inches(6.0), Inches(5.7)])
+x_positions = [0.5, 4.7, 8.9]
+for (title, num, desc, color), x in zip(cards, x_positions):
+    box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
+                                Inches(x), Inches(y),
+                                Inches(4.0), Inches(2.3))
+    box.fill.solid()
+    box.fill.fore_color.rgb = color
+    box.line.fill.background()
+    add_textbox(s, Inches(x), Inches(y + 0.2), Inches(4.0), Inches(0.4),
+                title, font_size=BODY_MD, bold=True, color=WHITE,
+                align=PP_ALIGN.CENTER)
+    add_textbox(s, Inches(x), Inches(y + 0.7), Inches(4.0), Inches(0.9),
+                num, font_size=44, bold=True, color=WHITE,
+                align=PP_ALIGN.CENTER)
+    add_textbox(s, Inches(x), Inches(y + 1.75), Inches(4.0), Inches(0.4),
+                desc, font_size=BODY_SM, color=WHITE, align=PP_ALIGN.CENTER)
+
+add_callout(s, Inches(0.5), Inches(4.0), Inches(12.4), Inches(2.9),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(4.2), Inches(12.0), Inches(0.5),
+            "💡 核心发现",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(4.8), Inches(12.0), Inches(0.5),
+            "人工看见「症状」，AI 挖出「根因」 — 两者几乎不重叠，而是互补",
+            font_size=BODY_LG, bold=True, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.4), Inches(12.0), Inches(0.5),
+            "·  人工：截图 / 真机崩溃 / 部署环境问题（AI 无法获知）",
+            font_size=BODY_MD, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.85), Inches(12.0), Inches(0.5),
+            "·  AI：跨文件链路 / 时序逻辑 / 并发陷阱（人工难以全量覆盖）",
+            font_size=BODY_MD, color=DARK)
+add_textbox(s, Inches(0.8), Inches(6.35), Inches(12.0), Inches(0.5),
+            "→  任何只有一方参与的流程，都会漏掉至少 40% 的问题",
+            font_size=BODY_MD, color=GRAY)
 
 # =================================================================
-# Slide 9: Human Issues - Deployment Phase
+# Slide 5: Human-discovered Issues (3 phases compacted)
 # =================================================================
 s = add_slide()
-add_header(s, "四、人工发现 (2/3)：部署阶段（9 个）")
+add_header(s, "四、人工发现的问题（~32 个，3 阶段）")
 
-issues_dep = [
-    ["12", "CI 失败：服务端被 Android 构建拉入", "从 settings.gradle 移除服务端"],
-    ["13", "服务端无 Gradle Wrapper，无法启动", "补充 gradlew + wrapper"],
-    ["14", "联网模块编译错误（3 处 API 错误）", "修复 CardGroup / GameResult / ConnectionState"],
-    ["15", "服务端 JVM 工具链配置错误", "修复 toolchain 配置"],
-    ["16", "ChatAdapter 引用不存在的 View ID", "修正为实际存在的 tvSender"],
-    ["17", "部署腾讯云后连接不上", "更新服务器 URL"],
-    ["18", "Android 9+ cleartext 连接被拒绝", "添加 network_security_config.xml"],
-    ["19", "连接返回 503，无法诊断", "添加健康检查接口 + 详细日志"],
-    ["20", "「开始游戏」按钮让用户困惑", "改为「单机游戏」"],
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+            "单机阶段（11 个）  ·  反复 UI 打磨",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+sp = [
+    ["UI 显示", "看不到玩家出牌 · 玩家ID映射错位 · 字体不统一 · 布局拥挤 · 卡片圆角丢失"],
+    ["游戏逻辑", "队伍积分只显示个人 · 手牌顺序乱 · AI 滥用炸弹"],
+    ["环境兼容", "炸弹重叠比例 · APK 签名不匹配 · 五子棋图标旧 Android 崩溃"],
 ]
-add_table(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(5.0),
-            ["#", "症状 / 反馈", "对应修复"], issues_dep, font_size=12,
-            col_widths=[Inches(0.6), Inches(6.0), Inches(5.7)])
+add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(1.5),
+            ["类型", "症状（合并相似项）"], sp, font_size=BODY_SM,
+            col_widths=[Inches(2.0), Inches(10.3)])
 
-# =================================================================
-# Slide 10: Human Issues - Multiplayer Game Phase
-# =================================================================
-s = add_slide()
-add_header(s, "四、人工发现 (3/3)：联网游戏阶段（12 个）")
-
-issues_mp = [
-    ["21", "loading 遮罩断线后永远不消失", "断线后直接反馈错误"],
-    ["22", "单个中文昵称被 2 字符限制拒绝", "移除最低长度限制"],
-    ["23", "进入大厅崩溃（CardSuit 枚举不匹配）", "统一枚举值"],
-    ["24", "AI 玩家显示为离线状态", "AI 默认 isConnected=true"],
-    ["25", "房间内没有踢人按钮", "添加房主踢人功能"],
-    ["26", "看不到有哪些房间可加入", "添加房间列表功能"],
-    ["27", "📷 等待电脑54出牌，长时间卡死", "canBeat 炸弹逻辑 + AI 回退链"],
-    ["28", "📷 修复后依然卡死（反复 3 次）", "并发 Mutex + 兜底推进"],
-    ["29", "📷 已收分全是 0", "playerScores 追踪 + 结算公式"],
-    ["30", "反复修复反复复现 → 触发全量自查", "4 轮 AI 审查"],
-    ["31", "[Bot P1] 断线重连遮罩永久卡住", "修复重连 UI 路径"],
-    ["32", "[Bot P2] UI按房间名加入但服务端不支持", "待修复"],
+add_textbox(s, Inches(0.5), Inches(3.15), Inches(12.3), Inches(0.4),
+            "部署阶段（9 个）  ·  环境与构建",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+dep = [
+    ["构建编译", "CI 拉入服务端模块 · Gradle Wrapper 缺失 · 联网代码 3 处编译错误 · JVM 工具链 · 视图 ID"],
+    ["部署连通", "服务器 URL · Android 9+ cleartext · 503 错误"],
+    ["UI 表述", "「开始游戏」按钮让用户困惑"],
 ]
-add_table(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(5.7),
-            ["#", "症状 / 反馈", "对应修复"], issues_mp, font_size=11,
-            col_widths=[Inches(0.6), Inches(6.5), Inches(5.2)])
+add_table(s, Inches(0.5), Inches(3.6), Inches(12.3), Inches(1.5),
+            ["类型", "症状（合并相似项）"], dep, font_size=BODY_SM,
+            col_widths=[Inches(2.0), Inches(10.3)])
+
+add_textbox(s, Inches(0.5), Inches(5.25), Inches(12.3), Inches(0.4),
+            "联网游戏阶段（12 个）  ·  ⭐ 核心痛点",
+            font_size=BODY_MD, bold=True, color=RED)
+mp = [
+    ["UI / 大厅", "loading 永久卡住 · 昵称限制 · 大厅崩溃 · AI 离线 · 无房间列表 · 无踢人"],
+    ["📷 游戏卡死", "等待电脑 54 出牌（反复 3 次复现，触发 4 轮 AI 全量自查）"],
+    ["📷 分数错误", "已收分全是 0"],
+]
+add_table(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(1.5),
+            ["类型", "症状（合并相似项）"], mp, font_size=BODY_SM,
+            col_widths=[Inches(2.0), Inches(10.3)])
 
 # =================================================================
-# Slide 11: AI-discovered Issues
+# Slide 6: AI-discovered Issues
 # =================================================================
 s = add_slide()
-add_header(s, "四、AI 发现：~35 个，4 轮审查")
+add_header(s, "四、AI 发现的问题（~35 个，4 轮审查）")
 
-# Round 1
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
             "第 1 轮：综合审查（~20 个）",
-            font_size=16, bold=True, color=PRIMARY)
+            font_size=BODY_MD, bold=True, color=PRIMARY)
 r1 = [
     ["协议 / 序列化 (4)", "sealed class 缺 classDiscriminator；枚举值不对齐"],
     ["会话 / 重连 (3)", "sessionToken 未设置；leaveRoom 未清空 token"],
     ["房间状态机 (4)", "未检查 WAITING；退出不补 AI；重复加入"],
-    ["UI / 状态同步 (6)", "seatIndex%2 误算；初始化后未刷新；onDestroy 未 guard"],
+    ["UI / 状态同步 (6)", "seatIndex%2 误算；初始化未刷新；onDestroy 未 guard"],
     ["其他 (3)", "applyState 版本反向；senderId 不稳定"],
 ]
-add_table(s, Inches(0.5), Inches(1.75), Inches(12.3), Inches(2.3),
-            ["类别", "主要问题"], r1, font_size=12,
-            col_widths=[Inches(3.0), Inches(9.3)])
+add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(2.6),
+            ["类别", "主要问题"], r1, font_size=BODY_SM,
+            col_widths=[Inches(2.8), Inches(9.5)])
 
-# Round 2-3
 add_textbox(s, Inches(0.5), Inches(4.3), Inches(12.3), Inches(0.4),
             "第 2-3 轮：深层审查（~8 个）",
-            font_size=16, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.5), Inches(4.75), Inches(12.3), Inches(0.5),
-            "赢家未设为下轮首家  ·  ArrayList 并发修改  ·  AI 回退链缺失  ·  collectedScore 硬编码 0",
-            font_size=12, color=DARK)
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.7), Inches(4.75), Inches(12.0), Inches(0.45),
+            "·  赢家未设为下轮首家  ·  ArrayList 并发修改  ·  AI 回退链缺失  ·  collectedScore 硬编码 0",
+            font_size=BODY_SM, color=DARK)
 
-# Round 4
-add_textbox(s, Inches(0.5), Inches(5.5), Inches(12.3), Inches(0.4),
-            "第 4 轮：根因专项（~7 个）",
-            font_size=16, bold=True, color=RED)
-add_textbox(s, Inches(0.5), Inches(5.95), Inches(12.3), Inches(0.5),
-            "WebSocket CONNECTING send() 静默失败  ·  多协程无锁并发写  ·  playerScores 整体缺失",
-            font_size=12, color=DARK)
-add_textbox(s, Inches(0.5), Inches(6.4), Inches(12.3), Inches(0.5),
-            "结算公式漏算输方未走完已收分  ·  两端逻辑不一致",
-            font_size=12, color=DARK)
+add_textbox(s, Inches(0.5), Inches(5.4), Inches(12.3), Inches(0.4),
+            "第 4 轮：根因专项（~7 个） — 这一轮才挖到真正的卡死根因",
+            font_size=BODY_MD, bold=True, color=RED)
+add_textbox(s, Inches(0.7), Inches(5.85), Inches(12.0), Inches(0.45),
+            "·  WebSocket CONNECTING 时 send() 静默失败（重连根因）",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.7), Inches(6.25), Inches(12.0), Inches(0.45),
+            "·  多协程无锁并发写 state.hands（卡死根因）",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.7), Inches(6.65), Inches(12.0), Inches(0.45),
+            "·  playerScores 整体缺失  ·  结算公式漏算输方未走完已收分",
+            font_size=BODY_SM, color=DARK)
 
 # =================================================================
-# Slide 12: Collaboration - 4 Levels
+# Slide 7: Collaboration — 4 levels + Matrix
 # =================================================================
 s = add_slide()
-add_header(s, "五、人机协同：4 个层次")
+add_header(s, "五、人机协同：4 层次 + 实际分工")
 
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.5), Inches(0.4),
+            "协同的 4 个层次", font_size=BODY_LG, bold=True, color=PRIMARY)
 levels = [
-    ("Level 1", "AI 执行人工指令", "传统：人主导",
-     "人工写完整指令 → AI 执行 → 等下一条", "缺点：人工成为瓶颈", GRAY),
-    ("Level 2", "AI 提建议，人工决策", "审稿模式",
-     "AI 输出方案+备选 → 人工选择/驳回", "优点：人工不动手，但对质量负责", DARK),
-    ("Level 3", "人工反馈现象，AI 自主排查", "本项目大量使用 ★",
-     "人工：「还卡住」 / 截图", "AI：看代码 + 推理 + 多轮自查 + 修复", PRIMARY),
-    ("Level 4", "AI 主动审查，人工验证", "本项目最高效模式 ★★",
-     "人工：「自查自纠所有问题」", "AI：全量扫描 + 清单 + 修复  ·  人工：真机验证", PRIMARY),
+    ("L1", "AI 执行人工指令", "传统：人主导，瓶颈", GRAY),
+    ("L2", "AI 提建议，人工决策", "审稿模式", DARK),
+    ("L3", "人工反馈现象，AI 自主排查", "本项目大量使用 ★", PRIMARY),
+    ("L4", "AI 主动审查，人工验证", "本项目最高效模式 ★★", PRIMARY),
 ]
-y = 1.3
-for lvl, title, tag, line1, line2, color in levels:
-    box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                                Inches(0.5), Inches(y),
-                                Inches(12.3), Inches(1.3))
-    box.fill.solid()
-    box.fill.fore_color.rgb = LIGHT_BG if color == PRIMARY else WHITE
-    box.line.color.rgb = color
+y = 1.55
+for lvl, title, tag, color in levels:
+    add_textbox(s, Inches(0.5), Inches(y), Inches(0.5), Inches(0.4),
+                lvl, font_size=BODY_MD, bold=True, color=color)
+    add_textbox(s, Inches(1.1), Inches(y), Inches(5.5), Inches(0.4),
+                title, font_size=BODY_MD, bold=True, color=DARK)
+    add_textbox(s, Inches(1.1), Inches(y + 0.4), Inches(5.5), Inches(0.4),
+                tag, font_size=BODY_SM, color=color)
+    y += 0.95
 
-    add_textbox(s, Inches(0.7), Inches(y + 0.1), Inches(2.0), Inches(0.4),
-                lvl, font_size=18, bold=True, color=color)
-    add_textbox(s, Inches(2.7), Inches(y + 0.1), Inches(6.5), Inches(0.4),
-                title, font_size=16, bold=True, color=DARK)
-    add_textbox(s, Inches(9.0), Inches(y + 0.1), Inches(3.5), Inches(0.4),
-                tag, font_size=13, color=color, align=PP_ALIGN.RIGHT)
-    add_textbox(s, Inches(0.7), Inches(y + 0.55), Inches(11.8), Inches(0.35),
-                line1, font_size=12, color=DARK)
-    add_textbox(s, Inches(0.7), Inches(y + 0.9), Inches(11.8), Inches(0.35),
-                line2, font_size=12, color=GRAY)
-    y += 1.45
-
-# =================================================================
-# Slide 13: Task Allocation Matrix
-# =================================================================
-s = add_slide()
-add_header(s, "五、实际分工矩阵")
-
+add_textbox(s, Inches(7.2), Inches(1.05), Inches(6.0), Inches(0.4),
+            "实际任务分工矩阵", font_size=BODY_LG, bold=True, color=PRIMARY)
 matrix = [
-    ["需求定义", "100%", "—", "人工口述 / 截图"],
-    ["架构设计", "70%", "30%", "人工拍板，AI 提方案对比"],
-    ["编码实现", "5%", "95%", "AI 主导，人工修正方向"],
-    ["UI 调试", "60%", "40%", "人工真机截图，AI 改代码"],
-    ["逻辑 Bug 排查", "20%", "80%", "人工提症状，AI 挖根因"],
-    ["部署/网络问题", "80%", "20%", "人工诊断环境，AI 改配置"],
-    ["文档编写", "10%", "90%", "AI 起草，人工指出遗漏"],
-    ["代码审查", "30%", "70%", "AI 全量扫描 + 人工 PR review"],
+    ["需求定义", "100%", "—"],
+    ["架构设计", "70%", "30%"],
+    ["编码实现", "5%", "95%"],
+    ["UI 调试", "60%", "40%"],
+    ["逻辑 Bug 排查", "20%", "80%"],
+    ["部署/网络", "80%", "20%"],
+    ["文档编写", "10%", "90%"],
+    ["代码审查", "30%", "70%"],
 ]
-add_table(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(5.6),
-            ["任务类型", "人工", "AI", "协同方式"], matrix, font_size=13,
-            header_font_size=14,
-            col_widths=[Inches(2.5), Inches(1.5), Inches(1.5), Inches(6.8)])
+add_table(s, Inches(7.2), Inches(1.5), Inches(5.8), Inches(4.6),
+            ["任务", "人工", "AI"], matrix, font_size=BODY_SM,
+            col_widths=[Inches(2.4), Inches(1.7), Inches(1.7)])
+
+add_callout(s, Inches(0.5), Inches(6.4), Inches(12.4), Inches(0.6),
+            "本项目 L3 + L4 占用约 70% 协同时间  ·  开放性指令激发全量审查",
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=BODY_MD, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
-# Slide 14: AI Strengths vs Human Irreplaceability
+# Slide 8: Strengths + Anti-patterns + Best practices + Efficiency
 # =================================================================
 s = add_slide()
-add_header(s, "五、AI 优势 vs 人工不可替代")
+add_header(s, "五、优势分工 · 反模式 · 效率")
 
-# Left: AI strengths
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(6.0), Inches(0.5),
-            "✅ AI 显著优于人工", font_size=18, bold=True, color=GREEN)
-ai_strengths = [
-    ["全量代码审查", "单次 35 个问题，覆盖 90 个文件"],
-    ["跨文件链路追踪", "客户端到服务端的完整调用链"],
-    ["重复模式识别", "5 处类似并发问题一次发现"],
-    ["测试用例生成", "15 个结算用例自动覆盖边界"],
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.0), Inches(0.4),
+            "✅ AI 显著优于人工", font_size=BODY_MD, bold=True, color=GREEN)
+ai_pts = [
+    "·  全量代码审查（35 问题 / 90 文件）",
+    "·  跨文件链路追踪",
+    "·  重复模式识别（5 处一次发现）",
+    "·  测试用例生成（15 边界用例）",
 ]
-add_table(s, Inches(0.5), Inches(1.85), Inches(6.0), Inches(2.8),
-            ["场景", "说明"], ai_strengths, font_size=11,
-            header_color=GREEN, header_font_size=12,
-            col_widths=[Inches(2.0), Inches(4.0)])
+y = 1.5
+for pt in ai_pts:
+    add_textbox(s, Inches(0.6), Inches(y), Inches(6.0), Inches(0.35),
+                pt, font_size=BODY_SM, color=DARK)
+    y += 0.32
 
-# Right: Human irreplaceable
-add_textbox(s, Inches(7.0), Inches(1.3), Inches(6.0), Inches(0.5),
-            "❌ 人工不可替代", font_size=18, bold=True, color=RED)
-human_only = [
-    ["真机环境验证", "Android cleartext / 503 错误 AI 看不见"],
-    ["时序竞争复现", "网络抖动 / 并发，需真机才能复现"],
-    ["用户体验判断", "「布局太挤」AI 无视觉感知"],
-    ["部署 & 业务决策", "服务器选择 / 密钥 / 业务规则拍板"],
+add_textbox(s, Inches(6.8), Inches(1.05), Inches(6.0), Inches(0.4),
+            "❌ 人工不可替代", font_size=BODY_MD, bold=True, color=RED)
+hu_pts = [
+    "·  真机环境验证（cleartext / 503）",
+    "·  时序竞争复现（网络抖动 / 并发）",
+    "·  用户体验判断（视觉感知）",
+    "·  部署 & 业务决策",
 ]
-add_table(s, Inches(7.0), Inches(1.85), Inches(6.0), Inches(2.8),
-            ["场景", "原因"], human_only, font_size=11,
-            header_color=RED, header_font_size=12,
-            col_widths=[Inches(2.0), Inches(4.0)])
+y = 1.5
+for pt in hu_pts:
+    add_textbox(s, Inches(6.9), Inches(y), Inches(6.0), Inches(0.35),
+                pt, font_size=BODY_SM, color=DARK)
+    y += 0.32
 
-# Footer key insight
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(5.3),
-                            Inches(12.4), Inches(1.7))
-foot.fill.solid()
-foot.fill.fore_color.rgb = LIGHT_BG
-foot.line.color.rgb = PRIMARY
-add_textbox(s, Inches(0.8), Inches(5.5), Inches(12.0), Inches(0.5),
-            "💡 关键洞察",
-            font_size=18, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(6.0), Inches(12.0), Inches(0.5),
-            "AI 静态分析 vs 人工动态验证 — 二者覆盖的 Bug 类型几乎不重叠",
-            font_size=15, color=DARK)
-add_textbox(s, Inches(0.8), Inches(6.45), Inches(12.0), Inches(0.5),
-            "→ 任何只有一方参与的流程，都会漏掉至少 40% 的问题",
-            font_size=13, color=GRAY)
-
-# =================================================================
-# Slide 15: Anti-patterns
-# =================================================================
-s = add_slide()
-add_header(s, "五、协同反模式（要避免）")
-
-antis = [
-    ["🚨 过度信任", "AI 说「已修复」就直接合入", "表层修复未触根因，反复复现"],
-    ["🚨 过度怀疑", "每个修改都逐行 review", "失去 AI 提速核心价值"],
-    ["🚨 模糊指令", "「把这个 bug 修了」", "只修表象，根因仍在"],
-    ["🚨 一次到位幻想", "期待一次审查解决所有问题", "本项目经历 4 轮才彻底解决"],
-    ["🚨 跳过验证", "AI 修完直接发布", "真机问题永远暴露不出来"],
+add_textbox(s, Inches(0.5), Inches(3.0), Inches(12.3), Inches(0.4),
+            "🚨 协同反模式（要避免）",
+            font_size=BODY_MD, bold=True, color=RED)
+anti = [
+    ["过度信任", "AI 说「已修复」就直接合入 → 反复复现"],
+    ["模糊指令", "「把这个 bug 修了」 → 只修表象"],
+    ["一次到位幻想", "期待一次解决所有问题 → 本项目经历 4 轮"],
+    ["跳过验证", "AI 修完直接发布 → 真机问题永远暴露不出来"],
 ]
-add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(4.0),
-            ["反模式", "表现", "后果"], antis, font_size=14,
-            header_color=RED, header_font_size=15,
-            col_widths=[Inches(2.5), Inches(4.5), Inches(5.3)])
+add_table(s, Inches(0.5), Inches(3.5), Inches(7.5), Inches(2.4),
+            ["反模式", "后果"], anti, font_size=BODY_SM,
+            header_color=RED, col_widths=[Inches(2.0), Inches(5.5)])
 
-# Bottom callout
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(6.0),
-                            Inches(12.4), Inches(1.0))
-foot.fill.solid()
-foot.fill.fore_color.rgb = RGBColor(0xFF, 0xF3, 0xE0)
-foot.line.color.rgb = ORANGE
-add_textbox(s, Inches(0.8), Inches(6.15), Inches(12.0), Inches(0.4),
-            "本项目的真实经历",
-            font_size=14, bold=True, color=ORANGE)
-add_textbox(s, Inches(0.8), Inches(6.55), Inches(12.0), Inches(0.4),
-            "卡死问题历经 4 层防御才彻底解决：canBeat → 回退链 → Mutex → 兜底推进",
-            font_size=13, color=DARK)
-
-# =================================================================
-# Slide 16: Best Practices & Efficiency
-# =================================================================
-s = add_slide()
-add_header(s, "五、最佳实践 & 效率数据")
-
-# Left: 6 practices
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(7.0), Inches(0.5),
-            "高效协同的 6 条实践", font_size=18, bold=True, color=PRIMARY)
-practices = [
-    "1. 症状描述要具体 — 截图比文字信息量大 10 倍",
-    "2. 截图优于文字 — UI/现象类问题直接给上下文",
-    "3. 允许多轮迭代 — 表象 → 根因 → 防护",
-    "4. 关键决策人工拍板 — 架构、协议、依赖",
-    "5. 人工把守发布闸门 — commit/push 前最终 review",
-    "6. 开放性指令激发全量审查 — 「自查自纠」 > 「修这个 bug」",
-]
-y = 1.85
-for p in practices:
-    add_textbox(s, Inches(0.7), Inches(y), Inches(7.0), Inches(0.4),
-                p, font_size=13, color=DARK)
-    y += 0.55
-
-# Right: Efficiency data
-add_textbox(s, Inches(7.8), Inches(1.3), Inches(5.0), Inches(0.5),
-            "效率数据", font_size=18, bold=True, color=PRIMARY)
+add_textbox(s, Inches(8.3), Inches(3.0), Inches(4.7), Inches(0.4),
+            "📊 效率数据",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
 eff = [
     ["人工总投入", "~30 小时"],
     ["AI 等效工作量", "~300 小时"],
     ["提速比", "约 10 倍"],
-    ["单次修复成功率", "~12%"],
-    ["总迭代次数", "8 次 commit"],
+    ["单次成功率", "~12%"],
 ]
-add_table(s, Inches(7.8), Inches(1.85), Inches(5.0), Inches(3.3),
-            ["指标", "数值"], eff, font_size=13,
-            col_widths=[Inches(2.5), Inches(2.5)])
+add_table(s, Inches(8.3), Inches(3.5), Inches(4.7), Inches(2.4),
+            ["指标", "数值"], eff, font_size=BODY_SM,
+            col_widths=[Inches(2.5), Inches(2.2)])
 
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(7.8), Inches(5.4),
-                            Inches(5.0), Inches(1.6))
-foot.fill.solid()
-foot.fill.fore_color.rgb = LIGHT_BG
-foot.line.color.rgb = PRIMARY
-add_textbox(s, Inches(8.0), Inches(5.55), Inches(4.6), Inches(0.4),
-            "💡 启示", font_size=14, bold=True, color=PRIMARY)
-add_textbox(s, Inches(8.0), Inches(5.95), Inches(4.6), Inches(1.0),
-            "提速 10 倍的代价是迭代次数增加，需要轻量 review 流程配合",
-            font_size=12, color=DARK)
+add_textbox(s, Inches(0.5), Inches(6.05), Inches(12.3), Inches(0.4),
+            "💡 高效协同 6 条实践",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.7), Inches(6.5), Inches(12.0), Inches(0.4),
+            "①症状要具体  ②截图优于文字  ③允许多轮迭代  ④关键决策人工拍板  ⑤人工守发布闸门  ⑥开放性指令激发全量审查",
+            font_size=BODY_SM, color=DARK)
 
 # =================================================================
-# Slide 17: Fix 1 - 4-layer defense for stuck game
+# Slide 9: Key Technical Fixes (3 in 1)
 # =================================================================
 s = add_slide()
-add_header(s, "六、关键技术修复 (1/3)：四层防卡死")
+add_header(s, "六、关键技术修复（3 处核心）")
 
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
-            "症状：游戏卡在等待 AI 出牌，永不响应",
-            font_size=16, bold=True, color=RED)
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+            "1️⃣ 游戏卡死 — 四层防御",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+fix1 = """[层1] canBeat 炸弹比较错误：大张数应直接胜（修复前要求同张数）
+[层2] AI 失败无回退：增加三级回退（首选 → 过牌 → 最小单张）
+[层3] 多协程无锁并发写 state.hands：每房间一把 Mutex（改在锁内/广播在锁外）
+[层4] 三级回退仍失败：broadcastForceAdvance 强制推进兜底"""
+add_code_block(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(1.7),
+                fix1, font_size=BODY_SM)
 
-defense = """[层 1]  canBeat 炸弹比较错误
-        修复前：current.size != last.size → return false（大炸弹反而打不过！）
-        修复后：大张数直接胜，张数相同再比牌点
+add_textbox(s, Inches(0.5), Inches(3.3), Inches(12.3), Inches(0.4),
+            "2️⃣ 重连失效 — 异步时序陷阱",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+fix2 = """❌ 修复前：newWebSocket() 后立即 send(Reconnect)，ws 仍在 CONNECTING → 静默丢弃
+✅ 修复后：在 onOpen 回调内 send，确保 ws 已 OPEN
+教训：「创建连接」≠「连接已建立」，异步 API 必须在回调中操作"""
+add_code_block(s, Inches(0.5), Inches(3.75), Inches(12.3), Inches(1.4),
+                fix2, font_size=BODY_SM)
 
-[层 2]  AI 失败无任何回退
-        修复：首选动作 → 过牌 → 最小单张（三级回退）
-
-[层 3]  多协程无锁并发写 state.hands
-        修复：每房间一把 Mutex
-              修改 state 在锁内 · 广播在锁外（避免 I/O 阻塞锁）
-
-[层 4]  三级回退均失败时游戏仍卡
-        修复：broadcastForceAdvance 强制推进，同步所有客户端"""
-add_code_block(s, Inches(0.5), Inches(1.85), Inches(12.3), Inches(4.4),
-                defense, font_size=13)
-
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(6.4),
-                            Inches(12.4), Inches(0.7))
-foot.fill.solid()
-foot.fill.fore_color.rgb = LIGHT_BG
-foot.line.color.rgb = PRIMARY
-add_textbox(s, Inches(0.8), Inches(6.55), Inches(12.0), Inches(0.5),
-            "💡 教训：单机与联网验证逻辑必须保持一致，差异越早发现代价越低",
-            font_size=14, color=PRIMARY, bold=True)
-
-# =================================================================
-# Slide 18: Fix 2 - Reconnect timing
-# =================================================================
-s = add_slide()
-add_header(s, "六、关键技术修复 (2/3)：重连时序陷阱")
-
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
-            "症状：断线后重连，游戏永远显示「连接中」",
-            font_size=16, bold=True, color=RED)
-
-code1 = """// ❌ 修复前
-ws = client.newWebSocket(request, listener)  // 异步，立即返回
-// ws 仍在 CONNECTING 状态，send() 返回 false，消息静默丢弃 ↓
-sessionToken?.let { send(Reconnect(it)) }    // BUG：永远失败"""
-add_code_block(s, Inches(0.5), Inches(1.95), Inches(12.3), Inches(2.0),
-                code1, font_size=14)
-
-code2 = """// ✅ 修复后：在 onOpen 回调内发送，确保 ws 已 OPEN
-override fun onOpen(ws: WebSocket, response: Response) {
-    scope.launch {
-        _connectionState.value = Connected
-        sessionToken?.let { send(Reconnect(it)) }  // OK
-    }
-}"""
-add_code_block(s, Inches(0.5), Inches(4.1), Inches(12.3), Inches(2.4),
-                code2, font_size=14)
-
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(6.65),
-                            Inches(12.4), Inches(0.6))
-foot.fill.solid()
-foot.fill.fore_color.rgb = LIGHT_BG
-foot.line.color.rgb = PRIMARY
-add_textbox(s, Inches(0.8), Inches(6.78), Inches(12.0), Inches(0.4),
-            "💡 教训：「创建连接」 ≠ 「连接已建立」；异步 API 必须在回调中操作",
-            font_size=14, color=PRIMARY, bold=True)
+add_textbox(s, Inches(0.5), Inches(5.25), Inches(12.3), Inches(0.4),
+            "3️⃣ 两端结算不一致 — 统一公式",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+fix3 = """根因：collectedScore 硬编码为 0；服务端漏算「输方未走完已收分」
+统一公式：赢方 = 赢方所有已收 + 输方未走完(已收 + 手牌分)；输方 = 输方已走完已收
+新增 state.playerScores: MutableMap<Int,Int> 实时追踪每人已收分
+✓ 15 个验证用例全部通过（含提前结算、速度流、极端场景）"""
+add_code_block(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(1.5),
+                fix3, font_size=BODY_SM)
 
 # =================================================================
-# Slide 19: Fix 3 - Settlement formula alignment
+# Slide 10: Lessons + Action Items + Closing
 # =================================================================
 s = add_slide()
-add_header(s, "六、关键技术修复 (3/3)：两端结算不一致")
+add_header(s, "七、经验总结 & 后续行动")
 
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
-            "症状：已收分全是 0；游戏结束时双方分数不符合预期",
-            font_size=16, bold=True, color=RED)
-
-add_textbox(s, Inches(0.5), Inches(1.85), Inches(12.3), Inches(0.4),
-            "根因：",
-            font_size=15, bold=True, color=DARK)
-root_causes = [
-    "1. getStateForPlayer 中 collectedScore 硬编码为 0（playerScores 字段缺失）",
-    "2. 结算公式服务端遗漏「输方未走完玩家已收分」",
-]
-y = 2.3
-for r in root_causes:
-    add_textbox(s, Inches(0.7), Inches(y), Inches(12.0), Inches(0.4),
-                r, font_size=13, color=DARK)
-    y += 0.4
-
-formula_code = """统一公式：
-  赢方得分 = 赢方所有已收
-           + 输方未走完玩家（已收 + 手牌分）  ← 服务端原来漏了这项
-  输方得分 = 输方已走完玩家的已收
-
-新增字段：
-  state.playerScores: MutableMap<Int, Int>
-  在 handleRoundEnd 每次赢牌时同步累加 → collectedScore 实时正确"""
-add_code_block(s, Inches(0.5), Inches(3.4), Inches(12.3), Inches(2.8),
-                formula_code, font_size=13)
-
-foot = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(0.5), Inches(6.4),
-                            Inches(12.4), Inches(0.7))
-foot.fill.solid()
-foot.fill.fore_color.rgb = RGBColor(0xE8, 0xF5, 0xE9)
-foot.line.color.rgb = GREEN
-add_textbox(s, Inches(0.8), Inches(6.55), Inches(12.0), Inches(0.5),
-            "✓ 15 个验证用例全部通过（含提前结算、速度流、极端场景）",
-            font_size=14, color=GREEN, bold=True)
-
-# =================================================================
-# Slide 20: Lessons + Action Items
-# =================================================================
-s = add_slide()
-add_header(s, "七、工程经验 & 后续行动")
-
-add_textbox(s, Inches(0.5), Inches(1.3), Inches(12.3), Inches(0.4),
-            "核心经验",
-            font_size=18, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
+            "🎯 核心经验",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
 lessons = [
-    "1. 「修了又坏」根因 — 只修表层，没往深挖；卡死历经 4 层才解决",
-    "2. 单机/联网共享逻辑必须保持一致 — 炸弹/结算/回合 3 处不一致",
-    "3. AI 辅助的正确分工 — AI 静态扫描 + 人工真机验证，不可互相替代",
-    "4. 协议与环境问题必须人工打通 — Android cleartext、503 等纯代码看不出",
+    "1. 「修了又坏」的根因：只修表层，没往深挖",
+    "2. 单机/联网共享逻辑必须保持一致",
+    "3. AI 静态扫描 + 人工真机验证不可互相替代",
+    "4. 协议与环境问题必须人工打通",
 ]
-y = 1.85
+y = 1.55
 for l in lessons:
-    add_textbox(s, Inches(0.7), Inches(y), Inches(12.0), Inches(0.4),
-                l, font_size=13, color=DARK)
-    y += 0.45
+    add_textbox(s, Inches(0.6), Inches(y), Inches(6.2), Inches(0.4),
+                l, font_size=BODY_SM, color=DARK)
+    y += 0.5
 
-add_textbox(s, Inches(0.5), Inches(3.85), Inches(12.3), Inches(0.4),
-            "后续建议行动",
-            font_size=18, bold=True, color=PRIMARY)
+add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
+            "🚀 后续建议行动",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
 actions = [
-    ["🔴 P0", "自动化集成测试", "炸弹比较 / 结算 / 重连流程写服务端单元测试"],
-    ["🔴 P0", "共享规则层", "canBeat + SettlementCalculator → KMP 共享模块"],
-    ["🟠 P1", "监控告警", "上线 force-advance 计数指标，触发即告警"],
-    ["🟡 P2", "弱网测试", "集成限速工具，系统化回归重连场景"],
-    ["🟡 P2", "协议版本号", "添加 protocolVersion 强制兼容检查"],
+    ["P0", "自动化集成测试（炸弹/结算/重连）"],
+    ["P0", "共享规则层（KMP 模块）"],
+    ["P1", "force-advance 监控告警"],
+    ["P2", "弱网回归测试"],
+    ["P2", "协议版本号兼容检查"],
 ]
-add_table(s, Inches(0.5), Inches(4.4), Inches(12.3), Inches(2.6),
-            ["优先级", "行动", "说明"], actions, font_size=12,
-            col_widths=[Inches(1.2), Inches(2.5), Inches(8.6)])
+add_table(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(2.5),
+            ["优先级", "行动"], actions, font_size=BODY_SM,
+            col_widths=[Inches(1.2), Inches(4.8)])
 
-# =================================================================
-# Slide 21: Closing
-# =================================================================
-s = add_slide()
-# Side accent bar
-accent = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, Inches(0.3), SLIDE_H)
-accent.fill.solid()
-accent.fill.fore_color.rgb = PRIMARY
-accent.line.fill.background()
+add_callout(s, Inches(0.5), Inches(4.2), Inches(12.4), Inches(2.5),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(4.4), Inches(12.0), Inches(0.5),
+            "🏆 本次交付成果",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(4.95), Inches(12.0), Inches(0.4),
+            "·  全程 33 PR / 123 commit  ·  修复约 67 个问题  ·  本次深度调试 8 commit / 重写 700 行",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.4), Inches(12.0), Inches(0.4),
+            "·  游戏永不卡死 ✓  ·  重连无缝恢复 ✓  ·  两端结算一致 ✓",
+            font_size=BODY_SM, color=GREEN, bold=True)
+add_textbox(s, Inches(0.8), Inches(5.95), Inches(12.0), Inches(0.5),
+            "💡 核心结论：AI 静态全量审查 + 人工动态真机验证 = 互补提速 10 倍",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
 
-add_textbox(s, Inches(1.0), Inches(2.3), Inches(11.5), Inches(1.5),
-            "谢谢", font_size=84, bold=True, color=PRIMARY,
-            align=PP_ALIGN.CENTER)
-
-# Core conclusion box
-box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(1.5), Inches(4.5),
-                            Inches(10.3), Inches(1.6))
-box.fill.solid()
-box.fill.fore_color.rgb = LIGHT_BG
-box.line.color.rgb = PRIMARY
-add_textbox(s, Inches(1.7), Inches(4.7), Inches(9.9), Inches(0.5),
-            "核心结论",
-            font_size=18, bold=True, color=PRIMARY,
-            align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(1.7), Inches(5.2), Inches(9.9), Inches(0.5),
-            "AI 负责「静态全量审查」，人工负责「动态真机验证」",
-            font_size=18, color=DARK, align=PP_ALIGN.CENTER)
-add_textbox(s, Inches(1.7), Inches(5.65), Inches(9.9), Inches(0.5),
-            "互补而非替代  ·  协同效率约 10 倍",
-            font_size=18, bold=True, color=PRIMARY, align=PP_ALIGN.CENTER)
-
-add_textbox(s, Inches(1.0), Inches(6.6), Inches(11.5), Inches(0.5),
-            "问题 & 讨论", font_size=20, color=GRAY,
+add_textbox(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.4),
+            "谢谢  ·  问题 & 讨论",
+            font_size=BODY_MD, bold=True, color=GRAY,
             align=PP_ALIGN.CENTER)
 
 # =================================================================
-# Add page numbers (skip cover and closing)
-# =================================================================
-total_slides = len(prs.slides)
+total = len(prs.slides)
 for i, slide in enumerate(prs.slides, start=1):
-    if i == 1 or i == total_slides:
+    if i == 1:
         continue
-    add_page_number(slide, i, total_slides)
+    add_page_number(slide, i, total)
 
-# Save
 output = "/home/user/AndroidAPP/docs/dev_summary.pptx"
 prs.save(output)
-print(f"✓ Saved {total_slides} slides to {output}")
+print(f"✓ Saved {total} slides to {output}")
