@@ -329,44 +329,53 @@ add_header(s, "三、问题全景：人工 vs AI")
 
 y = 1.3
 cards = [
-    ("🔴 人工测试 / 反馈", "~32 个", "UI体验 · 部署环境 · 运行时崩溃", RED),
-    ("🔵 AI 静态审查", "~35 个", "逻辑错误 · 并发 · 协议细节", PRIMARY),
-    ("🟡 Code Review Bot", "2 个", "PR 自动审查额外发现", ORANGE),
+    ("🔴 人工测试 / 反馈", "~30 个",
+     "UI 体验 · 部署环境 · 运行时崩溃", "", RED),
+    ("🔵 AI #1：Claude Code", "~35 个",
+     "全量扫描 · 跨文件链路 · 并发陷阱", "claude-opus-4-7 / sonnet-4-6", PRIMARY),
+    ("🟡 AI #2：ChatGPT Codex", "3 个",
+     "PR 自动审查 · 细粒度风险点", "chatgpt-codex-connector[bot]", ORANGE),
 ]
 x_positions = [0.5, 4.7, 8.9]
-for (title, num, desc, color), x in zip(cards, x_positions):
+for (title, num, desc, model, color), x in zip(cards, x_positions):
     box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
                                 Inches(x), Inches(y),
-                                Inches(4.0), Inches(2.3))
+                                Inches(4.0), Inches(2.5))
     box.fill.solid()
     box.fill.fore_color.rgb = color
     box.line.fill.background()
-    add_textbox(s, Inches(x), Inches(y + 0.2), Inches(4.0), Inches(0.4),
+    add_textbox(s, Inches(x), Inches(y + 0.15), Inches(4.0), Inches(0.4),
                 title, font_size=BODY_MD, bold=True, color=WHITE,
                 align=PP_ALIGN.CENTER)
-    add_textbox(s, Inches(x), Inches(y + 0.7), Inches(4.0), Inches(0.9),
-                num, font_size=44, bold=True, color=WHITE,
+    add_textbox(s, Inches(x), Inches(y + 0.6), Inches(4.0), Inches(0.9),
+                num, font_size=40, bold=True, color=WHITE,
                 align=PP_ALIGN.CENTER)
-    add_textbox(s, Inches(x), Inches(y + 1.75), Inches(4.0), Inches(0.4),
+    add_textbox(s, Inches(x), Inches(y + 1.65), Inches(4.0), Inches(0.35),
                 desc, font_size=BODY_SM, color=WHITE, align=PP_ALIGN.CENTER)
+    add_textbox(s, Inches(x), Inches(y + 2.05), Inches(4.0), Inches(0.35),
+                model, font_size=10, color=WHITE,
+                align=PP_ALIGN.CENTER)
 
-add_callout(s, Inches(0.5), Inches(4.0), Inches(12.4), Inches(2.9),
+add_callout(s, Inches(0.5), Inches(4.1), Inches(12.4), Inches(2.85),
             "", bg=LIGHT_BG, border=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.2), Inches(12.0), Inches(0.5),
+add_textbox(s, Inches(0.8), Inches(4.3), Inches(12.0), Inches(0.5),
             "💡 核心发现",
             font_size=BODY_LG, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.8), Inches(12.0), Inches(0.5),
-            "人工看见「症状」，AI 挖出「根因」 — 两者几乎不重叠，而是互补",
-            font_size=BODY_LG, bold=True, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.4), Inches(12.0), Inches(0.5),
-            "·  人工：截图 / 真机崩溃 / 部署环境问题（AI 无法获知）",
-            font_size=BODY_MD, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.85), Inches(12.0), Inches(0.5),
-            "·  AI：跨文件链路 / 时序逻辑 / 并发陷阱（人工难以全量覆盖）",
-            font_size=BODY_MD, color=DARK)
-add_textbox(s, Inches(0.8), Inches(6.35), Inches(12.0), Inches(0.5),
-            "→  任何只有一方参与的流程，都会漏掉至少 40% 的问题",
-            font_size=BODY_MD, color=GRAY)
+add_textbox(s, Inches(0.8), Inches(4.85), Inches(12.0), Inches(0.5),
+            "人工看见「症状」 · Claude 挖「根因」 · Codex 找「细节风险」 — 三者几乎不重叠",
+            font_size=BODY_MD, bold=True, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.35), Inches(12.0), Inches(0.5),
+            "·  人工：截图 / 真机崩溃 / 部署环境问题",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.7), Inches(12.0), Inches(0.5),
+            "·  Claude Code Agent：跨文件链路 / 并发陷阱 / 协议一致性",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(6.05), Inches(12.0), Inches(0.5),
+            "·  ChatGPT Codex Bot：UUID 截断 / loading 卡死 / UI/服务端不一致",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(6.45), Inches(12.0), Inches(0.5),
+            "→  多 AI 交叉审查比单一审查更可靠",
+            font_size=BODY_SM, bold=True, color=PRIMARY)
 
 # =================================================================
 # Slide 5: Human-discovered Issues (3 phases compacted)
@@ -411,44 +420,56 @@ add_table(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(1.5),
             col_widths=[Inches(2.0), Inches(10.3)])
 
 # =================================================================
-# Slide 6: AI-discovered Issues
+# Slide 6: AI-discovered Issues (Claude + Codex)
 # =================================================================
 s = add_slide()
-add_header(s, "四、AI 发现的问题（~35 个，4 轮审查）")
+add_header(s, "四、AI 发现的问题（~38 个）")
 
-add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
-            "第 1 轮：综合审查（~20 个）",
+# Section 1: Claude Code Agent
+add_textbox(s, Inches(0.5), Inches(1.0), Inches(12.3), Inches(0.4),
+            "🔵 AI #1：Claude Code Agent（~35 个，4 轮审查）",
             font_size=BODY_MD, bold=True, color=PRIMARY)
-r1 = [
-    ["协议 / 序列化 (4)", "sealed class 缺 classDiscriminator；枚举值不对齐"],
-    ["会话 / 重连 (3)", "sessionToken 未设置；leaveRoom 未清空 token"],
-    ["房间状态机 (4)", "未检查 WAITING；退出不补 AI；重复加入"],
-    ["UI / 状态同步 (6)", "seatIndex%2 误算；初始化未刷新；onDestroy 未 guard"],
-    ["其他 (3)", "applyState 版本反向；senderId 不稳定"],
+add_textbox(s, Inches(0.5), Inches(1.4), Inches(12.3), Inches(0.4),
+            "模型：claude-opus-4-7（1M 上下文）+ claude-sonnet-4-6  ·  工作模式：Level 4「自查自纠」",
+            font_size=10, color=GRAY)
+
+claude_rounds = [
+    ["第 1 轮 综合审查 (~20)",
+     "协议/序列化 4 · 会话/重连 3 · 房间状态机 4 · UI/状态同步 6 · 其他 3"],
+    ["第 2-3 轮 深层 (~8)",
+     "回合错位 · ArrayList 并发 · AI 回退链缺失 · collectedScore 硬编码 0"],
+    ["第 4 轮 根因 (~7) ⭐",
+     "WebSocket CONNECTING send() 静默失败 · 多协程无锁并发 · 结算公式漏算"],
 ]
-add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(2.6),
-            ["类别", "主要问题"], r1, font_size=BODY_SM,
-            col_widths=[Inches(2.8), Inches(9.5)])
+add_table(s, Inches(0.5), Inches(1.85), Inches(12.3), Inches(1.95),
+            ["审查轮次", "主要问题"], claude_rounds, font_size=BODY_SM,
+            col_widths=[Inches(3.0), Inches(9.3)])
 
-add_textbox(s, Inches(0.5), Inches(4.3), Inches(12.3), Inches(0.4),
-            "第 2-3 轮：深层审查（~8 个）",
-            font_size=BODY_MD, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.7), Inches(4.75), Inches(12.0), Inches(0.45),
-            "·  赢家未设为下轮首家  ·  ArrayList 并发修改  ·  AI 回退链缺失  ·  collectedScore 硬编码 0",
-            font_size=BODY_SM, color=DARK)
+# Section 2: ChatGPT Codex Review Bot
+add_textbox(s, Inches(0.5), Inches(4.05), Inches(12.3), Inches(0.4),
+            "🟡 AI #2：ChatGPT Codex Review Bot（3 个）",
+            font_size=BODY_MD, bold=True, color=ORANGE)
+add_textbox(s, Inches(0.5), Inches(4.45), Inches(12.3), Inches(0.4),
+            "Agent：chatgpt-codex-connector[bot]  ·  PR 自动审查触发  ·  按 P1/P2 标注优先级",
+            font_size=10, color=GRAY)
 
-add_textbox(s, Inches(0.5), Inches(5.4), Inches(12.3), Inches(0.4),
-            "第 4 轮：根因专项（~7 个） — 这一轮才挖到真正的卡死根因",
-            font_size=BODY_MD, bold=True, color=RED)
-add_textbox(s, Inches(0.7), Inches(5.85), Inches(12.0), Inches(0.45),
-            "·  WebSocket CONNECTING 时 send() 静默失败（重连根因）",
-            font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.7), Inches(6.25), Inches(12.0), Inches(0.45),
-            "·  多协程无锁并发写 state.hands（卡死根因）",
-            font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.7), Inches(6.65), Inches(12.0), Inches(0.45),
-            "·  playerScores 整体缺失  ·  结算公式漏算输方未走完已收分",
-            font_size=BODY_SM, color=DARK)
+codex_findings = [
+    ["#29", "P1", "Application.kt:48", "UUID 截断到 8 字符 → 碰撞致跨用户混乱", "❌→✅ 本次修复"],
+    ["#31", "P1", "LobbyActivity.kt:219", "重连后 loading 遮罩可能永久卡住", "✅ PR #33 已修复"],
+    ["#33", "P2", "MainActivity.kt", "UI 提示按房间名加入但服务端不支持", "✅ UI 重构后修复"],
+]
+add_table(s, Inches(0.5), Inches(4.95), Inches(12.3), Inches(1.6),
+            ["PR", "优先级", "位置", "意见", "处置"], codex_findings,
+            header_color=ORANGE,
+            font_size=BODY_SM,
+            col_widths=[Inches(0.8), Inches(0.9), Inches(2.4),
+                        Inches(5.5), Inches(2.7)])
+
+# Bottom callout
+add_callout(s, Inches(0.5), Inches(6.7), Inches(12.4), Inches(0.55),
+            "💡 关键观察：Claude 偏向「全局逻辑链路」 vs Codex 偏向「细粒度风险点」 — 两 AI 几乎不重叠",
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=BODY_SM, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
 # Slide 7: Collaboration — 4 levels + Matrix

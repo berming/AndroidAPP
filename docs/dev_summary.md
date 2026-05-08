@@ -123,11 +123,11 @@
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| **人工测试/反馈** | ~32 | 48% | 覆盖 UI 体验、部署环境、运行时崩溃 |
-| **AI 静态审查** | ~35 | 52% | 覆盖逻辑错误、并发、协议细节 |
-| **代码 Review Bot** | 2 | — | PR 自动审查额外发现 |
+| **人工测试 / 反馈** | ~30 | 44% | 覆盖 UI 体验、部署环境、运行时崩溃 |
+| **AI #1：Claude Code Agent**<br/>（claude-opus-4-7 / sonnet-4-6） | ~35 | 51% | 全量代码扫描、跨文件链路、并发陷阱 |
+| **AI #2：ChatGPT Codex Review Bot**<br/>（chatgpt-codex-connector[bot]） | 3 | 5% | PR 自动审查、细粒度风险点 |
 
-> **核心规律**：人工发现"能看见的问题"，AI 发现"藏在代码里的问题"。两者几乎不重叠，而是互补。
+> **核心规律**：人工发现"能看见的问题"，AI 发现"藏在代码里的问题"。两类 AI 之间也几乎不重叠 —— 多 AI 交叉审查比单一审查更可靠。
 
 ---
 
@@ -178,16 +178,14 @@
 | 29 | **截图：已收分全是 0** | playerScores 追踪 + 结算公式（本次）|
 | 30 | 游戏逻辑反复修复反复复现 | 触发 4 轮 AI 全量自查（本次）|
 
-#### 代码 Review Bot 发现（2 个）
-
-| # | 优先级 | 问题 |
-|---|--------|------|
-| 31 | P1 | 断线重连时 loading 遮罩可能永久卡住（PR #31 审查）|
-| 32 | P2 | UI 提示可按房间名加入但服务端不支持（PR #33 审查）|
+> 备注：Codex Review Bot 提的 3 条意见（PR #29/#31/#33）属于"AI 静态审查"，已移至下文 AI 章节统一统计。
 
 ---
 
 ### AI（Claude）自主发现的问题（~35 个，4 轮审查）
+
+> **AI 来源**：Claude Code Agent  ·  模型：claude-opus-4-7（1M 上下文） + claude-sonnet-4-6
+> **工作模式**：Level 4 — 用户开放性指令"自查自纠"，AI 全量代码扫描后输出问题清单 + 修复
 
 #### 第 1 轮：综合审查（~20 个）
 
@@ -218,6 +216,25 @@
 - 结算公式漏算"输方未走完玩家已收分"
 - `computeAllFinishedScores` 两端逻辑不一致
 - `checkGameEnd` 提前结算条件判断有误
+
+---
+
+### 第二个 AI：ChatGPT Codex Review Bot（3 条）
+
+> **AI 来源**：ChatGPT Codex Review（GitHub App `chatgpt-codex-connector[bot]`）
+> **工作模式**：PR 创建时自动触发的 GPT 系列模型代码审查
+> **特点**：聚焦于细粒度的代码缺陷与隐式风险，按 P1 / P2 优先级标注
+
+| # | PR | 优先级 | 文件 / 位置 | 意见 | 处置 |
+|---|-----|--------|-----------|------|------|
+| 1 | #29 | P1 | `server/Application.kt:48` | UUID 截断到 8 字符 → entropy 仅 32 位，会话 ID 碰撞会让 `playerToRoom` 指向错误玩家，导致跨用户重连混乱 | ❌ 长期未修复 → ✅ 本次补修（commit `06d445c`，改用完整 36 字符 UUID） |
+| 2 | #31 | P1 | `LobbyActivity.kt:219` | createRoom/joinRoom 帧丢失后，`Reconnecting → Connected` 路径不触发 `RoomEvent.Error`，loading 遮罩永久卡住 | ✅ 已修复（PR #33 在 Disconnected/Reconnecting/Error 三个状态都加了 hideLoading + Toast） |
+| 3 | #33 | P2 | `MainActivity.kt` | UI 提示「房间号或名称」加入，但服务端 `joinRoom` 只解析 `roomsByCode`，输入名称必失败 | ✅ 已修复（UI 重构为「房间列表点击加入」，去掉了输入框；LobbyActivity 输入框 hint 改为「输入房间码」） |
+
+**关键观察**：
+- Codex 的 P1 UUID 意见在审查后约 4 天才被处理（被人工 + Claude 多轮调试遗漏，直到本次系统化复盘才发现）
+- 两个 AI 的发现**几乎不重叠**：Claude 偏向"全局架构与逻辑链路"，Codex 偏向"细粒度风险点"
+- 启示：单一 AI 工具仍有盲区，**多 AI 交叉审查**比单一审查更可靠
 
 ---
 
