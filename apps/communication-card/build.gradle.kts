@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
+    // serialization 插件不再需要：所有 @Serializable 类都已移至 :shared 模块
 }
 
 android {
@@ -52,6 +52,9 @@ android {
 }
 
 dependencies {
+    // 共享模块：协议 + 牌型规则 + 结算 + AI（Android / Web 共用同一份代码）
+    implementation(project(":shared"))
+
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
@@ -61,9 +64,8 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // 网络通信
+    // 网络通信（Android 端用 OkHttp 实现 WebSocket，协议 DTO 来自 :shared）
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

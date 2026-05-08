@@ -1,7 +1,8 @@
 package com.communicationcard.game.engine
 
-import org.junit.Assert.*
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /**
  * 结算逻辑测试 - 验证所有15个用例
