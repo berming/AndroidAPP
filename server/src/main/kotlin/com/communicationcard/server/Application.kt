@@ -45,7 +45,7 @@ fun main() {
             }
 
             webSocket("/game") {
-                val sessionId = UUID.randomUUID().toString().take(8)
+                val sessionId = UUID.randomUUID().toString()
                 println("=== WebSocket /game connected: $sessionId ===")
 
                 val session = GameSession(sessionId, this)
