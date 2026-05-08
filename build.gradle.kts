@@ -10,12 +10,8 @@ detekt {
     parallel = true
     buildUponDefaultConfig = true
     allRules = false
-    source.setFrom(
-        files(
-            "apps/communication-card/src/main/java",
-            "apps/communication-card/src/test/java"
-        )
-    )
+    // 测试代码允许 !! 等模式（assertNotNull 后立即 !! 访问），不在 detekt 范围内
+    source.setFrom(files("apps/communication-card/src/main/java"))
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {

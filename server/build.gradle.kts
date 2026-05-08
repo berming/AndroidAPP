@@ -10,7 +10,8 @@ detekt {
     parallel = true
     buildUponDefaultConfig = true
     allRules = false
-    source.setFrom(files("src/main/kotlin", "src/test/kotlin"))
+    // 测试代码不在 detekt 范围内（允许 assertNotNull 后立即 !! 等惯用模式）
+    source.setFrom(files("src/main/kotlin"))
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {

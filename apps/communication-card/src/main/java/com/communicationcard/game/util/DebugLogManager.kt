@@ -146,6 +146,7 @@ object DebugLogManager {
         return try {
             logFile?.readText() ?: getLogsAsString()
         } catch (e: Exception) {
+            Log.e("DebugLogManager", "Failed to read full log file", e)
             getLogsAsString()
         }
     }
