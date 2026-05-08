@@ -203,7 +203,8 @@ add_textbox(s, Inches(0.8), Inches(4.0), Inches(11.5), Inches(0.4),
 items = [
     "①  项目背景与开发全貌    ②  架构设计与遗憾",
     "③  问题全景：人工 vs AI    ④  人机协同模式",
-    "⑤  关键技术修复    ⑥  经验总结与后续行动",
+    "⑤  AI 质量改进路径：多 Claude 协同 + 跨 vendor",
+    "⑥  关键技术修复    ⑦  经验总结与后续行动",
 ]
 y = 4.5
 for it in items:
@@ -584,10 +585,137 @@ add_textbox(s, Inches(0.7), Inches(6.5), Inches(12.0), Inches(0.4),
             font_size=BODY_SM, color=DARK)
 
 # =================================================================
-# Slide 9: Key Technical Fixes (3 in 1)
+# Slide 9: Reflection — Why Claude code has bugs (root cause)
 # =================================================================
 s = add_slide()
-add_header(s, "六、关键技术修复（3 处核心）")
+add_header(s, "六、反思：为什么 AI 写的代码 Bug 不少？")
+
+add_textbox(s, Inches(0.5), Inches(1.0), Inches(12.3), Inches(0.4),
+            "🔵 生成阶段必然有 Bug 的 5 个结构性原因",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+gen_reasons = [
+    ["1", "生成 vs 验证是不同认知任务", "canBeat 套用「同张数比大小」常用模式，忽略大炸弹直胜"],
+    ["2", "生成时无执行反馈，时序/并发是盲区", "WebSocket CONNECTING 时 send() 静默失败"],
+    ["3", "自然语言规格隐式不完整", "「重连后游戏继续」未明确秒数和保留状态"],
+    ["4", "模式匹配编码「常用 ≠ 正确」", "UUID.take(8) / ArrayList — 常用但联网场景错"],
+    ["5", "跨文件一致性是结构盲区", "单机 CardRules vs 服务端 canBeat — 双份 3 处不一致"],
+]
+add_table(s, Inches(0.5), Inches(1.45), Inches(12.3), Inches(2.5),
+            ["#", "原因", "本项目例子"], gen_reasons, font_size=BODY_SM,
+            col_widths=[Inches(0.5), Inches(4.5), Inches(7.3)])
+
+add_textbox(s, Inches(0.5), Inches(4.15), Inches(12.3), Inches(0.4),
+            "🔁 多轮自审仍能发现新问题的 4 个原因",
+            font_size=BODY_MD, bold=True, color=ORANGE)
+multi_reasons = [
+    ["1", "每轮在问不同的问题", "R1:「代码整洁吗？」 R4:「为什么 3 次修了还卡？」"],
+    ["2", "自审有确认偏差，用户「还卡住」才打破", "4 轮逐层挖到 send() 静默失败"],
+    ["3", "症状被消除后下一层根因才暴露", "canBeat → 回退链 → Mutex → 兜底 必须按序解锁"],
+    ["4", "注意力有限，单轮无法全部仔细看", "1M 上下文 ≠ 全部能仔细分析"],
+]
+add_table(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(2.0),
+            ["#", "原因", "本项目体现"], multi_reasons, font_size=BODY_SM,
+            header_color=ORANGE,
+            col_widths=[Inches(0.5), Inches(4.5), Inches(7.3)])
+
+add_callout(s, Inches(0.5), Inches(6.75), Inches(12.4), Inches(0.55),
+            "💡 启示：AI 写代码不是「一次到位」，而是「快速迭代到位」 — 接受多轮，但用工具/流程压低轮次",
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=BODY_SM, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
+
+# =================================================================
+# Slide 10: 5 Multi-Claude Collaboration Patterns
+# =================================================================
+s = add_slide()
+add_header(s, "六、多 Claude 模型协同的 5 种模式")
+
+# Top: available models
+add_textbox(s, Inches(0.5), Inches(1.0), Inches(12.3), Inches(0.4),
+            "可用模型",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+models = [
+    ["Claude Opus 4.7（1M）", "推理深度最强，全局视角", "架构 / 根因分析 / 深度审查"],
+    ["Claude Sonnet 4.6", "平衡速度与能力", "主要实现 / PR review"],
+    ["Claude Haiku 4.5", "极快、便宜", "静态扫描 / 测试生成 / 批量检查"],
+]
+add_table(s, Inches(0.5), Inches(1.45), Inches(12.3), Inches(1.6),
+            ["模型", "特点", "适合的角色"], models, font_size=BODY_SM,
+            col_widths=[Inches(3.0), Inches(4.5), Inches(4.8)])
+
+# Bottom: 5 patterns
+add_textbox(s, Inches(0.5), Inches(3.25), Inches(12.3), Inches(0.4),
+            "5 种协同模式（按可行性排序）",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+patterns = [
+    ["①", "开新会话 = 等价的「另一个 Claude」",
+     "上下文重置打破自审偏差，零成本，本项目 4 轮自查实质即此 — 推荐"],
+    ["②", "Generator / Reviewer 分工",
+     "Opus 架构 → Sonnet 实现 → Haiku 静态扫描 → Opus（新会话）根因审查"],
+    ["③", "对抗式审查（Adversarial）",
+     "A 实现 / B 攻击「找崩溃场景」 / C 仲裁 — 适合金钱/分数/安全代码"],
+    ["④", "TDD 反向流",
+     "Haiku 先写边界用例 → Sonnet 实现到通过 → Opus 审查覆盖率 — 最压低 Bug"],
+    ["⑤", "Self-Consistency 校验",
+     "同一任务 Opus 跑 3 次对比，差异处标记为「不确定区」 — 关键代码"],
+]
+add_table(s, Inches(0.5), Inches(3.7), Inches(12.3), Inches(3.4),
+            ["#", "模式", "做法 / 适用场景"], patterns, font_size=BODY_SM,
+            col_widths=[Inches(0.5), Inches(3.5), Inches(8.3)])
+
+# =================================================================
+# Slide 11: Coverage ceiling + Cross-vendor + Recommended workflow
+# =================================================================
+s = add_slide()
+add_header(s, "六、协同天花板 & 推荐工作流")
+
+# Top: ceiling
+add_textbox(s, Inches(0.5), Inches(1.0), Inches(12.3), Inches(0.4),
+            "⚠ 多 Claude 协同的天花板：相关性盲区",
+            font_size=BODY_MD, bold=True, color=RED)
+add_textbox(s, Inches(0.7), Inches(1.45), Inches(12.0), Inches(0.4),
+            "原因：所有 Claude 共享同一训练语料 + 同一训练目标 + 同一架构",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.7), Inches(1.85), Inches(12.0), Inches(0.4),
+            "→ Codex Bot 找到的 3 个问题（UUID 截断 / loading 卡死 / UI 不一致）多 Claude 也大概率找不出",
+            font_size=BODY_SM, color=GRAY)
+
+# Middle: Cross-vendor strategy
+add_textbox(s, Inches(0.5), Inches(2.4), Inches(12.3), Inches(0.4),
+            "📊 真正补盲区的策略对比",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+cross = [
+    ["多个 Claude 实例", "全局架构 + 逻辑链路（多角度）", "中等"],
+    ["Claude + Codex（OpenAI）", "增加细粒度风险点", "较高"],
+    ["Claude + Codex + Gemini", "不同训练目标，覆盖最广", "最高"],
+    ["Claude + Detekt / SpotBugs / kover", "规则化盲区", "必要"],
+]
+add_table(s, Inches(0.5), Inches(2.85), Inches(12.3), Inches(1.8),
+            ["组合", "找到的问题类型", "互补程度"], cross, font_size=BODY_SM,
+            col_widths=[Inches(4.5), Inches(5.5), Inches(2.3)])
+
+# Bottom: Recommended workflow
+add_textbox(s, Inches(0.5), Inches(4.85), Inches(12.3), Inches(0.4),
+            "🚀 给本项目的推荐工作流（如果重做联网模块）",
+            font_size=BODY_MD, bold=True, color=GREEN)
+
+workflow = """开发：  Opus 4.7 (1M)  架构 + 协议    Sonnet 4.6  实现    Haiku 4.5  静态扫描
+
+PR 4 关：  Claude PR Review (新会话)  +  Codex Bot  +  Detekt  +  人工真机验证
+
+测试驱动：  关键路径（结算 / 协议 / 并发）必须 TDD，Haiku 4.5 批量生成边界用例"""
+add_code_block(s, Inches(0.5), Inches(5.3), Inches(12.3), Inches(1.6),
+                workflow, font_size=BODY_SM)
+
+add_callout(s, Inches(0.5), Inches(7.0), Inches(12.4), Inches(0.4),
+            "💡 单 Claude 多轮 = 时间换覆盖率  ·  多 Claude = 视角换覆盖率  ·  多 vendor + 静态 + 真机 = 异构换覆盖率（边际收益最大）",
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=10, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
+
+# =================================================================
+# Slide 12: Key Technical Fixes (3 in 1)
+# =================================================================
+s = add_slide()
+add_header(s, "七、关键技术修复（3 处核心）")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
             "1️⃣ 游戏卡死 — 四层防御",
@@ -619,10 +747,10 @@ add_code_block(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(1.5),
                 fix3, font_size=BODY_SM)
 
 # =================================================================
-# Slide 10: Lessons + Action Items + Closing
+# Slide 13: Lessons + Action Items + Closing
 # =================================================================
 s = add_slide()
-add_header(s, "七、经验总结 & 后续行动")
+add_header(s, "八、经验总结 & 后续行动")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
             "🎯 核心经验",
