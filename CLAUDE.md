@@ -110,3 +110,51 @@ cd server && ./gradlew run
 - `docs/multiplayer_guide.md` — 联网部署 / 协议 / 调试
 - `docs/settlement_verification.md` — 结算公式（含 15 验证用例）
 - `docs/dev_summary.md` — 开发实践总结（多 AI 协同方案）
+
+---
+
+## 八、Commit 署名规范（遵循 Linux 内核《AI 编程助手》）
+
+每次 AI 辅助的提交必须在 commit 信息底部加上**两行**：
+
+```
+Signed-off-by: <人类作者> <人类邮箱>
+AI-Assisted-By: <具体模型版本标识>
+```
+
+### 模型版本标识对照
+
+| 当前会话模型 | 标识写法 |
+|------------|---------|
+| Claude Opus 4.7（1M 上下文）| `Claude Opus 4.7 (claude-opus-4-7, 1M context)` |
+| Claude Sonnet 4.6 | `Claude Sonnet 4.6 (claude-sonnet-4-6)` |
+| Claude Haiku 4.5 | `Claude Haiku 4.5 (claude-haiku-4-5)` |
+
+### 完整示例
+
+```
+fix: use full UUIDs for session IDs (Codex P1 from PR #29)
+
+Truncating UUID to 8 chars drops entropy to 32 bits, making
+collisions realistic. Use full 36-char UUID instead.
+
+Signed-off-by: berming <8458941+berming@users.noreply.github.com>
+AI-Assisted-By: Claude Sonnet 4.6 (claude-sonnet-4-6)
+```
+
+### 多模型协同的写法
+
+如果一次提交跨多个模型（如 Opus 设计 + Sonnet 实现），追加多行 `AI-Assisted-By`：
+
+```
+AI-Assisted-By: Claude Opus 4.7 (claude-opus-4-7, 1M context) — architecture
+AI-Assisted-By: Claude Sonnet 4.6 (claude-sonnet-4-6) — implementation
+```
+
+### 不需要署名的情况
+
+- 纯人工修改（无 AI 介入）
+- 自动化工具生成（如 lint --fix、formatter）
+
+> 责任原则：`Signed-off-by` 行的人类作者对该提交承担最终责任，AI 仅为辅助工具记录。
+

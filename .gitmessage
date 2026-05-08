@@ -1,0 +1,13 @@
+# <type>: <subject>  (≤ 70 chars)
+#
+# <body — explain what & why, not how>
+#
+# Signed-off-by: <Your Name> <your-email>
+# AI-Assisted-By: <Model Name (model-id, optional context-size)>
+#
+# === 模型版本对照 ===
+# Opus 4.7   →  Claude Opus 4.7 (claude-opus-4-7, 1M context)
+# Sonnet 4.6 →  Claude Sonnet 4.6 (claude-sonnet-4-6)
+# Haiku 4.5  →  Claude Haiku 4.5 (claude-haiku-4-5)
+#
+# 详见 CLAUDE.md 第八章
