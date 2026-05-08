@@ -92,7 +92,7 @@ data class CardGroup(
             CardGroupType.SINGLE, CardGroupType.PAIR, CardGroupType.TRIPLE, CardGroupType.BOMB ->
                 cards.first().rank
             CardGroupType.STRAIGHT ->
-                cards.maxByOrNull { it.rank.value }!!.rank
+                cards.maxByOrNull { it.rank.value }?.rank ?: cards.first().rank
         }
 
     override fun toString(): String = cards.joinToString(" ") { it.displayName }

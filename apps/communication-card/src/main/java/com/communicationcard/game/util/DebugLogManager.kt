@@ -48,32 +48,34 @@ object DebugLogManager {
             val dir = context.filesDir
             logFile = File(dir, LOG_FILE_NAME)
 
-            // 如果文件超过大小限制，清空
-            if (logFile!!.exists() && logFile!!.length() > MAX_FILE_SIZE) {
-                logFile!!.delete()
-            }
-
-            // 加载已有日志到内存（用于显示）
-            if (logFile!!.exists()) {
-                try {
-                    val existing = logFile!!.readText().lines().filter { it.isNotBlank() }
-                    existing.takeLast(MAX_LOGS).forEach { line ->
-                        logs.add(LogEntry("", "", "", line))
-                    }
-                } catch (e: Exception) {
-                    Log.e("DebugLogManager", "Failed to load existing log", e)
+            logFile?.let { file ->
+                // 如果文件超过大小限制，清空
+                if (file.exists() && file.length() > MAX_FILE_SIZE) {
+                    file.delete()
                 }
+
+                // 加载已有日志到内存（用于显示）
+                if (file.exists()) {
+                    try {
+                        val existing = file.readText().lines().filter { it.isNotBlank() }
+                        existing.takeLast(MAX_LOGS).forEach { line ->
+                            logs.add(LogEntry("", "", "", line))
+                        }
+                    } catch (e: Exception) {
+                        Log.e("DebugLogManager", "Failed to load existing log", e)
+                    }
+                }
+
+                // 打开文件以追加模式写入
+                fileWriter = FileWriter(file, true)
+                initialized = true
+
+                // 写一条标记日志
+                val sep = "\n========== App Start ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())} ==========\n"
+                fileWriter?.write(sep)
+                fileWriter?.flush()
+                logs.add(LogEntry("", "I", "DebugLogManager", sep.trim()))
             }
-
-            // 打开文件以追加模式写入
-            fileWriter = FileWriter(logFile!!, true)
-            initialized = true
-
-            // 写一条标记日志
-            val sep = "\n========== App Start ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())} ==========\n"
-            fileWriter?.write(sep)
-            fileWriter?.flush()
-            logs.add(LogEntry("", "I", "DebugLogManager", sep.trim()))
         } catch (e: Exception) {
             Log.e("DebugLogManager", "init failed", e)
         }
@@ -158,6 +160,16 @@ object DebugLogManager {
             }
         } catch (e: Exception) {
             Log.e("DebugLogManager", "clear failed", e)
+        }
+    }
+
+    fun shutdown() {
+        try {
+            fileWriter?.flush()
+            fileWriter?.close()
+            fileWriter = null
+        } catch (e: Exception) {
+            Log.e("DebugLogManager", "shutdown failed", e)
         }
     }
 }
