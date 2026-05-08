@@ -119,36 +119,50 @@ cd server && ./gradlew run
 
 ```
 Signed-off-by: <人类作者> <人类邮箱>
-AI-Assisted-By: <具体模型版本标识>
+AI-Assisted-By: <提交此 commit 时实际使用的模型>
 ```
 
-### 模型版本标识对照
+> ⚠️ **`AI-Assisted-By` 必须反映该次 commit 实际使用的模型**，不能写成固定值。
+> 切换模型（`/model` 命令）后，下一次 commit 必须用新模型的标识。
 
-| 当前会话模型 | 标识写法 |
-|------------|---------|
-| Claude Opus 4.7（1M 上下文）| `Claude Opus 4.7 (claude-opus-4-7, 1M context)` |
+### 当前会话如何确定模型
+
+Claude Code 会话中：
+- 会话启动时的 system context 会注明 "powered by the model named ..."
+- `/model` 命令切换后立即生效，下一次 commit 即按新模型署名
+
+### 模型标识写法（严格匹配模型 ID）
+
+| 实际模型 | `AI-Assisted-By:` 值 |
+|---------|---------------------|
+| Claude Opus 4.7（含 1M 上下文）| `Claude Opus 4.7 (claude-opus-4-7, 1M context)` |
+| Claude Opus 4.7（标准）| `Claude Opus 4.7 (claude-opus-4-7)` |
 | Claude Sonnet 4.6 | `Claude Sonnet 4.6 (claude-sonnet-4-6)` |
-| Claude Haiku 4.5 | `Claude Haiku 4.5 (claude-haiku-4-5)` |
+| Claude Haiku 4.5 | `Claude Haiku 4.5 (claude-haiku-4-5-20251001)` |
+| 其他第三方 AI | `<vendor> <model> (<model-id>)` |
 
-### 完整示例
+### 完整示例（用 Opus 实际工作的 commit）
 
 ```
-fix: use full UUIDs for session IDs (Codex P1 from PR #29)
+feat: add per-room mutex to serialize state mutations
 
-Truncating UUID to 8 chars drops entropy to 32 bits, making
-collisions realistic. Use full 36-char UUID instead.
+Multiple coroutines could race on state.hands. Each room now has
+its own kotlinx.coroutines.sync.Mutex; mutations happen inside
+withLock, broadcasts outside the lock to avoid I/O blocking.
 
 Signed-off-by: berming <bermin@live.cn>
-AI-Assisted-By: Claude Sonnet 4.6 (claude-sonnet-4-6)
+AI-Assisted-By: Claude Opus 4.7 (claude-opus-4-7, 1M context)
 ```
 
 ### 多模型协同的写法
 
-如果一次提交跨多个模型（如 Opus 设计 + Sonnet 实现），追加多行 `AI-Assisted-By`：
+一次提交跨多个模型（如 Opus 设计 + Sonnet 实现）时，列多行 `AI-Assisted-By:`：
 
 ```
+Signed-off-by: berming <bermin@live.cn>
 AI-Assisted-By: Claude Opus 4.7 (claude-opus-4-7, 1M context) — architecture
 AI-Assisted-By: Claude Sonnet 4.6 (claude-sonnet-4-6) — implementation
+AI-Assisted-By: Claude Haiku 4.5 (claude-haiku-4-5-20251001) — pre-commit scan
 ```
 
 ### 不需要署名的情况
