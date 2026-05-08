@@ -69,9 +69,7 @@ class GameSyncManager(
     private suspend fun handleMessage(message: GameMessage) {
         when (message) {
             is GameStart -> {
-                _gameState.value = message.state
-                // 仅在 localSeatIndex 尚未设置时才自动查找
-                // (setInitialState 已设置正确值时不覆盖)
+                applyState(message.state)
                 if (localSeatIndex < 0) {
                     findLocalSeatIndex(message.state)
                 }
@@ -79,16 +77,27 @@ class GameSyncManager(
             }
 
             is GameSync -> {
-                _gameState.value = message.state
+                applyState(message.state)
+                if (localSeatIndex < 0) {
+                    findLocalSeatIndex(message.state)
+                }
                 resetTurnTimer()
+            }
+
+            is ReconnectSuccess -> {
+                message.state?.let {
+                    applyState(it)
+                    if (localSeatIndex < 0) {
+                        findLocalSeatIndex(it)
+                    }
+                    resetTurnTimer()
+                }
             }
 
             is GameActionResult -> {
                 _actionResults.emit(message)
                 if (message.success && message.state != null) {
-                    val newState = message.state
-                    println("DEBUG GameActionResult: currentPlayerIndex=${newState.currentPlayerIndex}, localSeatIndex=$localSeatIndex")
-                    _gameState.value = newState
+                    applyState(message.state)
                     resetTurnTimer()
                 }
             }
@@ -108,6 +117,18 @@ class GameSyncManager(
 
             else -> { /* 其他消息由其他管理器处理 */ }
         }
+    }
+
+    /**
+     * 应用新状态（带版本号校验，丢弃过期更新）
+     */
+    private fun applyState(newState: SerializedGameState) {
+        val current = _gameState.value
+        if (current != null && newState.version < current.version) {
+            // 过期状态丢弃
+            return
+        }
+        _gameState.value = newState
     }
 
     private fun findLocalSeatIndex(state: SerializedGameState) {

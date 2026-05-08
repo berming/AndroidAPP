@@ -61,38 +61,41 @@ class ServerRoomManager {
         val room = roomsByCode[roomCode]
             ?: return Result.failure(Exception("房间不存在"))
 
-        if (room.status != RoomStatus.WAITING) {
-            return Result.failure(Exception("游戏已开始，无法加入"))
+        // 串行化座位分配 + 玩家加入，防止两个客户端同时加入时分到同一座位
+        synchronized(room) {
+            if (room.status != RoomStatus.WAITING) {
+                return Result.failure(Exception("游戏已开始，无法加入"))
+            }
+
+            if (room.players.size >= room.maxPlayers) {
+                return Result.failure(Exception("房间已满"))
+            }
+
+            // 检查是否已在房间中
+            if (room.players.any { it.id == session.id }) {
+                return Result.failure(Exception("你已在房间中"))
+            }
+
+            val seatIndex = findNextSeat(room)
+            val team = if (seatIndex % 2 == 0) "TEAM_A" else "TEAM_B"
+
+            val player = ServerPlayer(
+                id = session.id,
+                name = playerName,
+                session = session,
+                isReady = false,
+                isAI = false,
+                seatIndex = seatIndex,
+                team = team
+            )
+            room.players.add(player)
+
+            session.roomId = room.roomId
+            session.playerName = playerName
+            session.seatIndex = seatIndex
+
+            playerToRoom[session.id] = room.roomId
         }
-
-        if (room.players.size >= room.maxPlayers) {
-            return Result.failure(Exception("房间已满"))
-        }
-
-        // 检查是否已在房间中
-        if (room.players.any { it.id == session.id }) {
-            return Result.failure(Exception("你已在房间中"))
-        }
-
-        val seatIndex = findNextSeat(room)
-        val team = if (seatIndex % 2 == 0) "TEAM_A" else "TEAM_B"
-
-        val player = ServerPlayer(
-            id = session.id,
-            name = playerName,
-            session = session,
-            isReady = false,
-            isAI = false,
-            seatIndex = seatIndex,
-            team = team
-        )
-        room.players.add(player)
-
-        session.roomId = room.roomId
-        session.playerName = playerName
-        session.seatIndex = seatIndex
-
-        playerToRoom[session.id] = room.roomId
 
         println("Player $playerName joined room ${room.roomCode}")
         return Result.success(room)
@@ -137,6 +140,9 @@ class ServerRoomManager {
     fun setReady(session: GameSession, isReady: Boolean): ServerRoom? {
         val roomId = session.roomId ?: return null
         val room = rooms[roomId] ?: return null
+
+        // 仅在等待中允许更改准备状态
+        if (room.status != RoomStatus.WAITING) return null
 
         room.players.find { it.id == session.id }?.isReady = isReady
         return room
@@ -204,11 +210,13 @@ class ServerRoomManager {
 
     /**
      * 检查是否可以开始游戏
+     * 至少1名真人玩家，所有真人玩家都已准备（房主自动算准备）
+     * 服务端会自动用AI补足到6人
      */
     fun canStartGame(room: ServerRoom): Boolean {
-        val humanPlayers = room.players.count { !it.isAI }
-        val allReady = room.players.all { it.isReady }
-        return humanPlayers >= 1 && allReady && room.players.size >= 4
+        val humanPlayers = room.players.filter { !it.isAI }
+        if (humanPlayers.isEmpty()) return false
+        return humanPlayers.all { it.isReady || it.id == room.hostId }
     }
 
     /**
@@ -257,6 +265,23 @@ class ServerRoomManager {
     }
 
     /**
+     * 直接删除房间（用于游戏结束后无人连接时清理资源）
+     */
+    fun deleteRoom(roomId: String) {
+        val room = rooms.remove(roomId) ?: return
+        roomsByCode.remove(room.roomCode)
+        room.players.forEach { playerToRoom.remove(it.id) }
+        println("Room ${room.roomCode} deleted")
+    }
+
+    /**
+     * 清除某玩家ID到房间的映射（用于显式离开后阻止其用旧token重连回原房间）
+     */
+    fun forgetPlayerMapping(playerId: String) {
+        playerToRoom.remove(playerId)
+    }
+
+    /**
      * 获取房间内的所有会话
      */
     fun getRoomSessions(roomId: String): List<GameSession> {
@@ -278,7 +303,13 @@ class ServerRoomManager {
 
     private fun generateRoomCode(): String {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        return (1..4).map { chars.random() }.joinToString("")
+        // 防止与现有房间码冲突（4位编码空间约一百万，碰撞概率小但确实存在）
+        repeat(8) {
+            val code = (1..4).map { chars.random() }.joinToString("")
+            if (!roomsByCode.containsKey(code)) return code
+        }
+        // 退化方案：附加序号确保唯一
+        return (1..6).map { chars.random() }.joinToString("")
     }
 }
 
@@ -292,7 +323,8 @@ class ServerRoom(
     var hostId: String,
     val maxPlayers: Int
 ) {
-    val players = mutableListOf<ServerPlayer>()
+    // 使用线程安全的 CopyOnWriteArrayList，避免在并发广播/迭代时抛 ConcurrentModificationException
+    val players: MutableList<ServerPlayer> = java.util.concurrent.CopyOnWriteArrayList()
     var status: RoomStatus = RoomStatus.WAITING
     var gameState: ServerGameState? = null
 

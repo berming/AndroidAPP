@@ -53,6 +53,8 @@ class RoomManager(
                 DebugLogManager.i(TAG, "RoomCreated: roomCode=${message.room.roomCode}, hostId=${message.room.hostId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.room.hostId
+                // 保存为重连令牌
+                networkManager.setSessionToken(message.room.hostId)
                 DebugLogManager.i(TAG, "Emitting RoomEvent.RoomCreated")
                 _roomEvents.emit(RoomEvent.RoomCreated(message.room))
             }
@@ -60,6 +62,8 @@ class RoomManager(
                 DebugLogManager.i(TAG, "RoomJoined: roomCode=${message.room.roomCode}, playerId=${message.playerId}")
                 _currentRoom.value = message.room
                 _localPlayerId = message.playerId
+                // 保存为重连令牌
+                networkManager.setSessionToken(message.playerId)
                 _roomEvents.emit(RoomEvent.JoinedRoom(message.room))
             }
             is RoomUpdate -> {
@@ -115,6 +119,8 @@ class RoomManager(
         if (result) {
             _currentRoom.value = null
             _localPlayerId = null
+            // 清除会话令牌：避免连接断开后用旧 token 重连回已离开的房间
+            networkManager.setSessionToken(null)
         }
         return result
     }

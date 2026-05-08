@@ -251,6 +251,9 @@ class OnlineGameActivity : AppCompatActivity() {
         updatePlayerHand()
         updateScores()
         updateCurrentRoundDisplay()
+        // 显示首位玩家的回合提示（避免 SharedFlow replay=0 错过初始 TurnStart）
+        multiplayerEngine.getCurrentPlayer()?.let { updateTurnIndicator(it) }
+        updateButtonStates()
 
         gameHistory.add("=== 联网游戏开始 ===")
         roundNumber = 1
@@ -408,7 +411,15 @@ class OnlineGameActivity : AppCompatActivity() {
             }
 
             is GameEvent.StateRefresh -> {
-                // 状态刷新：只更新必要的UI元素（不重建手牌，避免清空选中）
+                // 状态刷新：默认情况下不重建手牌（避免清空选中）
+                // 但若手牌内容变了（重连后、AI代打、超时托管等），必须重建以保持一致
+                val currentHand = multiplayerEngine.getMyHand()
+                val displayedHand = cardViewMap.keys
+                val handChanged = currentHand.size != displayedHand.size ||
+                    currentHand.toSet() != displayedHand
+                if (handChanged) {
+                    updatePlayerHand()
+                }
                 updateAllPlayerViews()
                 updateScores()
                 updateCurrentRoundDisplay()
@@ -977,9 +988,11 @@ class OnlineGameActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
-        multiplayerEngine.release()
-        gameSyncManager.release()
-        soundManager.release()
+        if (::multiplayerEngine.isInitialized) multiplayerEngine.release()
+        if (::gameSyncManager.isInitialized) gameSyncManager.release()
+        if (::soundManager.isInitialized) soundManager.release()
+        // 注意：不在此处断开 NetworkManager / 清空 holder，
+        // 因为 LobbyActivity 共享同一连接，断开会破坏返回大厅后的体验
     }
 
     private fun Int.dpToPx(): Int {

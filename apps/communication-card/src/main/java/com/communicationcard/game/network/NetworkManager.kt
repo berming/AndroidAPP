@@ -40,9 +40,11 @@ class NetworkManager(
     private var webSocket: WebSocket? = null
     private var sessionToken: String? = null
     private var reconnectAttempts = 0
+    @Volatile private var manualDisconnect = false
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var heartbeatJob: Job? = null
+    private var reconnectJob: Job? = null
 
     // 连接状态
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -64,12 +66,15 @@ class NetworkManager(
         DebugLogManager.w(TAG, ">>> Network available: ${isNetworkAvailable()}")
 
         return scope.launch {
-            if (_connectionState.value == ConnectionState.Connected ||
-                _connectionState.value == ConnectionState.Connecting) {
-                DebugLogManager.w(TAG, ">>> Already connected or connecting, skipping")
+            val state = _connectionState.value
+            if (state == ConnectionState.Connected ||
+                state == ConnectionState.Connecting ||
+                state is ConnectionState.Reconnecting) {
+                DebugLogManager.w(TAG, ">>> Already connected/connecting/reconnecting, skipping")
                 return@launch
             }
 
+            manualDisconnect = false
             sessionToken = token
             _connectionState.value = ConnectionState.Connecting
             reconnectAttempts = 0
@@ -105,6 +110,12 @@ class NetworkManager(
                     _connectionState.value = ConnectionState.Connected
                     reconnectAttempts = 0
                     startHeartbeat()
+                    // 如果有保存的会话令牌（即此次是重连），在 WebSocket 真正打开后才发送
+                    // Reconnect 消息。之前在 attemptReconnect 中过早发送，会因 ws 尚未 OPEN 被丢弃
+                    sessionToken?.let { token ->
+                        DebugLogManager.w(TAG, ">>> Sending Reconnect with token=$token")
+                        send(Reconnect(token))
+                    }
                     _connectionEvents.emit(ConnectionEvent.Connected)
                 }
             }
@@ -154,6 +165,8 @@ class NetworkManager(
             is ReconnectSuccess -> {
                 DebugLogManager.d(TAG, "Reconnection successful")
                 _connectionEvents.emit(ConnectionEvent.Reconnected)
+                // 仍需转发给 GameSyncManager 等订阅者，以便恢复状态
+                _messages.emit(message)
             }
             is ErrorMessage -> {
                 DebugLogManager.e(TAG, "Server error: ${message.code} - ${message.message}")
@@ -176,15 +189,27 @@ class NetworkManager(
 
         _connectionEvents.emit(ConnectionEvent.Disconnected(code, reason))
 
-        // 尝试重连（除非是主动断开）
+        // 主动断开（用户操作）不要尝试重连
+        if (manualDisconnect) {
+            _connectionState.value = ConnectionState.Disconnected
+            return
+        }
+
+        // 尝试重连（除非是主动断开 code=1000）
         if (code != 1000 && reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
-            attemptReconnect()
+            reconnectJob?.cancel()
+            reconnectJob = scope.launch { attemptReconnect() }
         } else {
             _connectionState.value = ConnectionState.Disconnected
         }
     }
 
     private suspend fun attemptReconnect() {
+        if (manualDisconnect) {
+            _connectionState.value = ConnectionState.Disconnected
+            return
+        }
+
         reconnectAttempts++
         val delay = RECONNECT_BASE_DELAY_MS * (1 shl (reconnectAttempts - 1))
         DebugLogManager.d(TAG, "Attempting reconnect $reconnectAttempts/$RECONNECT_MAX_ATTEMPTS in ${delay}ms")
@@ -194,16 +219,19 @@ class NetworkManager(
 
         delay(delay)
 
+        if (manualDisconnect) {
+            _connectionState.value = ConnectionState.Disconnected
+            return
+        }
+
         if (isNetworkAvailable()) {
             try {
                 establishConnection()
-                // 发送重连请求
-                sessionToken?.let { token ->
-                    send(Reconnect(token))
-                }
+                // 注意：Reconnect 消息现在在 onOpen 回调中发送（webSocket 打开之后），
+                // 不再在这里发送，避免 send() 在 ws 尚未 OPEN 时被丢弃
             } catch (e: Exception) {
                 DebugLogManager.e(TAG, "Reconnect attempt failed", e)
-                if (reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
+                if (!manualDisconnect && reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
                     attemptReconnect()
                 } else {
                     _connectionState.value = ConnectionState.Disconnected
@@ -211,7 +239,7 @@ class NetworkManager(
                 }
             }
         } else {
-            if (reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
+            if (!manualDisconnect && reconnectAttempts < RECONNECT_MAX_ATTEMPTS) {
                 attemptReconnect()
             } else {
                 _connectionState.value = ConnectionState.Disconnected
@@ -234,6 +262,10 @@ class NetworkManager(
      * 断开连接
      */
     fun disconnect() {
+        // 标记为主动断开，阻止任何排队中的重连尝试
+        manualDisconnect = true
+        reconnectJob?.cancel()
+        reconnectJob = null
         scope.launch {
             stopHeartbeat()
             webSocket?.close(1000, "User disconnect")
@@ -244,9 +276,9 @@ class NetworkManager(
     }
 
     /**
-     * 设置会话令牌
+     * 设置会话令牌（传 null 可以清除）
      */
-    fun setSessionToken(token: String) {
+    fun setSessionToken(token: String?) {
         sessionToken = token
     }
 

@@ -361,6 +361,8 @@ class LobbyActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // 防御性处理 onCreate 中途失败时 lateinit 未初始化的情况
+        if (!::roomManager.isInitialized || !::networkManager.isInitialized) return
         // 如果没有进入房间，断开连接
         if (roomManager.currentRoom.value == null) {
             networkManager.disconnect()
