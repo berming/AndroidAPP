@@ -138,7 +138,7 @@ fix: use full UUIDs for session IDs (Codex P1 from PR #29)
 Truncating UUID to 8 chars drops entropy to 32 bits, making
 collisions realistic. Use full 36-char UUID instead.
 
-Signed-off-by: berming <8458941+berming@users.noreply.github.com>
+Signed-off-by: berming <bermin@live.cn>
 AI-Assisted-By: Claude Sonnet 4.6 (claude-sonnet-4-6)
 ```
 
