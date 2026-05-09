@@ -47,10 +47,40 @@ jobs:
         continue-on-error: true
 
       - name: Build Debug APK with Gradle
-        run: ./gradlew :apps:communication-card:assembleDebug
+        # 加 --info --stacktrace + tee 到日志文件；失败时下一步把尾巴 200 行
+        # 写到 GITHUB_STEP_SUMMARY，方便沙箱/无登录环境通过 WebFetch 看到错误。
+        run: |
+          set -o pipefail
+          ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
+            | tee assembleDebug.log
+
+      - name: Surface assembleDebug error on failure
+        if: failure()
+        run: |
+          {
+            echo "## :apps:communication-card:assembleDebug 失败 — 末 200 行"
+            echo ""
+            echo '```'
+            tail -200 assembleDebug.log || echo "(no log file)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build Web (Wasm-JS) bundle
-        run: ./gradlew :apps:web:wasmJsBrowserDistribution
+        run: |
+          set -o pipefail
+          ./gradlew :apps:web:wasmJsBrowserDistribution --info --stacktrace 2>&1 \
+            | tee wasmJsBrowserDistribution.log
+
+      - name: Surface wasmJsBrowserDistribution error on failure
+        if: failure()
+        run: |
+          {
+            echo "## :apps:web:wasmJsBrowserDistribution 失败 — 末 200 行"
+            echo ""
+            echo '```'
+            tail -200 wasmJsBrowserDistribution.log || echo "(no log file)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Web bundle
         uses: actions/upload-artifact@v4
