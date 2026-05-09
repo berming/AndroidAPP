@@ -32,8 +32,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Run client unit tests
-        run: ./gradlew :apps:communication-card:test
+      - name: Run shared module tests (commonTest)
+        run: ./gradlew :shared:jvmTest
 
       - name: Run server unit tests
         working-directory: server
@@ -48,6 +48,17 @@ jobs:
 
       - name: Build Debug APK with Gradle
         run: ./gradlew :apps:communication-card:assembleDebug
+
+      - name: Build Web (Wasm-JS) bundle
+        run: ./gradlew :apps:web:wasmJsBrowserDistribution
+
+      - name: Upload Web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: communication-card-web
+          path: apps/web/build/dist/wasmJs/productionExecutable
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload Communication Card APK
         uses: actions/upload-artifact@v4

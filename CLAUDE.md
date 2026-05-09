@@ -22,13 +22,20 @@
 这些约束源于本项目历史 Bug 教训，违反任一条都会导致回归。
 
 ### 约束 1：单机 / 联网共享逻辑必须一致
-| 单机（客户端） | 联网（服务端） | 说明 |
-|---------------|--------------|------|
-| `engine/CardRules.kt` 的 `canBeat` | `server/ServerGameManager.kt` 的 `canBeat` | 两份必须等价 |
-| `engine/SettlementCalculator.kt` | `server/ServerGameManager.kt` 的 `computeAllFinishedScores` | 公式必须等价 |
+
+> **2026-05 更新**：客户端的牌型规则、结算公式、游戏引擎、AI、协议 DTO 全部抽到了
+> `:shared` 多平台模块。Android 客户端、Web 客户端（`:apps:web`）以及未来的
+> iOS/桌面客户端都依赖同一份 `:shared`，**客户端侧不再可能出现"两份 canBeat 不一致"
+> 的回归**。但服务端仍持有自己的 `Messages.kt`/`canBeat`，下表的同步约束仍然有效。
+
+| 多平台共享（客户端） | 联网（服务端） | 说明 |
+|---------------------|--------------|------|
+| `shared/.../engine/CardRules.kt` 的 `canBeat` | `server/ServerGameManager.kt` 的 `canBeat` | 两份必须等价 |
+| `shared/.../engine/SettlementCalculator.kt` | `server/ServerGameManager.kt` 的 `computeAllFinishedScores` | 公式必须等价 |
 | 回合归属 | `handleRoundEnd` 设 `currentPlayerIndex = winnerId` | 赢家是下轮首家 |
 
-> 改动其中一份，必须同步另一份；否则联网游戏会出现两端不一致的 Bug。
+> 改动 `:shared` 中的任一份，必须同步服务端对应实现；否则联网游戏会出现两端不一致的 Bug。
+> （后续可考虑让 server 也直接依赖 `:shared` 以彻底消除这条约束。）
 
 ### 约束 2：服务端并发安全
 - 任何修改 `ServerGameState.hands / playerScores / currentPlayerIndex` 的代码 → **必须在 `mutexFor(room).withLock { ... }` 内**
@@ -40,10 +47,11 @@
 - 任何首次发送（如 `Reconnect` 消息）**必须在 `onOpen` 回调内**，否则 `send()` 会静默丢弃
 
 ### 约束 4：协议消息双端对齐
-- `apps/.../network/GameMessage.kt`（客户端）
+- `shared/src/commonMain/kotlin/.../network/GameMessage.kt`（**所有客户端共享**：Android / Web / 未来 iOS/Desktop）
 - `server/src/main/kotlin/.../Messages.kt`（服务端）
 - **任一字段增删改都必须同步另一边**
 - 枚举值（如 `CardSuit`）两端的字符串必须一致（不要一边 `CLUB` 一边 `clubs`）
+- 客户端侧由于已抽到 `:shared`，多端之间不会再出现协议漂移；只需对齐 client ↔ server。
 
 ### 约束 5：会话 ID 完整性
 - 服务端 `sessionId` 用**完整 36 字符 UUID**，不要截断（避免碰撞）
@@ -90,17 +98,49 @@
 ## 六、构建命令速查
 
 ```bash
-# 客户端
+# 共享模块（所有客户端依赖）
+./gradlew :shared:jvmTest                       # 跑 commonTest（含 15 个结算用例）
+./gradlew :shared:assemble                      # 编译所有 target
+
+# Android 客户端
 ./gradlew :apps:communication-card:assembleDebug
-./gradlew :apps:communication-card:test
+
+# Web 客户端（Compose Multiplatform / Wasm-JS，浏览器版本）
+./gradlew :apps:web:wasmJsBrowserDevelopmentRun  # 启本地 dev 服务器（默认 8080），热重载
+./gradlew :apps:web:wasmJsBrowserDistribution    # 输出生产包到 apps/web/build/dist/wasmJs/productionExecutable
 
 # 服务端（独立 Gradle 工程）
 cd server && ./gradlew test
-cd server && ./gradlew run
+cd server && ./gradlew run                       # 监听 :8080，提供 /game WebSocket
 
 # 静态分析
 ./gradlew detekt
 ```
+
+### 模块层次
+
+```
+:shared                          KMP（android + jvm + wasmJs targets）
+  commonMain/
+    model/      Card · Deck · Player
+    engine/     CardRules · SettlementCalculator · GameEngine
+    ai/         AIPlayer
+    network/    GameMessage（+ 所有 SerializedXxx DTO）
+  commonTest/   SettlementCalculatorTest（15 用例，kotlin.test）
+
+:apps:communication-card         Android 视图层（依赖 :shared）
+:apps:web                        Compose Multiplatform / Wasm-JS（依赖 :shared）
+server/                          独立 Ktor 工程（暂不依赖 :shared）
+```
+
+### Web 客户端架构速读
+
+- 入口：`apps/web/src/wasmJsMain/kotlin/.../web/Main.kt` → `ComposeViewport(document.body) { App() }`
+- 状态机：`viewmodel/AppViewModel.kt` 持有 `StateFlow<Screen>`；屏幕枚举 `Screen.{Home,Lobby,Room,Game,Settlement}`
+- 网络：浏览器原生 `WebSocket` 包装在 `net/WebSocketTransport.kt`；
+  `NetworkClient` / `RoomManager` / `GameSyncManager` 与 Android 端职责对等
+- 单机模式：`singleplayer/SinglePlayerEngine.kt` 包装 `:shared` 的 `GameEngine`，
+  把本地 `Card/Player` 状态映射成 `SerializedGameState` 后由 UI 渲染（与联网模式同一套渲染层）
 
 ---
 
