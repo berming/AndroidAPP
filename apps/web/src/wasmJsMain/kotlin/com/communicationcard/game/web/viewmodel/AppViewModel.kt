@@ -7,6 +7,7 @@ import com.communicationcard.game.web.net.RoomManager
 import com.communicationcard.game.web.singleplayer.SinglePlayerEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +39,17 @@ class AppViewModel {
     // ---------- 单机引擎（懒加载） ----------
     private var single: SinglePlayerEngine? = null
 
+    // 每"会话"（一次单机或一次联网）独立的协程 Job：goHome / 切换模式时取消，
+    // 避免上一会话的 collectors 继续把过期事件推到 _screen。
+    private var sessionJob: Job? = null
+
+    private fun newSessionScope(): CoroutineScope {
+        sessionJob?.cancel()
+        val job = SupervisorJob(parent = scope.coroutineContext[Job])
+        sessionJob = job
+        return CoroutineScope(scope.coroutineContext + job)
+    }
+
     // ---------- 用户偏好（暂存内存；后续可以接 localStorage） ----------
     private var nickname = "玩家"
     private var serverUrl = defaultServerUrl()
@@ -47,9 +59,10 @@ class AppViewModel {
     // ============================================================
 
     fun startSinglePlayer() {
+        val sessionScope = newSessionScope()
         val engine = SinglePlayerEngine(playerCount = 6).also { single = it }
         engine.start()
-        scope.launch {
+        sessionScope.launch {
             engine.state.collect { state ->
                 if (state == null) return@collect
                 _screen.value = Screen.Game(
@@ -60,7 +73,7 @@ class AppViewModel {
                 )
             }
         }
-        scope.launch {
+        sessionScope.launch {
             engine.gameEnd.collect { result ->
                 _screen.value = Screen.Settlement(result, Screen.Game.Mode.SinglePlayer)
             }
@@ -68,6 +81,9 @@ class AppViewModel {
     }
 
     fun startMultiplayer() {
+        // 进入联网入口时立刻取消之前可能残留的 single-player collectors
+        sessionJob?.cancel()
+        sessionJob = null
         _screen.value = Screen.Lobby(
             serverUrl = serverUrl,
             nickname = nickname,
@@ -77,6 +93,8 @@ class AppViewModel {
     }
 
     fun goHome() {
+        sessionJob?.cancel()
+        sessionJob = null
         net?.close()
         net = null
         room = null
@@ -100,12 +118,16 @@ class AppViewModel {
     }
 
     fun connectServer() {
+        // 关闭/丢弃上一次连接的 transport 与 collectors，避免双连接
+        net?.close()
+        val sessionScope = newSessionScope()
+
         val n = NetworkClient(serverUrl).also { net = it }
         val r = RoomManager(n).also { room = it }
         val s = GameSyncManager(n).also { sync = it }
 
         // 监听连接状态
-        scope.launch {
+        sessionScope.launch {
             n.connectionState.collect { st ->
                 updateLobby { it.copy(connectionState = st) }
                 if (st == com.communicationcard.game.web.net.WebSocketTransport.State.Connected) {
@@ -115,12 +137,12 @@ class AppViewModel {
         }
 
         // 监听房间列表
-        scope.launch {
+        sessionScope.launch {
             r.roomList.collect { list -> updateLobby { it.copy(rooms = list) } }
         }
 
         // 监听 currentRoom 变化 -> 进入 Room 屏幕
-        scope.launch {
+        sessionScope.launch {
             combine(r.currentRoom, r.localPlayerId) { cr, pid -> cr to pid }
                 .collect { (cr, pid) ->
                     if (cr != null && pid != null) {
@@ -135,12 +157,12 @@ class AppViewModel {
         }
 
         // 监听联网游戏状态 -> 进入 Game 屏幕
-        scope.launch {
-            sync!!.gameState.collect { state ->
+        sessionScope.launch {
+            s.gameState.collect { state ->
                 if (state == null) return@collect
                 _screen.value = Screen.Game(
                     state = state,
-                    localSeatIndex = sync!!.localSeatIndex.value,
+                    localSeatIndex = s.localSeatIndex.value,
                     mode = Screen.Game.Mode.Multiplayer,
                     selectedCardIds = currentSelection(),
                 )
@@ -148,8 +170,8 @@ class AppViewModel {
         }
 
         // 监听游戏结束
-        scope.launch {
-            sync!!.gameEnd.collect { result ->
+        sessionScope.launch {
+            s.gameEnd.collect { result ->
                 _screen.value = Screen.Settlement(result, Screen.Game.Mode.Multiplayer)
             }
         }
