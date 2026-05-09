@@ -9,28 +9,74 @@ on:
 
 # 定义工作流中的任务
 jobs:
-  build:
-    # 在GitHub托管的Linux最新版虚拟环境中运行
+  # ============================================================
+  # 关键路径 TDD 守门：PR 改了 CardRules.kt / SettlementCalculator.kt /
+  # ServerGameManager.kt 这些文件，但没改对应 *Test.kt → 直接红
+  # （CLAUDE.md 第三章 + docs/playbooks/bug-triage.md）
+  # ============================================================
+  tdd-gate:
+    name: TDD gate (critical paths require tests)
     runs-on: ubuntu-latest
-
-    # 定义步骤
+    if: github.event_name == 'pull_request'
     steps:
-      # 1. 拉取代码到虚拟环境
+      - name: Checkout (with full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify critical-path changes are accompanied by tests
+        run: |
+          set -u
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
+          HEAD_REF="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$BASE_REF" "$HEAD_REF")
+          echo "Changed files in this PR:"
+          echo "$changed"
+          echo "---"
+
+          fail=0
+          # 关键路径与对应测试的映射；任一行匹配则要求对应测试也变动
+          declare -A REQUIRES=(
+            ["apps/communication-card/src/main/java/com/communicationcard/game/engine/CardRules.kt"]="apps/communication-card/src/test/java/com/communicationcard/game/engine/CardRulesTest.kt"
+            ["apps/communication-card/src/main/java/com/communicationcard/game/engine/SettlementCalculator.kt"]="apps/communication-card/src/test/java/com/communicationcard/game/engine/SettlementCalculatorTest.kt"
+            ["server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt"]="server/src/test/kotlin/com/communicationcard/server/ServerGameManagerTest.kt"
+          )
+
+          for src in "${!REQUIRES[@]}"; do
+            test_path="${REQUIRES[$src]}"
+            if echo "$changed" | grep -qx "$src"; then
+              if ! echo "$changed" | grep -qx "$test_path"; then
+                echo "❌ $src 改动了，但 $test_path 没动。"
+                echo "   关键路径必须先 TDD（CLAUDE.md 第三章）。"
+                fail=1
+              else
+                echo "✅ $src 与 $test_path 同改"
+              fi
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "提示：先在对应 *Test.kt 写失败测试 commit，再实施修复 commit。"
+            echo "      详见 docs/playbooks/bug-triage.md（Loop B）。"
+            exit 1
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. 设置Java环境（Android开发需要JDK 11或17）
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. 设置Gradle包装器（wrapper）可执行权限（Linux环境需要）
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 4. 【关键优化】设置Gradle依赖缓存，大幅加快后续构建速度
       - name: Cache Gradle Dependencies
         uses: actions/cache@v4
         with:
@@ -41,11 +87,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # 5. 构建Debug版本APK (只构建communication-card，忽略gomoku)
+      # 客户端单元测试（CardRulesTest + SettlementCalculatorTest，
+      # 关键路径强制 TDD 的运行端）
+      - name: Run client unit tests
+        run: ./gradlew :apps:communication-card:test
+
+      # 服务端单元测试（ServerGameManagerTest 的运行端）
+      - name: Run server unit tests
+        working-directory: server
+        run: ./gradlew test
+
+      # 构建 Debug APK
       - name: Build Debug APK with Gradle
         run: ./gradlew :apps:communication-card:assembleDebug
 
-      # 6. 上传Communication Card APK
       - name: Upload Communication Card APK
         uses: actions/upload-artifact@v4
         with:
