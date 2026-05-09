@@ -9,13 +9,26 @@
 - [ ] **Claude PR review**：开新会话用 Opus 4.7 跑 `/review`，输出无 P0/P1
 - [ ] **真机验证**：覆盖 happy path + 至少 1 个边界 / 异常场景
 
-## 关键路径改动？（CardRules / SettlementCalculator / ServerGameManager / GameMessage）
+## 关键路径改动？（CardRules / SettlementCalculator / ServerGameManager）
+
+CI 的 `tdd-gate` job 会强制校验：以下三个文件被改但对应 `*Test.kt` 没动 → CI 红。
 
 - [ ] **否**
 - [ ] **是** —— 必须满足全部：
-  - [ ] 同 PR 内修改对应 `*Test.kt`（CI tdd-gate 强制）
+  - [ ] 同 PR 内修改对应 `*Test.kt`（`shared/src/commonTest/.../engine/CardRulesTest.kt` /
+        `SettlementCalculatorTest.kt` / `server/src/test/.../ServerGameManagerTest.kt`）
   - [ ] **已开新会话用 Opus 4.7 `/review`**（`docs/playbooks/adversarial-review.md` 第 2 节）
-  - [ ] 改动了 `GameMessage.kt` → `protocol-syncer` agent 已确认（升 PROTOCOL_VERSION 或 non-breaking）
+
+## 协议 DTO 改动？（`shared/.../network/GameMessage.kt`）
+
+GameMessage.kt 不在 tdd-gate 范围内（没有专门的 GameMessageTest），改动改走
+`protocol-syncer` subagent 检查 PROTOCOL_VERSION 升降。
+
+- [ ] **否**
+- [ ] **是** —— 必须满足：
+  - [ ] `protocol-syncer` agent 已运行，分类为 non-breaking **或** 已升 PROTOCOL_VERSION
+  - [ ] 升版本则 `server/.../Application.kt::handleReconnect` 的版本握手仍正确拒绝旧客户端
+  - [ ] 关键路径改动 → 已开新会话用 Opus 4.7 `/review`
 
 ## 服务端状态修改？
 

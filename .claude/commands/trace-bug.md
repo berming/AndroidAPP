@@ -1,6 +1,6 @@
 ---
 description: Turn a user bug report into a failing test commit BEFORE attempting any fix (Loop B opener)
-allowed-tools: Read, Edit, Write, Bash(git diff*), Bash(git log*), Bash(grep*), Grep, Glob, Agent(tdd-scaffolder)
+allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(git status*), Bash(git add*), Bash(git commit*), Bash(grep*), Agent(tdd-scaffolder)
 ---
 
 # /trace-bug
