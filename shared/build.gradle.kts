@@ -9,7 +9,9 @@ kotlin {
     androidTarget {
         compilations.all {
             kotlinOptions {
-                jvmTarget = "17"
+                // 必须与 :apps:communication-card 一致（jvmTarget = "1.8"）；
+                // 不一致 AGP 会报 "Inconsistent JVM-target compatibility..."。
+                jvmTarget = "1.8"
             }
         }
     }
@@ -62,7 +64,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        // 与 :apps:communication-card 对齐
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 }
