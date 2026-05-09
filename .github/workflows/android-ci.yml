@@ -102,7 +102,23 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           {
-            echo "## :apps:web:wasmJsBrowserDistribution 失败 — 末 200 行"
+            echo "## :apps:web:wasmJsBrowserDistribution 失败"
+            echo ""
+            echo "### 关键错误片段（grep）"
+            echo ""
+            echo '```'
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED|What went wrong|Could not resolve|Could not find|Cannot find|not found|Plugin .* was not found|^Caused by:" wasmJsBrowserDistribution.log \
+              | head -100 \
+              || echo "(no error markers found)"
+            echo '```'
+            echo ""
+            echo "### 头 100 行（gradle config 阶段错误通常在这里）"
+            echo ""
+            echo '```'
+            head -100 wasmJsBrowserDistribution.log
+            echo '```'
+            echo ""
+            echo "### 末 200 行"
             echo ""
             echo '```'
             tail -200 wasmJsBrowserDistribution.log

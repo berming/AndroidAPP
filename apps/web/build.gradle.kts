@@ -24,10 +24,9 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(compose.components.resources)
-                // Kotlin 1.9.24 wasmJs stdlib 不直接包含 org.w3c.dom.*；
-                // 由 kotlinx-browser 提供 WebSocket / document / window 等浏览器绑定。
-                // KMP 自动按 target 选择正确变体（这里会拉取 -wasm-js 后缀）。
-                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.1")
+                // 注：不再依赖 kotlinx-browser（0.1 版要求 Kotlin 2.0+，与本项目
+                // 1.9.24 不兼容）。WebSocket / document 等 DOM API 通过
+                // 各文件内的 @JsFun external 声明直接 interop（见 net/WebSocketTransport.kt）。
             }
         }
     }

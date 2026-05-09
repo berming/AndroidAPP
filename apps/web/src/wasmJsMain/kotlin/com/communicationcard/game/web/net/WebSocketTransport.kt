@@ -6,15 +6,16 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.w3c.dom.MessageEvent
-import org.w3c.dom.WebSocket
 
 /**
  * 浏览器原生 WebSocket 的 Kotlin/Wasm-JS 包装。
  *
- * - 不引入 Ktor 客户端依赖（Ktor 2.3 系列对 wasmJs 支持不稳定）；直接用浏览器 API。
+ * 设计取舍（Kotlin 1.9.24 + CMP 1.6.10）：
+ * - 不依赖 kotlinx-browser:0.1（该包要求 Kotlin 2.0+）；改为 @JsFun 直接 interop
+ *   —— 把 WebSocket 的对象身份留在 JS 侧，Kotlin 持一个 JsAny 句柄，所有操作通过
+ *   外部函数中转。这种方式跨 Kotlin/Wasm-JS 版本最稳，回调型 API 也最简单。
+ * - 不引入 Ktor 客户端（Ktor 2.3 系列对 wasmJs 支持不稳定）。
  * - 状态/消息以 Coroutines Flow 暴露，UI 层 collectAsState 即可。
- * - 重连策略：指数退避，最多 5 次（与 Android 端 NetworkManager 一致）。
  */
 class WebSocketTransport(private val url: String) {
 
@@ -26,7 +27,7 @@ class WebSocketTransport(private val url: String) {
     private val _messages = MutableSharedFlow<String>(replay = 0, extraBufferCapacity = 64)
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
-    private var ws: WebSocket? = null
+    private var ws: JsAny? = null
     private var manualClose = false
 
     fun connect(onOpen: (() -> Unit)? = null) {
@@ -34,47 +35,68 @@ class WebSocketTransport(private val url: String) {
         manualClose = false
         _state.value = State.Connecting
 
-        val socket = WebSocket(url)
-        socket.onopen = {
-            _state.value = State.Connected
-            onOpen?.invoke()
-        }
-        socket.onmessage = { event ->
-            // MessageEvent.data 在浏览器 WebSocket 上可能是 String / ArrayBuffer / Blob；
-            // 我们的协议固定用 text frame，按 String 处理即可。
-            val data = (event as MessageEvent).data
-            if (data != null) {
-                _messages.tryEmit(data.toString())
-            }
-        }
-        socket.onclose = {
-            _state.value = State.Disconnected
-            ws = null
-        }
-        socket.onerror = {
-            _state.value = State.Error
-        }
+        val socket = jsCreateWebSocket(
+            url = url,
+            onOpen = {
+                _state.value = State.Connected
+                onOpen?.invoke()
+            },
+            onMessage = { data ->
+                _messages.tryEmit(data)
+            },
+            onClose = {
+                _state.value = State.Disconnected
+                ws = null
+            },
+            onError = {
+                _state.value = State.Error
+            },
+        )
         ws = socket
     }
 
     fun send(text: String): Boolean {
         val socket = ws ?: return false
-        return try {
-            socket.send(text)
-            true
-        } catch (e: Throwable) {
-            consoleError("WebSocket send failed: ${e.message}")
-            false
-        }
+        return runCatching { jsWebSocketSend(socket, text) }
+            .onFailure { consoleError("WebSocket send failed: ${it.message}") }
+            .isSuccess
     }
 
     fun close() {
         manualClose = true
-        ws?.close()
+        ws?.let { jsWebSocketClose(it) }
         ws = null
         _state.value = State.Disconnected
     }
 }
+
+// ---------- JS interop ----------
+// 不引用 org.w3c.dom 包；Kotlin 1.9.24 wasmJs 标准库中这部分由 kotlinx-browser 提供，
+// 而 kotlinx-browser:0.1 要求 Kotlin 2.0+。统一改为 @JsFun 是绕开该约束最稳的方式。
+
+@JsFun(
+    """(url, onOpen, onMessage, onClose, onError) => {
+        const ws = new WebSocket(url);
+        ws.onopen = () => onOpen();
+        ws.onmessage = (e) => onMessage(typeof e.data === 'string' ? e.data : '');
+        ws.onclose = () => onClose();
+        ws.onerror = () => onError();
+        return ws;
+    }""",
+)
+private external fun jsCreateWebSocket(
+    url: String,
+    onOpen: () -> Unit,
+    onMessage: (String) -> Unit,
+    onClose: () -> Unit,
+    onError: () -> Unit,
+): JsAny
+
+@JsFun("(ws, data) => ws.send(data)")
+private external fun jsWebSocketSend(ws: JsAny, data: String)
+
+@JsFun("(ws) => ws.close()")
+private external fun jsWebSocketClose(ws: JsAny)
 
 @JsFun("(msg) => console.error(msg)")
 private external fun consoleError(msg: String?)
