@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# pre-push hook —— push 前自动跑快速测试。
+#
+# 设计原则：
+# - 关键路径（:shared:jvmTest）若不存在（pre-shared 时代），降级到
+#   :apps:communication-card:test，仍然是绿就放行
+# - 失败 → 阻止 push，但给逃生口（仅当 EMERGENCY_PUSH=1）
+# - 不动作 if push 的是 doc-only 改动（节省时间）
+
+set -u
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$ROOT" || exit 0
+
+# Doc-only 改动 → 跳过测试
+local_sha=$(git rev-parse HEAD 2>/dev/null || echo "")
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "")
+remote_sha=""
+if [ -n "$upstream" ]; then
+    remote_sha=$(git rev-parse "$upstream" 2>/dev/null || echo "")
+fi
+
+if [ -n "$remote_sha" ] && [ -n "$local_sha" ]; then
+    # 反向判断：如果**每个**改动文件都匹配「文档路径」，才算 doc-only。
+    # 这样资源文件（res/、AndroidManifest.xml、ProGuard 等）以及任何
+    # 其它 build 输入都会触发测试 —— 比之前枚举 *.kt/*.kts/gradle* 更安全。
+    non_doc_changed=$(git diff --name-only "${remote_sha}..${local_sha}" 2>/dev/null \
+        | grep -vE '^docs/|^README\.md$|\.md$|^\.github/(ISSUE_TEMPLATE|pull_request_template)' \
+        | wc -l | tr -d ' ')
+    if [ "$non_doc_changed" = "0" ]; then
+        echo "ℹ️  pre-push: 仅文档改动，跳过测试。"
+        exit 0
+    fi
+fi
+
+# 紧急逃生口（仅生产事故时使用）
+if [ "${EMERGENCY_PUSH:-0}" = "1" ]; then
+    echo "🚨 pre-push: 紧急 push 模式（EMERGENCY_PUSH=1），跳过测试。请在 PR 描述里说明原因。"
+    exit 0
+fi
+
+# 选择最快可用的测试任务
+TASK=""
+if [ -d "shared" ] && grep -q "^include(\":shared\")" settings.gradle.kts 2>/dev/null; then
+    TASK=":shared:jvmTest"
+elif [ -f "apps/communication-card/build.gradle.kts" ]; then
+    TASK=":apps:communication-card:test"
+fi
+
+if [ -z "$TASK" ]; then
+    echo "ℹ️  pre-push: 找不到可用的测试 gradle 任务，放行。"
+    exit 0
+fi
+
+echo "🧪 pre-push: 跑 ./gradlew $TASK"
+if ./gradlew "$TASK" --quiet --console=plain; then
+    echo "✅ pre-push: 测试通过。"
+    exit 0
+else
+    echo ""
+    echo "❌ pre-push: 测试失败，阻止 push。"
+    echo "   - 修复后重试，或"
+    echo "   - 紧急情况下用 EMERGENCY_PUSH=1 git push 强制推送（请在 PR 中说明）"
+    exit 1
+fi
