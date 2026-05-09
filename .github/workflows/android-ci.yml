@@ -1,18 +1,24 @@
 name: Android Build CI
 
-# 触发条件：当代码推送到main分支，或针对main分支发起pull_request时触发
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
-# 定义工作流中的任务
+# 失败时把 gradle 日志贴回 PR 作为评论（沙箱通过 MCP 读取），需要 write 权限
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   # ============================================================
   # 关键路径 TDD 守门：PR 改了 CardRules.kt / SettlementCalculator.kt /
   # ServerGameManager.kt 这些文件，但没改对应 *Test.kt → 直接红
   # （CLAUDE.md 第三章 + docs/playbooks/bug-triage.md）
+  #
+  # 路径已对齐 :shared KMP 重构后的新位置（CardRules / SettlementCalculator
+  # 在 shared/src/commonMain；测试在 shared/src/commonTest）。
   # ============================================================
   tdd-gate:
     name: TDD gate (critical paths require tests)
@@ -35,10 +41,11 @@ jobs:
           echo "---"
 
           fail=0
-          # 关键路径与对应测试的映射；任一行匹配则要求对应测试也变动
+          # 关键路径 → 对应测试。:shared 抽离后，CardRules / SettlementCalculator
+          # 的 main + test 都在 :shared；ServerGameManager 仍在 server/。
           declare -A REQUIRES=(
-            ["apps/communication-card/src/main/java/com/communicationcard/game/engine/CardRules.kt"]="apps/communication-card/src/test/java/com/communicationcard/game/engine/CardRulesTest.kt"
-            ["apps/communication-card/src/main/java/com/communicationcard/game/engine/SettlementCalculator.kt"]="apps/communication-card/src/test/java/com/communicationcard/game/engine/SettlementCalculatorTest.kt"
+            ["shared/src/commonMain/kotlin/com/communicationcard/game/engine/CardRules.kt"]="shared/src/commonTest/kotlin/com/communicationcard/game/engine/CardRulesTest.kt"
+            ["shared/src/commonMain/kotlin/com/communicationcard/game/engine/SettlementCalculator.kt"]="shared/src/commonTest/kotlin/com/communicationcard/game/engine/SettlementCalculatorTest.kt"
             ["server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt"]="server/src/test/kotlin/com/communicationcard/server/ServerGameManagerTest.kt"
           )
 
@@ -75,7 +82,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x gradlew server/gradlew
 
       - name: Cache Gradle Dependencies
         uses: actions/cache@v4
@@ -87,24 +94,124 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # 客户端单元测试（CardRulesTest + SettlementCalculatorTest，
-      # 关键路径强制 TDD 的运行端）
-      - name: Run client unit tests
-        run: ./gradlew :apps:communication-card:test
+      # 共享模块测试（含 SettlementCalculatorTest 15 用例 + CardRulesTest）
+      - name: Run shared module tests (commonTest)
+        run: ./gradlew :shared:jvmTest
 
-      # 服务端单元测试（ServerGameManagerTest 的运行端）
+      # 服务端单元测试（含 ServerGameManagerTest）
       - name: Run server unit tests
         working-directory: server
         run: ./gradlew test
 
-      # 构建 Debug APK
+      # Detekt 静态扫描；目前用 continue-on-error 软失败（待生成 baseline 后改回硬关）
+      - name: Detekt static analysis
+        run: ./gradlew detekt
+        continue-on-error: true
+
       - name: Build Debug APK with Gradle
-        run: ./gradlew :apps:communication-card:assembleDebug
+        # 加 --info --stacktrace + tee 到日志文件；失败时下一步把 grep+tail 写到
+        # GITHUB_STEP_SUMMARY 与 PR 评论，方便沙箱/无登录环境通过 MCP 读取错误。
+        run: |
+          set -o pipefail
+          ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
+            | tee assembleDebug.log
+
+      - name: Surface assembleDebug error on failure
+        if: failure() && hashFiles('assembleDebug.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## :apps:communication-card:assembleDebug 失败"
+            echo ""
+            echo "### Kotlin compiler errors（grep 'e:' / 'error:'）"
+            echo ""
+            echo '```'
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED" assembleDebug.log \
+              | head -80 \
+              || echo "(no Kotlin error lines found)"
+            echo '```'
+            echo ""
+            echo "### 末 300 行 gradle 输出"
+            echo ""
+            echo '```'
+            tail -300 assembleDebug.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-assembleDebug.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-assembleDebug.md \
+              || echo "PR comment failed; summary still written"
+          fi
+
+      - name: Build Web (Wasm-JS) bundle
+        run: |
+          set -o pipefail
+          ./gradlew :apps:web:wasmJsBrowserDistribution --info --stacktrace 2>&1 \
+            | tee wasmJsBrowserDistribution.log
+
+      - name: Surface wasmJsBrowserDistribution error on failure
+        if: failure() && hashFiles('wasmJsBrowserDistribution.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## :apps:web:wasmJsBrowserDistribution 失败"
+            echo ""
+            echo "### 关键错误片段（grep）"
+            echo ""
+            echo '```'
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED|What went wrong|Could not resolve|Could not find|Cannot find|not found|Plugin .* was not found|^Caused by:" wasmJsBrowserDistribution.log \
+              | head -100 \
+              || echo "(no error markers found)"
+            echo '```'
+            echo ""
+            echo "### 头 100 行（gradle config 阶段错误通常在这里）"
+            echo ""
+            echo '```'
+            head -100 wasmJsBrowserDistribution.log
+            echo '```'
+            echo ""
+            echo "### 末 200 行"
+            echo ""
+            echo '```'
+            tail -200 wasmJsBrowserDistribution.log
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-wasmJs.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-wasmJs.md \
+              || echo "PR comment failed; summary still written"
+          fi
+
+      - name: Upload Web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: communication-card-web
+          path: apps/web/build/dist/wasmJs/productionExecutable
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload Communication Card APK
         uses: actions/upload-artifact@v4
         with:
           name: communication-card-app
           path: apps/communication-card/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload test + detekt reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            apps/communication-card/build/reports/
+            apps/communication-card/build/test-results/
+            shared/build/reports/
+            shared/build/test-results/
+            server/build/reports/
+            server/build/test-results/
+            build/reports/detekt/
           if-no-files-found: warn
           retention-days: 7

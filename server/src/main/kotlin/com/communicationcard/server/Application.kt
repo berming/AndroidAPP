@@ -54,7 +54,7 @@ fun main() {
                 try {
                     handleSession(session, roomManager, gameManager, sessions)
                 } catch (e: ClosedReceiveChannelException) {
-                    println("=== WebSocket closed: $sessionId ===")
+                    println("=== WebSocket closed: $sessionId (${e.message}) ===")
                 } catch (e: Exception) {
                     println("=== WebSocket error: ${e.message} ===")
                     e.printStackTrace()

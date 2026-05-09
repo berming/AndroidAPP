@@ -27,6 +27,7 @@ class GameSession(
             val json = MessageSerializer.json.encodeToString(GameMessage.serializer(), message)
             webSocketSession.send(Frame.Text(json))
         } catch (e: Exception) {
+            System.err.println("WebSocket send failed: ${e.message}")
             isActive.set(false)
         }
     }
@@ -36,7 +37,8 @@ class GameSession(
         try {
             webSocketSession.close(CloseReason(CloseReason.Codes.NORMAL, reason))
         } catch (e: Exception) {
-            // Already closed
+            // 已经关闭或对端已断开属预期情况，仅记录不再处理
+            System.err.println("WebSocket close (already closed or peer gone): ${e.message}")
         }
     }
 
@@ -50,9 +52,11 @@ class GameSession(
                 null
             }
         } catch (e: ClosedReceiveChannelException) {
+            System.err.println("WebSocket channel closed: ${e.message}")
             isActive.set(false)
             null
         } catch (e: Exception) {
+            System.err.println("WebSocket receive failed: ${e.message}")
             null
         }
     }

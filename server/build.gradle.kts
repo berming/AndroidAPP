@@ -1,7 +1,26 @@
 plugins {
     kotlin("jvm") version "1.9.20"
     kotlin("plugin.serialization") version "1.9.20"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
     application
+}
+
+detekt {
+    config.setFrom("$rootDir/../detekt.yml")
+    parallel = true
+    buildUponDefaultConfig = true
+    allRules = false
+    // 测试代码不在 detekt 范围内（允许 assertNotNull 后立即 !! 等惯用模式）
+    source.setFrom(files("src/main/kotlin"))
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        txt.required.set(false)
+        sarif.required.set(false)
+    }
 }
 
 group = "com.communicationcard"

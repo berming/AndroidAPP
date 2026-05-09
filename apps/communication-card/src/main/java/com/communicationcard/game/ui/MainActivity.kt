@@ -243,25 +243,27 @@ class MainActivity : AppCompatActivity() {
         DebugLogManager.i(TAG, "initMultiplayer")
         try {
             networkManager = NetworkManager(this, SERVER_URL)
-            roomManager = RoomManager(networkManager!!)
+            val nm = networkManager ?: return
+            roomManager = RoomManager(nm)
+            val rm = roomManager ?: return
 
             lifecycleScope.launch {
-                networkManager!!.connectionState.collectLatest { state ->
+                nm.connectionState.collectLatest { state ->
                     updateConnectionUI(state)
                 }
             }
             lifecycleScope.launch {
-                roomManager!!.roomEvents.collectLatest { event ->
+                rm.roomEvents.collectLatest { event ->
                     handleRoomEvent(event)
                 }
             }
             lifecycleScope.launch {
-                roomManager!!.roomList.collectLatest { rooms ->
+                rm.roomList.collectLatest { rooms ->
                     updateRoomList(rooms)
                 }
             }
 
-            networkManager!!.connect()
+            nm.connect()
             multiplayerInited = true
 
             // 首次进入：如果没有昵称，提示输入

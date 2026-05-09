@@ -1036,6 +1036,11 @@ class GameActivity : AppCompatActivity() {
             findBestBeatPlay(safeNonBombs, bombs)
         }
 
+        if (hint == null) {
+            showMessage("没有合适的出牌建议")
+            return
+        }
+
         // Clear previous selection
         selectedCards.clear()
         cardViewMap.values.forEach { view ->
@@ -1067,7 +1072,7 @@ class GameActivity : AppCompatActivity() {
      * 优先级：小单张 > 小对子 > 小三张 > 顺子 > 炸弹
      * 避免出2、A、王等大牌（value >= 12）
      */
-    private fun findBestFreePlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup {
+    private fun findBestFreePlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup? {
         // 按牌型分类
         val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
         val pairs = nonBombs.filter { it.type == CardGroupType.PAIR }
@@ -1080,40 +1085,40 @@ class GameActivity : AppCompatActivity() {
         // 优先出小单张
         val smallSingles = singles.filter { it.primaryRank.value < smallThreshold }
         if (smallSingles.isNotEmpty()) {
-            return smallSingles.minByOrNull { it.primaryRank.value }!!
+            return smallSingles.minByOrNull { it.primaryRank.value }
         }
 
         // 其次出小对子
         val smallPairs = pairs.filter { it.primaryRank.value < smallThreshold }
         if (smallPairs.isNotEmpty()) {
-            return smallPairs.minByOrNull { it.primaryRank.value }!!
+            return smallPairs.minByOrNull { it.primaryRank.value }
         }
 
         // 然后出小三张
         val smallTriples = triples.filter { it.primaryRank.value < smallThreshold }
         if (smallTriples.isNotEmpty()) {
-            return smallTriples.minByOrNull { it.primaryRank.value }!!
+            return smallTriples.minByOrNull { it.primaryRank.value }
         }
 
         // 顺子可以出（一次走5张以上，有优势）
         if (straights.isNotEmpty()) {
-            return straights.minByOrNull { it.primaryRank.value }!!
+            return straights.minByOrNull { it.primaryRank.value }
         }
 
         // 如果没有小牌，出最小的非炸弹牌（可能是A、2、王）
         if (nonBombs.isNotEmpty()) {
-            return nonBombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
+            return nonBombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))
         }
 
         // 最后才出炸弹
-        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
+        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))
     }
 
     /**
      * 压牌策略：用刚好能压住的最小牌
      * 尽量保留大牌（2、王），除非没有其他选择
      */
-    private fun findBestBeatPlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup {
+    private fun findBestBeatPlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup? {
         if (nonBombs.isNotEmpty()) {
             // 定义"大牌"阈值：value >= 13 (2和王)
             val bigThreshold = 13
@@ -1121,15 +1126,15 @@ class GameActivity : AppCompatActivity() {
             // 优先用普通牌压（非2、非王）
             val regularPlays = nonBombs.filter { it.primaryRank.value < bigThreshold }
             if (regularPlays.isNotEmpty()) {
-                return regularPlays.minByOrNull { it.primaryRank.value }!!
+                return regularPlays.minByOrNull { it.primaryRank.value }
             }
 
             // 没有普通牌，只能用大牌（2或王）
-            return nonBombs.minByOrNull { it.primaryRank.value }!!
+            return nonBombs.minByOrNull { it.primaryRank.value }
         }
 
         // 没有非炸弹牌能压，用最小的炸弹
-        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))!!
+        return bombs.minWithOrNull(compareBy({ it.size }, { it.primaryRank.value }))
     }
 
     private fun updateScores() {

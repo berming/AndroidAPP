@@ -5,12 +5,12 @@ import com.communicationcard.game.model.CardGroup
 import com.communicationcard.game.model.CardGroupType
 import com.communicationcard.game.model.CardRank
 import com.communicationcard.game.model.CardSuit
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * CardRules 单元测试 —— 关键路径强制 TDD（CLAUDE.md 第三章）。
@@ -283,8 +283,8 @@ class CardRulesTest {
         val bombSmall = bomb(CardRank.TEN, count = 4)        // 4×10
         val bombLarge = bomb(CardRank.THREE, count = 5)      // 5×3
         assertTrue(
-            "5×3 应该压 4×10（炸弹张数优先于点数；regressions #2 L1）",
             CardRules.canBeat(bombSmall, bombLarge),
+            "5×3 应该压 4×10（炸弹张数优先于点数；regressions #2 L1）",
         )
     }
 
@@ -335,8 +335,8 @@ class CardRulesTest {
             card(CardRank.JACK),
         )
         val plays = CardRules.findValidPlays(hand, lastPlay = null)
-        assertTrue("有 SINGLE", plays.any { it.type == CardGroupType.SINGLE })
-        assertTrue("有 PAIR", plays.any { it.type == CardGroupType.PAIR })
+        assertTrue(plays.any { it.type == CardGroupType.SINGLE }, "有 SINGLE")
+        assertTrue(plays.any { it.type == CardGroupType.PAIR }, "有 PAIR")
     }
 
     @Test
@@ -351,9 +351,12 @@ class CardRulesTest {
         val plays = CardRules.findValidPlays(hand, lastPlay = single(CardRank.SEVEN))
 
         // 应包含: 4 个独立的 J 单张 + 1 个 4×J 炸弹
-        assertTrue("含更大单张", plays.any { it.type == CardGroupType.SINGLE && it.cards[0].rank == CardRank.JACK })
-        assertTrue("含炸弹", plays.any { it.type == CardGroupType.BOMB })
-        assertFalse("不含小于上家的单张 6", plays.any { it.cards[0].rank == CardRank.SIX })
+        assertTrue(
+            plays.any { it.type == CardGroupType.SINGLE && it.cards[0].rank == CardRank.JACK },
+            "含更大单张",
+        )
+        assertTrue(plays.any { it.type == CardGroupType.BOMB }, "含炸弹")
+        assertFalse(plays.any { it.cards[0].rank == CardRank.SIX }, "不含小于上家的单张 6")
     }
 
     // ============================================================
