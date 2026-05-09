@@ -33,12 +33,19 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(kotlin("test-annotations-common"))
             }
         }
 
         val androidMain by getting
 
         val jvmMain by getting
+        val jvmTest by getting {
+            dependencies {
+                // 显式声明 JVM 测试 runner，避免 KMP 依赖解析回落到不可用的实现
+                implementation(kotlin("test-junit"))
+            }
+        }
 
         val wasmJsMain by getting
     }
