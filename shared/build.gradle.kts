@@ -26,7 +26,9 @@ kotlin {
             dependencies {
                 // 用 api 暴露给消费方，否则 Android/Web 调用 GameMessage.json.encodeToString 时拿不到 serializer
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                // 协程 1.7.3 没有 wasmJs target；最早的支持版本是 1.8.0。
+                // 1.8.1 是 Kotlin 1.9.24 兼容线上最稳的一档。
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
             }
         }
 
