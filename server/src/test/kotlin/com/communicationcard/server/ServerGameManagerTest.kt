@@ -25,7 +25,9 @@ import kotlin.test.assertTrue
  */
 class ServerGameManagerTest {
 
-    private val gm = ServerGameManager()
+    // ServerGameManager 需要 ServerRoomManager；测试中我们不调任何依赖 roomManager
+    // 的方法，所以直接给一个最小实例。
+    private val gm = ServerGameManager(ServerRoomManager())
 
     // ============================================================
     //  identifyCardGroup
