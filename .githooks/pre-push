@@ -20,8 +20,13 @@ if [ -n "$upstream" ]; then
 fi
 
 if [ -n "$remote_sha" ] && [ -n "$local_sha" ]; then
-    code_changed=$(git diff --name-only "${remote_sha}..${local_sha}" -- '*.kt' '*.kts' 'gradle*' 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$code_changed" = "0" ]; then
+    # 反向判断：如果**每个**改动文件都匹配「文档路径」，才算 doc-only。
+    # 这样资源文件（res/、AndroidManifest.xml、ProGuard 等）以及任何
+    # 其它 build 输入都会触发测试 —— 比之前枚举 *.kt/*.kts/gradle* 更安全。
+    non_doc_changed=$(git diff --name-only "${remote_sha}..${local_sha}" 2>/dev/null \
+        | grep -vE '^docs/|^README\.md$|\.md$|^\.github/(ISSUE_TEMPLATE|pull_request_template)' \
+        | wc -l | tr -d ' ')
+    if [ "$non_doc_changed" = "0" ]; then
         echo "ℹ️  pre-push: 仅文档改动，跳过测试。"
         exit 0
     fi
