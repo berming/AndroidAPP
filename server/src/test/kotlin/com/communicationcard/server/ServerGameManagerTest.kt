@@ -38,22 +38,22 @@ class ServerGameManagerTest {
 
     @Test
     fun identifyCardGroup_singleCard_returnsSingle() {
-        val g = gm.identifyCardGroup(listOf(card("7")))
+        val g = gm.identifyCardGroup(listOf(card("SEVEN")))
         assertNotNull(g)
         assertEquals("SINGLE", g.type)
-        assertEquals("7", g.primaryRank)
+        assertEquals("SEVEN", g.primaryRank)
     }
 
     @Test
     fun identifyCardGroup_pairSameRank_returnsPair() {
-        val g = gm.identifyCardGroup(listOf(card("9", "SPADE"), card("9", "HEART")))
+        val g = gm.identifyCardGroup(listOf(card("NINE", "SPADE"), card("NINE", "HEART")))
         assertEquals("PAIR", g!!.type)
     }
 
     @Test
     fun identifyCardGroup_threeSameRank_returnsTriple() {
         val g = gm.identifyCardGroup(
-            listOf(card("Q", "SPADE"), card("Q", "HEART"), card("Q", "CLUB")),
+            listOf(card("QUEEN", "SPADE"), card("QUEEN", "HEART"), card("QUEEN", "CLUB")),
         )
         assertEquals("TRIPLE", g!!.type)
     }
@@ -61,14 +61,14 @@ class ServerGameManagerTest {
     @Test
     fun identifyCardGroup_fourSameRank_returnsBomb() {
         val g = gm.identifyCardGroup(
-            listOf(card("7", "SPADE"), card("7", "HEART"), card("7", "CLUB"), card("7", "DIAMOND")),
+            listOf(card("SEVEN", "SPADE"), card("SEVEN", "HEART"), card("SEVEN", "CLUB"), card("SEVEN", "DIAMOND")),
         )
         assertEquals("BOMB", g!!.type)
     }
 
     @Test
     fun identifyCardGroup_fiveSameRank_returnsBomb() {
-        val cards = (0..4).map { card("5", "SPADE", deckIndex = it) }
+        val cards = (0..4).map { card("FIVE", "SPADE", deckIndex = it) }
         val g = gm.identifyCardGroup(cards)
         assertEquals("BOMB", g!!.type)
         assertEquals(5, g.cards.size)
@@ -76,7 +76,7 @@ class ServerGameManagerTest {
 
     @Test
     fun identifyCardGroup_fiveConsecutive_returnsStraight() {
-        val cards = listOf(card("5"), card("6"), card("7"), card("8"), card("9"))
+        val cards = listOf(card("FIVE"), card("SIX"), card("SEVEN"), card("EIGHT"), card("NINE"))
         val g = gm.identifyCardGroup(cards)
         assertEquals("STRAIGHT", g!!.type)
     }
@@ -84,7 +84,7 @@ class ServerGameManagerTest {
     @Test
     fun identifyCardGroup_fourConsecutive_returnsNull() {
         // 顺子至少 5 张
-        val cards = listOf(card("5"), card("6"), card("7"), card("8"))
+        val cards = listOf(card("FIVE"), card("SIX"), card("SEVEN"), card("EIGHT"))
         assertNull(gm.identifyCardGroup(cards))
     }
 
@@ -95,7 +95,7 @@ class ServerGameManagerTest {
      */
     @Test
     fun identifyCardGroup_acceptsUppercaseSuit_regressions1() {
-        val g = gm.identifyCardGroup(listOf(card("8", "SPADE"), card("8", "HEART")))
+        val g = gm.identifyCardGroup(listOf(card("EIGHT", "SPADE"), card("EIGHT", "HEART")))
         assertEquals("PAIR", g!!.type)
     }
 
@@ -105,33 +105,33 @@ class ServerGameManagerTest {
 
     @Test
     fun canBeat_singleBiggerRank_beats() {
-        assertTrue(gm.canBeat(single("9"), single("J")))
+        assertTrue(gm.canBeat(single("NINE"), single("JACK")))
     }
 
     @Test
     fun canBeat_singleSameRank_doesNotBeat() {
-        assertFalse(gm.canBeat(single("9"), single("9")))
+        assertFalse(gm.canBeat(single("NINE"), single("NINE")))
     }
 
     @Test
     fun canBeat_singleSmallerRank_doesNotBeat() {
-        assertFalse(gm.canBeat(single("J"), single("9")))
+        assertFalse(gm.canBeat(single("JACK"), single("NINE")))
     }
 
     @Test
     fun canBeat_pairBiggerRank_beats() {
-        assertTrue(gm.canBeat(pair("7"), pair("J")))
+        assertTrue(gm.canBeat(pair("SEVEN"), pair("JACK")))
     }
 
     @Test
     fun canBeat_pairVsSingle_doesNotBeat() {
-        assertFalse(gm.canBeat(single("3"), pair("A")))
-        assertFalse(gm.canBeat(pair("3"), single("A")))
+        assertFalse(gm.canBeat(single("THREE"), pair("ACE")))
+        assertFalse(gm.canBeat(pair("THREE"), single("ACE")))
     }
 
     @Test
     fun canBeat_tripleBiggerRank_beats() {
-        assertTrue(gm.canBeat(triple("6"), triple("Q")))
+        assertTrue(gm.canBeat(triple("SIX"), triple("QUEEN")))
     }
 
     // ============================================================
@@ -140,27 +140,27 @@ class ServerGameManagerTest {
 
     @Test
     fun canBeat_bombBeatsSingle() {
-        assertTrue(gm.canBeat(single("A"), bomb("3", count = 4)))
+        assertTrue(gm.canBeat(single("ACE"), bomb("THREE", count = 4)))
     }
 
     @Test
     fun canBeat_bombBeatsPair() {
-        assertTrue(gm.canBeat(pair("A"), bomb("4", count = 4)))
+        assertTrue(gm.canBeat(pair("ACE"), bomb("FOUR", count = 4)))
     }
 
     @Test
     fun canBeat_singleDoesNotBeatBomb() {
-        assertFalse(gm.canBeat(bomb("3", count = 4), single("BIG_JOKER")))
+        assertFalse(gm.canBeat(bomb("THREE", count = 4), single("BIG_JOKER")))
     }
 
     @Test
     fun canBeat_bombSameSizeBiggerRank_beats() {
-        assertTrue(gm.canBeat(bomb("3", count = 4), bomb("K", count = 4)))
+        assertTrue(gm.canBeat(bomb("THREE", count = 4), bomb("KING", count = 4)))
     }
 
     @Test
     fun canBeat_bombSameSizeSmallerRank_doesNotBeat() {
-        assertFalse(gm.canBeat(bomb("K", count = 4), bomb("3", count = 4)))
+        assertFalse(gm.canBeat(bomb("KING", count = 4), bomb("THREE", count = 4)))
     }
 
     /**
@@ -170,8 +170,8 @@ class ServerGameManagerTest {
      */
     @Test
     fun canBeat_biggerBombSizeWinsOverRank_regressions2() {
-        val bombSmall = bomb("10", count = 4)        // 4×10
-        val bombLarge = bomb("3", count = 5)         // 5×3
+        val bombSmall = bomb("TEN", count = 4)        // 4×10
+        val bombLarge = bomb("THREE", count = 5)         // 5×3
         assertTrue(
             gm.canBeat(bombSmall, bombLarge),
             "5×3 应该压 4×10（炸弹张数优先于点数；regressions #2 L1）",
@@ -180,14 +180,14 @@ class ServerGameManagerTest {
 
     @Test
     fun canBeat_biggerBombBeatsAllSmallerBombs() {
-        val sixBomb = bomb("3", count = 6)
-        val fiveBomb = bomb("K", count = 5)
+        val sixBomb = bomb("THREE", count = 6)
+        val fiveBomb = bomb("KING", count = 5)
         assertTrue(gm.canBeat(fiveBomb, sixBomb))
     }
 
     @Test
     fun canBeat_smallerBombSize_doesNotBeat() {
-        val sixBomb = bomb("3", count = 6)
+        val sixBomb = bomb("THREE", count = 6)
         val fourBomb = bomb("BIG_JOKER", count = 4, suit = "JOKER")
         assertFalse(gm.canBeat(sixBomb, fourBomb))
     }
@@ -203,7 +203,7 @@ class ServerGameManagerTest {
 
     @Test
     fun canBeat_bigJokerBeatsTwo() {
-        assertTrue(gm.canBeat(single("2"), single("BIG_JOKER", "JOKER")))
+        assertTrue(gm.canBeat(single("TWO"), single("BIG_JOKER", "JOKER")))
     }
 
     @Test
@@ -213,10 +213,10 @@ class ServerGameManagerTest {
             gm.getRankValue("BIG_JOKER") > gm.getRankValue("SMALL_JOKER"),
             "BIG_JOKER 应该 > SMALL_JOKER",
         )
-        assertTrue(gm.getRankValue("SMALL_JOKER") > gm.getRankValue("2"))
-        assertTrue(gm.getRankValue("2") > gm.getRankValue("A"))
-        assertTrue(gm.getRankValue("A") > gm.getRankValue("K"))
-        assertTrue(gm.getRankValue("3") < gm.getRankValue("4"))
+        assertTrue(gm.getRankValue("SMALL_JOKER") > gm.getRankValue("TWO"))
+        assertTrue(gm.getRankValue("TWO") > gm.getRankValue("ACE"))
+        assertTrue(gm.getRankValue("ACE") > gm.getRankValue("KING"))
+        assertTrue(gm.getRankValue("THREE") < gm.getRankValue("FOUR"))
     }
 
     // ============================================================
@@ -237,9 +237,9 @@ class ServerGameManagerTest {
     @Test
     fun computeAllFinishedScores_includesLoserUnfinishedCollected_regressions8() {
         val winner = listOf(
-            sp(seat = 0, team = "A"),
-            sp(seat = 1, team = "A"),
-            sp(seat = 2, team = "A"),
+            sp(seat = 0, team = "ACE"),
+            sp(seat = 1, team = "ACE"),
+            sp(seat = 2, team = "ACE"),
         )
         val loser = listOf(
             sp(seat = 3, team = "B"),
@@ -252,8 +252,8 @@ class ServerGameManagerTest {
                 1 to emptyList(),                           // a2 走完
                 2 to emptyList(),                           // a3 走完
                 3 to emptyList(),                           // b1 走完
-                4 to listOf(card("5"), card("10"), card("10")), // b2 手牌 = 5+10+10 = 25 分
-                5 to listOf(card("5"), card("K")),              // b3 手牌 = 5+10 = 15 分
+                4 to listOf(card("FIVE"), card("TEN"), card("TEN")), // b2 手牌 = 5+10+10 = 25 分
+                5 to listOf(card("FIVE"), card("KING")),              // b3 手牌 = 5+10 = 15 分
             ),
             playerScores = mapOf(0 to 80, 1 to 60, 2 to 40, 3 to 20, 4 to 30, 5 to 10),
         )
@@ -269,7 +269,7 @@ class ServerGameManagerTest {
      */
     @Test
     fun computeAllFinishedScores_loserAllFinished_returnsCleanSums() {
-        val winner = listOf(sp(0, "A"), sp(1, "A"), sp(2, "A"))
+        val winner = listOf(sp(0, "ACE"), sp(1, "ACE"), sp(2, "ACE"))
         val loser = listOf(sp(3, "B"), sp(4, "B"), sp(5, "B"))
         val state = state(
             hands = mapOf(0 to listOf(), 1 to listOf(), 2 to listOf(),
@@ -287,14 +287,14 @@ class ServerGameManagerTest {
      */
     @Test
     fun computeAllFinishedScores_allCollectedZero_stillComputesHandScores() {
-        val winner = listOf(sp(0, "A"), sp(1, "A"), sp(2, "A"))
+        val winner = listOf(sp(0, "ACE"), sp(1, "ACE"), sp(2, "ACE"))
         val loser = listOf(sp(3, "B"), sp(4, "B"), sp(5, "B"))
         val state = state(
             hands = mapOf(
                 0 to listOf(), 1 to listOf(), 2 to listOf(),
                 3 to listOf(),
-                4 to listOf(card("5"), card("10")),  // 15 分
-                5 to listOf(card("K")),               // 10 分
+                4 to listOf(card("FIVE"), card("TEN")),  // 15 分
+                5 to listOf(card("KING")),               // 10 分
             ),
             playerScores = mapOf(0 to 0, 1 to 0, 2 to 0, 3 to 0, 4 to 0, 5 to 0),
         )
