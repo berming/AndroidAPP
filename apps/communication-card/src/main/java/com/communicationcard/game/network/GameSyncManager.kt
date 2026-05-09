@@ -96,8 +96,12 @@ class GameSyncManager(
 
             is GameActionResult -> {
                 _actionResults.emit(message)
-                if (message.success && message.state != null) {
-                    applyState(message.state)
+                // 跨模块属性必须用快照才能 smart-cast：message.state 在 :shared
+                // 编译单元里声明为 var/可空，Android 编译器无法保证在 null 检查与
+                // 使用之间它不会变化。本地 val 拷贝消除歧义。
+                val state = message.state
+                if (message.success && state != null) {
+                    applyState(state)
                     resetTurnTimer()
                 }
             }
