@@ -1,5 +1,6 @@
 package com.communicationcard.server
 
+import com.communicationcard.game.network.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
