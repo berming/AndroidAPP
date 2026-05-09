@@ -62,13 +62,19 @@
 
 修改以下文件**必须先写失败测试**，再实现修复：
 
-| 文件 | 测试位置 |
-|------|---------|
-| `engine/SettlementCalculator.kt` | `apps/.../test/.../SettlementCalculatorTest.kt`（已有 15 用例）|
-| `engine/CardRules.kt` | 待补 |
-| `server/.../ServerGameManager.kt` 的 `canBeat` / `handleRoundEnd` / `checkGameEnd` / `computeAllFinishedScores` | 待补 |
+| 文件 | 测试位置 | 状态 |
+|------|---------|------|
+| `shared/.../engine/SettlementCalculator.kt` | `shared/src/commonTest/.../SettlementCalculatorTest.kt` | ✓ 15 用例 |
+| `shared/.../engine/CardRules.kt` | `shared/src/commonTest/.../CardRulesTest.kt` | ✓ ~30 用例（PR-H2 引入）|
+| `server/.../ServerGameManager.kt` 的 `canBeat` / `handleRoundEnd` / `checkGameEnd` / `computeAllFinishedScores` | `server/src/test/.../ServerGameManagerTest.kt` | ✓ ~25 用例（PR-H2 引入）|
+
+CI 的 `tdd-gate` job 会 mechanically 校验：上表中任一文件被改但对应
+`*Test.kt` 没动，CI 直接红。详见 `.github/workflows/android-ci.yml`。
 
 > 教训：单机版结算因为有 15 个测试，3 个月没出过 Bug；联网版没测试，反复出问题。
+> 历史 Bug 的完整存档：`docs/regressions.md`（每条带防回归测试名）。
+
+> 修 Bug 的标准流程（"修了又坏"防火墙）：`docs/playbooks/bug-triage.md`。
 
 ---
 
@@ -92,6 +98,9 @@
 4. **真机验证**（至少 happy path + 1 个边界场景）
 
 详见 `.github/pull_request_template.md`。
+
+新功能开发的标准流程：`docs/playbooks/feature-development.md`（Loop A）。
+CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 
 ---
 
@@ -146,10 +155,32 @@ server/                          独立 Ktor 工程（暂不依赖 :shared）
 
 ## 七、文档参考
 
+**项目档案**
+
 - `docs/architecture.md` — 项目架构总览
 - `docs/multiplayer_guide.md` — 联网部署 / 协议 / 调试
 - `docs/settlement_verification.md` — 结算公式（含 15 验证用例）
 - `docs/dev_summary.md` — 开发实践总结（多 AI 协同方案）
+
+**Harness Engineering**（PR-H1/H2 引入）
+
+- `docs/regressions.md` — 历史 Bug 数据库；每条 8 字段（症状 / 根因 /
+  修复 commit / 教训 / 防回归测试）。新会话开局必扫一遍，避免重复踩坑。
+- `docs/playbooks/feature-development.md` — Loop A：新功能开发 happy path
+- `docs/playbooks/bug-triage.md` — Loop B："修了又坏"防火墙
+- `docs/playbooks/ci-failure-triage.md` — Loop D：CI 失败标准化排错
+  （含"沙箱里读不到 CI 日志？把 gradle 输出 exfil 到 PR 评论"模式）
+
+**Slash commands & Hooks**（`.claude/` 下）
+
+- `/test-fast` — `:shared:jvmTest` 30s 快反馈
+- `/ship-check` — push 前 4 关本地校验
+- `/pre-commit-scan` — Haiku 4.5 批量扫 5 大约束
+- `/align-server-shared` — diff 客户端/服务端 canBeat & Messages（PR-H3 后退役）
+- `.claude/hooks/{SessionStart,PostToolUse,UserPromptSubmit}.sh` — 启动摘要 /
+  关键路径 TDD 提醒 / push 关键词提醒
+- `.githooks/{pre-push,commit-msg}` — 自动跑 :shared:jvmTest / 校验署名两行
+  （需要 `git config core.hooksPath .githooks` 一次性启用）
 
 ---
 
