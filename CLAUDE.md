@@ -170,13 +170,23 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 - `docs/playbooks/bug-triage.md` — Loop B："修了又坏"防火墙
 - `docs/playbooks/ci-failure-triage.md` — Loop D：CI 失败标准化排错
   （含"沙箱里读不到 CI 日志？把 gradle 输出 exfil 到 PR 评论"模式）
+- `docs/playbooks/adversarial-review.md` — 跨 vendor 对抗审查节奏
+  （Codex 自动 / Opus 新会话 /review / 季度第二 vendor / 真机最后一关）
+  （含"沙箱里读不到 CI 日志？把 gradle 输出 exfil 到 PR 评论"模式）
 
 **Slash commands & Hooks**（`.claude/` 下）
 
 - `/test-fast` — `:shared:jvmTest` 30s 快反馈
 - `/ship-check` — push 前 4 关本地校验
 - `/pre-commit-scan` — Haiku 4.5 批量扫 5 大约束
-- `/align-server-shared` — diff 客户端/服务端 canBeat & Messages（PR-H3 后退役）
+- `/trace-bug` — 用户 bug 报告 → 失败测试 commit（Loop B 入口；PR-H4 引入）
+
+**Subagents**（`.claude/agents/` 下）
+
+- `protocol-syncer` — 当 GameMessage.kt 改动时校验 PROTOCOL_VERSION
+  bump（PR-H4 引入）
+- `tdd-scaffolder` — 关键路径函数 → 失败测试骨架（PR-H4 引入；
+  被 `/trace-bug` 调用）
 - `.claude/hooks/{SessionStart,PostToolUse,UserPromptSubmit}.sh` — 启动摘要 /
   关键路径 TDD 提醒 / push 关键词提醒
 - `.githooks/{pre-push,commit-msg}` — 自动跑 :shared:jvmTest / 校验署名两行
