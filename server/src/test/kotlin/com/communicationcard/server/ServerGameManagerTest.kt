@@ -28,6 +28,13 @@ import kotlin.test.assertTrue
  *  - 防回归 #4 #8：computeAllFinishedScores 的输入构建（playerScores、hand 求和）
  *    在 server 端独立于 :shared，错误仍会在此层被发现
  *  - 防止 server 端意外重新引入 canBeat 等逻辑副本（约束 1 漂移源头）
+ *
+ * Codex 在 PR #39 指出 `decideAIAction` 里有两条**绝对**阈值
+ * （`lastPlayValue >= 7` 和 `getRankValue(...) <= 2`），需要随 getRankValue
+ * 返回值整体 +1（PR-H3 stage 3 委托给 :shared CardRank 后从 0-based 变成
+ * 1-based）一起 +1 才能保持原意。已修：阈值改为 `>= 8` 和 `<= 3`。
+ * `decideAIAction` 是 private，未来如果对 AI 阈值做单元测试，可放宽到 internal
+ * 单独覆盖；本 PR 仅文档化此约束。
  */
 class ServerGameManagerTest {
 

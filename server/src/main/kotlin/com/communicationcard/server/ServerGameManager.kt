@@ -688,11 +688,17 @@ class ServerGameManager(
 
         // 如果上家牌太小（小于10），一般不值得用炸弹压
         // 除非：手牌很少（小于10张）或者炸弹很小（4张3/4/5）
+        //
+        // 阈值历史：旧 getRankValue 是 0-based（THREE=0..BIG_JOKER=14）。
+        // PR-H3 stage 3 委托给 :shared 的 CardRank.value（1-based，THREE=1..BIG_JOKER=15）
+        // 后，这两条绝对阈值都需要 +1 才能保持原意（Codex P2 在 PR #39 指出）：
+        //   旧 lastPlayValue >= 7  → TEN(7)+    新 >= 8  → TEN(8)+
+        //   旧 <= 2 → THREE/FOUR/FIVE(0/1/2)    新 <= 3 → THREE/FOUR/FIVE(1/2/3)
         val shouldUseBomb = when {
             hand.size <= 10 -> true  // 手牌少，积极出牌
-            lastPlayValue >= 7 -> true  // 上家牌大（10及以上），值得压
+            lastPlayValue >= 8 -> true  // 上家牌大（10及以上），值得压
             lastPlay.type == "BOMB" -> true  // 上家是炸弹，必须用炸弹压
-            smallestBomb.cards.size == 4 && getRankValue(smallestBomb.primaryRank) <= 2 -> true  // 小炸弹（4张3/4/5）可以用
+            smallestBomb.cards.size == 4 && getRankValue(smallestBomb.primaryRank) <= 3 -> true  // 小炸弹（4张3/4/5）可以用
             else -> false
         }
 
