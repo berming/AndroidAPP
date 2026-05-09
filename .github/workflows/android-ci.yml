@@ -12,6 +12,63 @@ permissions:
   pull-requests: write
 
 jobs:
+  # ============================================================
+  # 关键路径 TDD 守门：PR 改了 CardRules.kt / SettlementCalculator.kt /
+  # ServerGameManager.kt 这些文件，但没改对应 *Test.kt → 直接红
+  # （CLAUDE.md 第三章 + docs/playbooks/bug-triage.md）
+  #
+  # 路径已对齐 :shared KMP 重构后的新位置（CardRules / SettlementCalculator
+  # 在 shared/src/commonMain；测试在 shared/src/commonTest）。
+  # ============================================================
+  tdd-gate:
+    name: TDD gate (critical paths require tests)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout (with full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify critical-path changes are accompanied by tests
+        run: |
+          set -u
+          BASE_REF="${{ github.event.pull_request.base.sha }}"
+          HEAD_REF="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$BASE_REF" "$HEAD_REF")
+          echo "Changed files in this PR:"
+          echo "$changed"
+          echo "---"
+
+          fail=0
+          # 关键路径 → 对应测试。:shared 抽离后，CardRules / SettlementCalculator
+          # 的 main + test 都在 :shared；ServerGameManager 仍在 server/。
+          declare -A REQUIRES=(
+            ["shared/src/commonMain/kotlin/com/communicationcard/game/engine/CardRules.kt"]="shared/src/commonTest/kotlin/com/communicationcard/game/engine/CardRulesTest.kt"
+            ["shared/src/commonMain/kotlin/com/communicationcard/game/engine/SettlementCalculator.kt"]="shared/src/commonTest/kotlin/com/communicationcard/game/engine/SettlementCalculatorTest.kt"
+            ["server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt"]="server/src/test/kotlin/com/communicationcard/server/ServerGameManagerTest.kt"
+          )
+
+          for src in "${!REQUIRES[@]}"; do
+            test_path="${REQUIRES[$src]}"
+            if echo "$changed" | grep -qx "$src"; then
+              if ! echo "$changed" | grep -qx "$test_path"; then
+                echo "❌ $src 改动了，但 $test_path 没动。"
+                echo "   关键路径必须先 TDD（CLAUDE.md 第三章）。"
+                fail=1
+              else
+                echo "✅ $src 与 $test_path 同改"
+              fi
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "提示：先在对应 *Test.kt 写失败测试 commit，再实施修复 commit。"
+            echo "      详见 docs/playbooks/bug-triage.md（Loop B）。"
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -37,23 +94,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      # 共享模块测试（含 SettlementCalculatorTest 15 用例 + CardRulesTest）
       - name: Run shared module tests (commonTest)
         run: ./gradlew :shared:jvmTest
 
+      # 服务端单元测试（含 ServerGameManagerTest）
       - name: Run server unit tests
         working-directory: server
         run: ./gradlew test
 
+      # Detekt 静态扫描；目前用 continue-on-error 软失败（待生成 baseline 后改回硬关）
       - name: Detekt static analysis
         run: ./gradlew detekt
-        # 在沙箱环境无法运行 detektBaseline 任务，先以非阻塞模式运行；
-        # 报告仍会上传到 reports artifact 供 review。
-        # 待生成 detekt-baseline.xml 后改回 continue-on-error: false。
         continue-on-error: true
 
       - name: Build Debug APK with Gradle
-        # 加 --info --stacktrace + tee 到日志文件；失败时下一步把尾巴 200 行
-        # 写到 GITHUB_STEP_SUMMARY，方便沙箱/无登录环境通过 WebFetch 看到错误。
+        # 加 --info --stacktrace + tee 到日志文件；失败时下一步把 grep+tail 写到
+        # GITHUB_STEP_SUMMARY 与 PR 评论，方便沙箱/无登录环境通过 MCP 读取错误。
         run: |
           set -o pipefail
           ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
@@ -65,8 +122,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # 双段输出：(1) 抓到的 Kotlin compiler "e:" 行（最关键）
-          # (2) 末 300 行 gradle 输出（兜底）
           {
             echo "## :apps:communication-card:assembleDebug 失败"
             echo ""
@@ -153,6 +208,8 @@ jobs:
           path: |
             apps/communication-card/build/reports/
             apps/communication-card/build/test-results/
+            shared/build/reports/
+            shared/build/test-results/
             server/build/reports/
             server/build/test-results/
             build/reports/detekt/

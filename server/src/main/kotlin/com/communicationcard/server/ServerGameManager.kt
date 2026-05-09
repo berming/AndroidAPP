@@ -385,7 +385,9 @@ class ServerGameManager(
     /**
      * TEAM_ALL_FINISHED 结算：返回 (winnerScore, loserScore)
      */
-    private fun computeAllFinishedScores(
+    // 可见性：放宽到 internal，让 ServerGameManagerTest（同模块）能直接覆盖
+    // 关键路径（CLAUDE.md 第三章；docs/regressions.md #4 #8 防回归）。
+    internal fun computeAllFinishedScores(
         state: ServerGameState,
         winner: List<ServerPlayer>,
         loser: List<ServerPlayer>
@@ -738,7 +740,7 @@ class ServerGameManager(
         return cards
     }
 
-    private fun identifyCardGroup(cards: List<ServerCard>): ServerCardGroup? {
+    internal fun identifyCardGroup(cards: List<ServerCard>): ServerCardGroup? {
         if (cards.isEmpty()) return null
 
         val size = cards.size
@@ -779,7 +781,7 @@ class ServerGameManager(
         return true
     }
 
-    private fun canBeat(last: ServerCardGroup, current: ServerCardGroup): Boolean {
+    internal fun canBeat(last: ServerCardGroup, current: ServerCardGroup): Boolean {
         // 炸弹可以压任何非炸弹
         if (current.type == "BOMB" && last.type != "BOMB") return true
 
@@ -844,7 +846,7 @@ class ServerGameManager(
         return result
     }
 
-    private fun getRankValue(rank: String): Int {
+    internal fun getRankValue(rank: String): Int {
         return when (rank) {
             "THREE" -> 0
             "FOUR" -> 1
