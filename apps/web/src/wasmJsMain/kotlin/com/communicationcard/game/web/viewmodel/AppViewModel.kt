@@ -280,13 +280,23 @@ class AppViewModel {
     }
 }
 
-/** 默认服务器：当前页面 host 的 ws:// 端口 8080 路径 /game。 */
+/**
+ * 默认服务器 URL：
+ *
+ * - 本地 dev（hostname=localhost / 127.0.0.1 / 空）→ `ws://localhost:8080/game`
+ *   直连 `:server`，跳过反代。
+ * - 部署到带反代的服务器（Caddy / Nginx 等）→ `ws[s]://<host>/game` 同源同端口，
+ *   由反代转发到本机 8080。这样对外只需 80/443，wss 复用同一张证书。
+ *
+ * 用户在 Lobby 的输入框可以手动覆盖。
+ */
 private fun defaultServerUrl(): String {
     val proto = currentProtocol()
     val host = currentHost()
+    val isLocal = host.isBlank() || host == "localhost" || host == "127.0.0.1"
+    if (isLocal) return "ws://localhost:8080/game"
     val wsScheme = if (proto == "https:") "wss" else "ws"
-    val hostPart = host.ifBlank { "localhost" }
-    return "$wsScheme://$hostPart:8080/game"
+    return "$wsScheme://$host/game"
 }
 
 @JsFun("() => window.location.protocol")
