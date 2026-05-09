@@ -45,10 +45,10 @@ mcp__github__pull_request_read method=get_check_runs ...
 检查测试是否用了 `Random.Default` / `System.currentTimeMillis()` 这类
 unstable 源。
 
-### Step 4: `Run server unit tests` —— `cd server && ./gradlew test` 失败
+### Step 4: `Run server unit tests` —— `./gradlew :server:test` 失败
 
 ```bash
-cd server && ./gradlew test --console=plain
+./gradlew :server:test --console=plain
 ```
 
 本地复现 → Loop B。

@@ -1,26 +1,8 @@
 plugins {
-    kotlin("jvm") version "1.9.20"
-    kotlin("plugin.serialization") version "1.9.20"
-    id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    kotlin("jvm")
+    kotlin("plugin.serialization")
+    id("io.gitlab.arturbosch.detekt")
     application
-}
-
-detekt {
-    config.setFrom("$rootDir/../detekt.yml")
-    parallel = true
-    buildUponDefaultConfig = true
-    allRules = false
-    // 测试代码不在 detekt 范围内（允许 assertNotNull 后立即 !! 等惯用模式）
-    source.setFrom(files("src/main/kotlin"))
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        html.required.set(true)
-        xml.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
 }
 
 group = "com.communicationcard"
@@ -30,15 +12,19 @@ application {
     mainClass.set("com.communicationcard.server.ApplicationKt")
 }
 
-repositories {
-    mavenCentral()
-}
+// detekt 配置由 root build.gradle.kts 集中管理（已包含 server/src/main/kotlin
+// 在 source.setFrom）；本子项目无需重复定义 detekt 块。
 
 val ktorVersion = "2.3.6"
-val kotlinxSerializationVersion = "1.6.0"
+val kotlinxSerializationVersion = "1.6.3"
 val logbackVersion = "1.4.11"
 
 dependencies {
+    // 共享模块：协议 DTO + 牌型规则 + 结算公式（消除约束 1/4 的根因）。
+    // PR-H3 起，server 与所有客户端使用同一份 GameMessage / CardRules /
+    // SettlementCalculator —— 编译期保证两端等价。
+    implementation(project(":shared"))
+
     // Ktor Server
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
@@ -47,11 +33,11 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
-    // Kotlinx Serialization
+    // Kotlinx Serialization（与 :shared 对齐到 1.6.3——后者是首个支持 wasmJs 的版本）
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
 
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    // Coroutines（与 :shared 对齐到 1.8.1——首个支持 wasmJs 的版本）
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
     // Logging
     implementation("ch.qos.logback:logback-classic:$logbackVersion")

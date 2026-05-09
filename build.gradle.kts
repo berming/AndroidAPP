@@ -4,6 +4,7 @@ plugins {
     id("com.android.library") version "8.5.0" apply false
     id("org.jetbrains.kotlin.android") version "1.9.24" apply false
     id("org.jetbrains.kotlin.multiplatform") version "1.9.24" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.9.24" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24" apply false
     id("org.jetbrains.compose") version "1.6.10" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
@@ -20,6 +21,7 @@ detekt {
             "apps/communication-card/src/main/java",
             "apps/web/src/wasmJsMain/kotlin",
             "shared/src/commonMain/kotlin",
+            "server/src/main/kotlin",
         )
     )
 }
