@@ -9,7 +9,15 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    // 用 PREFER_SETTINGS（不是 FAIL_ON_PROJECT_REPOS）：Kotlin Gradle Plugin 的
+    // NodeJsSetupTask 会在 wasmJs target 启用时往 project-level repositories 注册
+    // "Node Distributions" ivy 仓库（KGP 1.9.x 行为，2.0+ 改为 settings-level）。
+    // 严格模式下会触发 InvalidUserCodeException：
+    //   "Build was configured to prefer settings repositories over project
+    //    repositories but repository 'Node Distributions at https://nodejs.org/dist'
+    //    was added by unknown code"
+    // PREFER_SETTINGS 仍然让 settings 仓库优先，仅允许 KGP 注册它的 Node 仓库。
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
