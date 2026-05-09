@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# commit-msg hook —— 校验 commit message 含 Signed-off-by + AI-Assisted-By 两行
+# 参考 CLAUDE.md 第八章「AI 协作 Commit 署名规范」。
+#
+# 例外：
+# - merge commit 的 message 由 git 自动生成，不强制要求
+# - revert commit 同上
+# - WIP / fixup / squash commit 让 rebase 流程兜底
+
+set -u
+MSG_FILE="${1:-}"
+[ -z "$MSG_FILE" ] && exit 0
+[ ! -r "$MSG_FILE" ] && exit 0
+
+first_line=$(head -1 "$MSG_FILE" 2>/dev/null || echo "")
+
+# 跳过自动生成的 commit
+case "$first_line" in
+    "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
+esac
+
+# 紧急逃生口
+if [ "${SKIP_COMMIT_MSG_CHECK:-0}" = "1" ]; then
+    exit 0
+fi
+
+missing=0
+if ! grep -qE '^Signed-off-by: ' "$MSG_FILE"; then
+    echo "❌ commit-msg: 缺少 Signed-off-by 行。"
+    missing=1
+fi
+if ! grep -qE '^AI-Assisted-By: ' "$MSG_FILE"; then
+    echo "❌ commit-msg: 缺少 AI-Assisted-By 行（CLAUDE.md 第八章规范）。"
+    missing=1
+fi
+
+if [ "$missing" -ne 0 ]; then
+    cat <<'HINT'
+
+正确格式（commit message 末尾 trailers，CLAUDE.md 第八章）：
+
+    feat(scope): 简短主题
+
+    详细描述...
+
+    Signed-off-by: <你的名字> <你的邮箱>
+    AI-Assisted-By: Claude Opus 4.7 (claude-opus-4-7, 1M context)
+
+紧急情况可用 SKIP_COMMIT_MSG_CHECK=1 git commit 跳过（请在 PR 中说明）。
+HINT
+    exit 1
+fi
+
+exit 0
