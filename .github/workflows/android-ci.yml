@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# 失败时把 gradle 日志贴回 PR 作为评论（沙箱通过 MCP 读取），需要 write 权限
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -55,15 +60,24 @@ jobs:
             | tee assembleDebug.log
 
       - name: Surface assembleDebug error on failure
-        if: failure()
+        if: failure() && hashFiles('assembleDebug.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # 把 gradle 输出尾巴 200 行写到 GITHUB_STEP_SUMMARY（公开页面渲染）
+          # 同时作为 PR 评论发出（沙箱可通过 MCP get_comments 读取）。
           {
             echo "## :apps:communication-card:assembleDebug 失败 — 末 200 行"
             echo ""
             echo '```'
-            tail -200 assembleDebug.log || echo "(no log file)"
+            tail -200 assembleDebug.log
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-assembleDebug.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-assembleDebug.md \
+              || echo "PR comment failed; summary still written"
+          fi
 
       - name: Build Web (Wasm-JS) bundle
         run: |
@@ -72,15 +86,22 @@ jobs:
             | tee wasmJsBrowserDistribution.log
 
       - name: Surface wasmJsBrowserDistribution error on failure
-        if: failure()
+        if: failure() && hashFiles('wasmJsBrowserDistribution.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           {
             echo "## :apps:web:wasmJsBrowserDistribution 失败 — 末 200 行"
             echo ""
             echo '```'
-            tail -200 wasmJsBrowserDistribution.log || echo "(no log file)"
+            tail -200 wasmJsBrowserDistribution.log
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-wasmJs.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-wasmJs.md \
+              || echo "PR comment failed; summary still written"
+          fi
 
       - name: Upload Web bundle
         uses: actions/upload-artifact@v4
