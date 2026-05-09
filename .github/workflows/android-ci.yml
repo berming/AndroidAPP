@@ -65,13 +65,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # 把 gradle 输出尾巴 200 行写到 GITHUB_STEP_SUMMARY（公开页面渲染）
-          # 同时作为 PR 评论发出（沙箱可通过 MCP get_comments 读取）。
+          # 双段输出：(1) 抓到的 Kotlin compiler "e:" 行（最关键）
+          # (2) 末 300 行 gradle 输出（兜底）
           {
-            echo "## :apps:communication-card:assembleDebug 失败 — 末 200 行"
+            echo "## :apps:communication-card:assembleDebug 失败"
+            echo ""
+            echo "### Kotlin compiler errors（grep 'e:' / 'error:'）"
             echo ""
             echo '```'
-            tail -200 assembleDebug.log
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED" assembleDebug.log \
+              | head -80 \
+              || echo "(no Kotlin error lines found)"
+            echo '```'
+            echo ""
+            echo "### 末 300 行 gradle 输出"
+            echo ""
+            echo '```'
+            tail -300 assembleDebug.log
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY" > comment-assembleDebug.md
           if [ -n "$PR_NUMBER" ]; then
