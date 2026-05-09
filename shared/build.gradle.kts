@@ -31,8 +31,10 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // 用 api 暴露给消费方，否则 Android/Web 调用 GameMessage.json.encodeToString 时拿不到 serializer
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+                // 用 api 暴露给消费方，否则 Android/Web 调用 GameMessage.json.encodeToString 时拿不到 serializer。
+                // 1.6.0 没有 wasmJs variant（CI 失败原因：`No matching variant ...
+                // attribute 'wasm.target' = 'js' but: ...`），最早提供 wasmJs 的是 1.6.3。
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 // 协程 1.7.3 没有 wasmJs target；最早的支持版本是 1.8.0。
                 // 1.8.1 是 Kotlin 1.9.24 兼容线上最稳的一档。
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")

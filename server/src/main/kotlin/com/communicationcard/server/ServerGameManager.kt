@@ -158,10 +158,11 @@ class ServerGameManager(
         val cardGroup = identifyCardGroup(playedCards)
             ?: return ActionResult(false, "无效的牌型")
 
-        // 验证是否能压过上家（用快照避免可变属性的非空智能转型问题）
-        val lastPlayed = state.lastPlayedGroup
-        if (lastPlayed != null && !canBeat(lastPlayed, cardGroup)) {
-            return ActionResult(false, "压不过上家")
+        // 验证是否能压过上家
+        if (state.lastPlayedGroup != null) {
+            if (!canBeat(state.lastPlayedGroup!!, cardGroup)) {
+                return ActionResult(false, "压不过上家")
+            }
         }
 
         // 执行出牌：用已扣除后的 handCopy 替换 hand 内容
@@ -503,13 +504,11 @@ class ServerGameManager(
                     result = handlePass(room, PlayerAction.Pass(playerIndex))
                 }
                 if (!result.success && hand.isNotEmpty()) {
-                    val smallest = hand.minByOrNull { getRankValue(it.rank) }
-                    if (smallest != null) {
-                        result = handlePlayCards(
-                            room,
-                            PlayerAction.PlayCards(playerIndex, listOf(smallest.toSerialized()))
-                        )
-                    }
+                    val smallest = hand.minByOrNull { getRankValue(it.rank) }!!
+                    result = handlePlayCards(
+                        room,
+                        PlayerAction.PlayCards(playerIndex, listOf(smallest.toSerialized()))
+                    )
                 }
             }
 
@@ -627,9 +626,7 @@ class ServerGameManager(
             val nonBombCards = hand.filter { card ->
                 grouped[card.rank]?.size?.let { it < 4 } ?: true
             }
-            val pool = nonBombCards.ifEmpty { hand }
-            val smallest = pool.minByOrNull { getRankValue(it.rank) }
-                ?: return PlayerAction.Pass(playerId)
+            val smallest = (nonBombCards.ifEmpty { hand }).minByOrNull { getRankValue(it.rank) }!!
             return PlayerAction.PlayCards(playerId, listOf(smallest.toSerialized()))
         }
 
@@ -645,7 +642,7 @@ class ServerGameManager(
             // 选择最小的同类型牌：先比张数（避免浪费大炸弹），再比点数
             val bestPlay = sameTypePlays.minWithOrNull(
                 compareBy({ it.cards.size }, { getRankValue(it.primaryRank) })
-            ) ?: return PlayerAction.Pass(playerId)
+            )!!
             return PlayerAction.PlayCards(playerId, bestPlay.cards.map { it.toSerialized() })
         }
 
@@ -657,8 +654,7 @@ class ServerGameManager(
 
         // 判断是否值得用炸弹
         val lastPlayValue = getRankValue(lastPlay.primaryRank)
-        val smallestBomb = bombs.minByOrNull { it.cards.size * 100 + getRankValue(it.primaryRank) }
-            ?: return PlayerAction.Pass(playerId)
+        val smallestBomb = bombs.minByOrNull { it.cards.size * 100 + getRankValue(it.primaryRank) }!!
 
         // 如果上家牌太小（小于10），一般不值得用炸弹压
         // 除非：手牌很少（小于10张）或者炸弹很小（4张3/4/5）
@@ -761,11 +757,7 @@ class ServerGameManager(
             size >= 4 && uniqueRanks.size == 1 -> ServerCardGroup(cards, "BOMB", cards[0].rank)
 
             // 顺子 (5张或以上连续)
-            size >= 5 && isStraight(cards) -> {
-                val maxRank = cards.maxByOrNull { getRankValue(it.rank) }?.rank
-                    ?: cards.first().rank
-                ServerCardGroup(cards, "STRAIGHT", maxRank)
-            }
+            size >= 5 && isStraight(cards) -> ServerCardGroup(cards, "STRAIGHT", cards.maxByOrNull { getRankValue(it.rank) }!!.rank)
 
             else -> null
         }
