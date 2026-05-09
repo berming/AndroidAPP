@@ -15,6 +15,9 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.text.SimpleDateFormat
 
+// PR-H3 引入的协议版本握手错误码（4000 段位预留给协议层错误，避免与业务错误冲突）
+private const val ERR_PROTOCOL_VERSION_MISMATCH = 4001
+
 fun main() {
     println("=== Starting Server ===")
 
@@ -363,6 +366,22 @@ private suspend fun handleReconnect(
     gameManager: ServerGameManager,
     sessions: ConcurrentHashMap<String, GameSession>
 ) {
+    // PR-H3 引入的协议版本握手：客户端的 Reconnect 必须声明与服务端兼容的版本。
+    // 不匹配 → 直接拒绝；客户端应弹「请更新到最新版本」并断开。
+    if (message.protocolVersion != GameMessage.PROTOCOL_VERSION) {
+        System.err.println(
+            "Reconnect rejected: protocol version mismatch " +
+                "(client=${message.protocolVersion}, server=${GameMessage.PROTOCOL_VERSION})"
+        )
+        session.send(
+            ErrorMessage(
+                code = ERR_PROTOCOL_VERSION_MISMATCH,
+                message = "协议版本不兼容（客户端 v${message.protocolVersion}, " +
+                    "服务端 v${GameMessage.PROTOCOL_VERSION}）。请更新客户端。"
+            )
+        )
+        return
+    }
     val oldSessionId = message.sessionToken
     val room = roomManager.getRoomByPlayer(oldSessionId)
 
