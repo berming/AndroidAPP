@@ -1,5 +1,14 @@
 package com.communicationcard.server
 
+import com.communicationcard.game.engine.CardRules
+import com.communicationcard.game.engine.SettlementCalculator
+import com.communicationcard.game.engine.SettlementCalculator.PlayerSettlementState
+import com.communicationcard.game.engine.SettlementCalculator.TeamSettlementState
+import com.communicationcard.game.model.Card
+import com.communicationcard.game.model.CardGroup
+import com.communicationcard.game.model.CardGroupType
+import com.communicationcard.game.model.CardRank
+import com.communicationcard.game.model.CardSuit
 import com.communicationcard.game.network.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -387,24 +396,44 @@ class ServerGameManager(
     /**
      * TEAM_ALL_FINISHED 结算：返回 (winnerScore, loserScore)
      */
-    // 可见性：放宽到 internal，让 ServerGameManagerTest（同模块）能直接覆盖
-    // 关键路径（CLAUDE.md 第三章；docs/regressions.md #4 #8 防回归）。
+    // PR-H3 stage 3：委托给 :shared 的 SettlementCalculator。
+    // 旧实现（保留三个月零回归的 15 用例之一）等价于 SettlementCalculator
+    // TEAM_ALL_FINISHED 分支：赢方 = 赢方已收 + 输方未走完玩家(已收+手牌分)；
+    // 输方 = 输方已走完玩家的已收。
+    //
+    // 调用前提：调用方（checkGameEnd）已确认有一队全员走完——即此处的 `winner`
+    // 列表 isFinished=true ∀ player。SettlementCalculator.calculate 检测到
+    // TEAM_ALL_FINISHED 触发后返回非 null。
+    //
+    // 可见性：保持 internal 让 ServerGameManagerTest 能直接覆盖
+    // （CLAUDE.md 第三章；docs/regressions.md #4 #8 防回归）。
     internal fun computeAllFinishedScores(
         state: ServerGameState,
         winner: List<ServerPlayer>,
         loser: List<ServerPlayer>
     ): Pair<Int, Int> {
-        val winnerScore = winner.sumOf { state.playerScores[it.seatIndex] ?: 0 } +
-            loser.filter { state.hands[it.seatIndex]?.isNotEmpty() == true }
-                .sumOf { p ->
-                    (state.playerScores[p.seatIndex] ?: 0) +
-                        (state.hands[p.seatIndex]?.sumOf { c -> getCardScore(c) } ?: 0)
-                }
-        val loserScore = loser
-            .filter { state.hands[it.seatIndex]?.isEmpty() == true }
-            .sumOf { state.playerScores[it.seatIndex] ?: 0 }
-        return Pair(winnerScore, loserScore)
+        val winnerTeam = winner.toSettlementState(state)
+        val loserTeam = loser.toSettlementState(state)
+        val result = SettlementCalculator.calculate(winnerTeam, loserTeam)
+            ?: error(
+                "computeAllFinishedScores 进入时应有一队全员走完——SettlementCalculator " +
+                    "返回 null 表示触发条件未满足。检查 checkGameEnd 的前置条件。"
+            )
+        return Pair(result.teamAScore, result.teamBScore)
     }
+
+    /** Server 队伍 → :shared 结算输入。 */
+    private fun List<ServerPlayer>.toSettlementState(state: ServerGameState): TeamSettlementState =
+        TeamSettlementState(
+            players = map { p ->
+                val hand = state.hands[p.seatIndex] ?: emptyList()
+                PlayerSettlementState(
+                    isFinished = hand.isEmpty(),
+                    collectedScore = state.playerScores[p.seatIndex] ?: 0,
+                    handScore = hand.sumOf { getCardScore(it) },
+                )
+            }
+        )
 
     /**
      * 获取玩家视角的游戏状态
@@ -737,66 +766,17 @@ class ServerGameManager(
         return cards
     }
 
+    // PR-H3 stage 3：删除本地副本，直接委托给 :shared 的 CardRules。
+    // 历史教训（docs/regressions.md #2）：服务端的 canBeat 与客户端的 canBeat
+    // 曾出现行为不一致导致联网卡死。现在编译期保证两端共用同一份算法。
     internal fun identifyCardGroup(cards: List<ServerCard>): ServerCardGroup? {
-        if (cards.isEmpty()) return null
-
-        val size = cards.size
-        val ranks = cards.map { it.rank }
-        val uniqueRanks = ranks.toSet()
-
-        return when {
-            // 单张
-            size == 1 -> ServerCardGroup(cards, "SINGLE", cards[0].rank)
-
-            // 对子
-            size == 2 && uniqueRanks.size == 1 -> ServerCardGroup(cards, "PAIR", cards[0].rank)
-
-            // 三张
-            size == 3 && uniqueRanks.size == 1 -> ServerCardGroup(cards, "TRIPLE", cards[0].rank)
-
-            // 炸弹 (4张或以上相同)
-            size >= 4 && uniqueRanks.size == 1 -> ServerCardGroup(cards, "BOMB", cards[0].rank)
-
-            // 顺子 (5张或以上连续)
-            size >= 5 && isStraight(cards) -> ServerCardGroup(cards, "STRAIGHT", cards.maxByOrNull { getRankValue(it.rank) }!!.rank)
-
-            else -> null
-        }
+        val sharedGroup = CardRules.identifyCardGroup(cards.map { it.toSharedCard() })
+            ?: return null
+        return sharedGroup.toServerCardGroup()
     }
 
-    private fun isStraight(cards: List<ServerCard>): Boolean {
-        val values = cards.map { getRankValue(it.rank) }.sorted()
-        if (values.any { it >= 13 }) return false // 2和王不能顺
-
-        for (i in 1 until values.size) {
-            if (values[i] != values[i - 1] + 1) return false
-        }
-        return true
-    }
-
-    internal fun canBeat(last: ServerCardGroup, current: ServerCardGroup): Boolean {
-        // 炸弹可以压任何非炸弹
-        if (current.type == "BOMB" && last.type != "BOMB") return true
-
-        // 上家是炸弹时，必须用炸弹才能压
-        if (last.type == "BOMB" && current.type != "BOMB") return false
-
-        // 炸弹之间比较：先比张数，张数相同再比点数
-        // （之前严格要求 size 相同导致 5+ 张大炸弹被错误拒绝，AI出牌失败卡死游戏）
-        if (last.type == "BOMB" && current.type == "BOMB") {
-            return if (current.cards.size != last.cards.size) {
-                current.cards.size > last.cards.size
-            } else {
-                getRankValue(current.primaryRank) > getRankValue(last.primaryRank)
-            }
-        }
-
-        // 非炸弹牌型：相同类型相同数量才能比
-        if (current.type != last.type) return false
-        if (current.cards.size != last.cards.size) return false
-
-        return getRankValue(current.primaryRank) > getRankValue(last.primaryRank)
-    }
+    internal fun canBeat(last: ServerCardGroup, current: ServerCardGroup): Boolean =
+        CardRules.canBeat(last.toSharedCardGroup(), current.toSharedCardGroup())
 
     private fun findValidPlays(hand: List<ServerCard>, lastPlay: ServerCardGroup): List<ServerCardGroup> {
         val result = mutableListOf<ServerCardGroup>()
@@ -839,35 +819,40 @@ class ServerGameManager(
         return result
     }
 
-    internal fun getRankValue(rank: String): Int {
-        return when (rank) {
-            "THREE" -> 0
-            "FOUR" -> 1
-            "FIVE" -> 2
-            "SIX" -> 3
-            "SEVEN" -> 4
-            "EIGHT" -> 5
-            "NINE" -> 6
-            "TEN" -> 7
-            "JACK" -> 8
-            "QUEEN" -> 9
-            "KING" -> 10
-            "ACE" -> 11
-            "TWO" -> 12
-            "SMALL_JOKER" -> 13
-            "BIG_JOKER" -> 14
-            else -> -1
-        }
-    }
+    // PR-H3 stage 3：委托给 :shared 的 CardRank 枚举。
+    // 注：返回值与旧实现相比整体偏移 +1（旧 THREE=0；新 THREE=1）。但所有调用方
+    // 只比较两个 getRankValue 结果的相对大小（current > last 之类），偏移对结果
+    // 无影响。直接 .name → CardRank.valueOf 即可，不需保留旧 0..14 编码。
+    internal fun getRankValue(rank: String): Int =
+        runCatching { CardRank.valueOf(rank).value }.getOrDefault(-1)
 
-    private fun getCardScore(card: ServerCard): Int {
-        return when (card.rank) {
-            "FIVE" -> 5
-            "TEN", "KING" -> 10
-            else -> 0
-        }
-    }
+    private fun getCardScore(card: ServerCard): Int =
+        runCatching { CardRank.valueOf(card.rank).scoreValue }.getOrDefault(0)
 }
+
+// ============================================================
+// PR-H3 stage 3：Server* ↔ :shared 类型互转
+// ServerCard / ServerCardGroup 在 server 内部仍以字符串编码 rank/suit/type
+// （历史遗留：与旧 protocol 一对一）。当 ServerGameManager 调用 :shared 的
+// CardRules / SettlementCalculator 时，先转成 Card / CardGroup，再转回。
+// 性能成本可忽略（每次出牌验证 ≤6 张牌）。
+// ============================================================
+
+internal fun ServerCard.toSharedCard(): Card =
+    Card(CardRank.valueOf(rank), CardSuit.valueOf(suit), deckIndex)
+
+internal fun ServerCardGroup.toSharedCardGroup(): CardGroup =
+    CardGroup(cards.map { it.toSharedCard() }, CardGroupType.valueOf(type))
+
+internal fun Card.toServerCard(): ServerCard =
+    ServerCard(rank.name, suit.name, deckIndex)
+
+internal fun CardGroup.toServerCardGroup(): ServerCardGroup =
+    ServerCardGroup(
+        cards = cards.map { it.toServerCard() },
+        type = type.name,
+        primaryRank = primaryRank.name,
+    )
 
 /**
  * 服务端游戏状态
