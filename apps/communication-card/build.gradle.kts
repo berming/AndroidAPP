@@ -62,7 +62,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // 网络通信（Android 端用 OkHttp 实现 WebSocket，协议 DTO 来自 :shared）
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

@@ -14,6 +14,11 @@ kotlin {
                 jvmTarget = "1.8"
             }
         }
+        // KMP 默认只发布 release 变体；Android 消费方（:apps:communication-card）
+        // 同时需要 debug 变体来跑 assembleDebug。不显式声明会出现
+        // "Could not find a variant of project :shared that matches the consumer
+        //  attributes" 这类 AGP variant resolution 错误。
+        publishLibraryVariants("release", "debug")
     }
 
     jvm()
