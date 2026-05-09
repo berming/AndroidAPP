@@ -118,9 +118,9 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 ./gradlew :apps:web:wasmJsBrowserDevelopmentRun  # 启本地 dev 服务器（默认 8080），热重载
 ./gradlew :apps:web:wasmJsBrowserDistribution    # 输出生产包到 apps/web/build/dist/wasmJs/productionExecutable
 
-# 服务端（独立 Gradle 工程）
-cd server && ./gradlew test
-cd server && ./gradlew run                       # 监听 :8080，提供 /game WebSocket
+# 服务端（PR-H3 起为 :server 子项目，依赖 :shared）
+./gradlew :server:test
+./gradlew :server:run                            # 监听 :8080，提供 /game WebSocket
 
 # 静态分析
 ./gradlew detekt
@@ -139,7 +139,7 @@ cd server && ./gradlew run                       # 监听 :8080，提供 /game W
 
 :apps:communication-card         Android 视图层（依赖 :shared）
 :apps:web                        Compose Multiplatform / Wasm-JS（依赖 :shared）
-server/                          独立 Ktor 工程（暂不依赖 :shared）
+:server                          Ktor 后端（PR-H3 起依赖 :shared，约束 1/4 已编译期消除）
 ```
 
 ### Web 客户端架构速读

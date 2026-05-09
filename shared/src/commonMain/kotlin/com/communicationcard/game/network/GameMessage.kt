@@ -11,6 +11,15 @@ import kotlinx.serialization.json.Json
 sealed class GameMessage {
 
     companion object {
+        /**
+         * 协议版本号。所有 client→server 的会话建立消息（如 Reconnect）都携带此字段；
+         * 服务端在握手时校验：版本不匹配 → 拒绝连接（避免老客户端误读新协议字段）。
+         *
+         * 升级规则（PR-H3 起）：任一兼容性破坏的协议变更（字段类型变 / 移除字段 /
+         * 枚举值改名）必须 +1。仅添加字段且字段有默认值不必 +1。
+         */
+        const val PROTOCOL_VERSION = 1
+
         val json = Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
@@ -179,7 +188,10 @@ data class Heartbeat(
 @Serializable
 @SerialName("sys.reconnect")
 data class Reconnect(
-    val sessionToken: String
+    val sessionToken: String,
+    // PR-H3 引入：服务端在 handleReconnect 时校验该字段；不匹配 → 拒绝重连。
+    // 默认值让旧客户端（不发该字段）仍按 v1 处理，到下次升 PROTOCOL_VERSION 时再断兼容。
+    val protocolVersion: Int = PROTOCOL_VERSION
 ) : GameMessage()
 
 @Serializable

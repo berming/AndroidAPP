@@ -82,7 +82,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew server/gradlew
+        run: chmod +x gradlew
 
       - name: Cache Gradle Dependencies
         uses: actions/cache@v4
@@ -99,9 +99,9 @@ jobs:
         run: ./gradlew :shared:jvmTest
 
       # 服务端单元测试（含 ServerGameManagerTest）
+      # PR-H3 起 server 是 :server 子项目，不再需要 working-directory。
       - name: Run server unit tests
-        working-directory: server
-        run: ./gradlew test
+        run: ./gradlew :server:test
 
       # Detekt 静态扫描；目前用 continue-on-error 软失败（待生成 baseline 后改回硬关）
       - name: Detekt static analysis

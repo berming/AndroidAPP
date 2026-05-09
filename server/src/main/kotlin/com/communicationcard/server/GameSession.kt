@@ -1,9 +1,9 @@
 package com.communicationcard.server
 
+import com.communicationcard.game.network.GameMessage
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.isActive
-import kotlinx.serialization.encodeToString
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -24,7 +24,7 @@ class GameSession(
     suspend fun send(message: GameMessage) {
         if (!isConnected()) return
         try {
-            val json = MessageSerializer.json.encodeToString(GameMessage.serializer(), message)
+            val json = GameMessage.json.encodeToString(GameMessage.serializer(), message)
             webSocketSession.send(Frame.Text(json))
         } catch (e: Exception) {
             System.err.println("WebSocket send failed: ${e.message}")
@@ -47,7 +47,7 @@ class GameSession(
             val frame = webSocketSession.incoming.receive()
             if (frame is Frame.Text) {
                 val text = frame.readText()
-                MessageSerializer.fromJson(text)
+                GameMessage.fromJson(text)
             } else {
                 null
             }

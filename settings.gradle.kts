@@ -34,9 +34,8 @@ include(":shared")
 include(":apps:communication-card")
 // Web 客户端（Compose Multiplatform / Wasm-JS，浏览器版本）
 include(":apps:web")
+// 服务端（Ktor + WebSocket）。PR-H3 起并入 root build；依赖 :shared 消除约束 1/4。
+include(":server")
 
 // Gomoku (五子棋)
 include(":apps:gomoku")
-
-// 注意: server/ 是独立的 Ktor 项目，需单独构建
-// 启动方式: cd server && ./gradlew run

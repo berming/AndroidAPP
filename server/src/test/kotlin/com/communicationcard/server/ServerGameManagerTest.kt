@@ -17,11 +17,24 @@ import kotlin.test.assertTrue
  *  - #4 已收分硬编码 0：computeAllFinishedScores 必须从 state.playerScores 读
  *  - #8 结算公式漏算："输方未走完玩家已收分"必须计入赢方
  *
- * 与客户端 CardRulesTest（apps/communication-card/.../engine/CardRulesTest.kt）
- * **测试用例必须保持同义**——这就是 CLAUDE.md 约束 1 的等价契约。任一边
- * 改了行为却没改另一边，CI 红 → 强迫两端同步。
+ * **PR-H3 起 server 端的 canBeat / identifyCardGroup / computeAllFinishedScores
+ * 全部委托给 :shared 的 CardRules + SettlementCalculator。本测试现在覆盖的是
+ * Server* 类型 ↔ :shared 类型的转换 + 业务行为，而不是逻辑本身**。逻辑由 :shared
+ * 的 CardRulesTest（~30 用例）+ SettlementCalculatorTest（15 用例）保证。
  *
- * （PR-H3 把 server 并入 :shared 后，本测试退化为 :shared 单一测试。）
+ * 即便如此，测试还有价值：
+ *  - 防回归 #1：rank/suit 字符串约定（如 "SPADE" vs "spade"）必须与 :shared 枚举
+ *    名字一致，否则 CardRank.valueOf 会抛 IllegalArgumentException
+ *  - 防回归 #4 #8：computeAllFinishedScores 的输入构建（playerScores、hand 求和）
+ *    在 server 端独立于 :shared，错误仍会在此层被发现
+ *  - 防止 server 端意外重新引入 canBeat 等逻辑副本（约束 1 漂移源头）
+ *
+ * Codex 在 PR #39 指出 `decideAIAction` 里有两条**绝对**阈值
+ * （`lastPlayValue >= 7` 和 `getRankValue(...) <= 2`），需要随 getRankValue
+ * 返回值整体 +1（PR-H3 stage 3 委托给 :shared CardRank 后从 0-based 变成
+ * 1-based）一起 +1 才能保持原意。已修：阈值改为 `>= 8` 和 `<= 3`。
+ * `decideAIAction` 是 private，未来如果对 AI 阈值做单元测试，可放宽到 internal
+ * 单独覆盖；本 PR 仅文档化此约束。
  */
 class ServerGameManagerTest {
 
