@@ -24,7 +24,7 @@
 | 根因 | 服务端枚举值 `clubs/diamonds/hearts/spades`（小写），客户端 `CLUB/DIAMOND/HEART/SPADE`（大写）；kotlinx.serialization 用 classDiscriminator 反序列化时失配 |
 | 修复 | PR #33 / commit `b038e73` |
 | 教训 | **协议两端的枚举字符串值是契约**。CLAUDE.md 约束 4 直接源于此。约束靠人记 → 必有漂移；唯一可靠的根治是 PR-H3 把 server 并入 `:shared`，让编译器保证一致 |
-| 防回归测试 | 缺失 → PR-H2 补 `GameMessageSerializationTest.kt`：每个 `@Serializable` 类做 round-trip 测试 |
+| 防回归测试 | 部分覆盖 → `ServerGameManagerTest.identifyCardGroup_acceptsUppercaseSuit_regressions1`（PR-H2 引入；保证服务端正常解析大写花色枚举）。完整 round-trip 序列化测试待 PR-H3 之后用 `:shared` 单元覆盖 |
 
 ---
 
@@ -36,7 +36,7 @@
 | 根因 | 同一现象**四层根因**：(L1) `canBeat` 比较不同张数炸弹时优先级颠倒，AI 选出的 5×3 被拒；(L2) AI 首选失败无回退链，直接返回过牌；(L3) `state.hands` 多协程无锁并发，触发 `ConcurrentModificationException`；(L4) 全部回退失败时无 `force-advance` 兜底，游戏永久卡死 |
 | 修复 | 4 个连续 commit：`fb6cc7c`（canBeat） + `8969125`（Mutex + force-advance） + `8a56e14`（playerScores 一致性）|
 | 教训 | dev_summary.md 第六章：「**修了又坏的根因是只修表层症状没往深挖根因**。卡死问题历经 4 层才彻底解决。原则：找到最小可复现场景，分层排除，验证到底。」一个 Bug 经常对应多个**结构性**根因 → 修复后必须由独立会话审查「这个根因还能从哪里发生」 |
-| 防回归测试 | **完全缺失** → PR-H2 补 `ServerGameManagerTest.kt` 覆盖：(a) `canBeat(5×3, 4×10)` 返回 true；(b) AI 三级回退链各自的 fallback 行为；(c) Mutex 保护下并发 action 的手牌张数守恒；(d) 全员 pass 后 force-advance 是否推进 |
+| 防回归测试 | **L1 已覆盖**（PR-H2）：客户端 `CardRulesTest.canBeat_biggerBombSizeWinsOverRank_regressions2` + 服务端 `ServerGameManagerTest.canBeat_biggerBombSizeWinsOverRank_regressions2` 双端断言 5×3 压 4×10。**L2/L3/L4 仍待补**：AI 三级回退链 / Mutex 并发守恒 / force-advance 推进 → 需要更深的集成测试，列入 PR-H4 的 MockServer e2e 范围 |
 
 ---
 
@@ -60,7 +60,7 @@
 | 根因 | `ServerGameState` 缺 `playerScores` 字段；`getStateForPlayer` 中 `collectedScore = 0` 硬编码；`handleRoundEnd` 只累加队伍总分，未同步个人分。结算公式两个信息源（个人 vs 队伍）不一致 |
 | 修复 | commit `8a56e14` |
 | 教训 | **硬编码占位符是隐藏 Bug 的最佳藏身处**。这种问题人工"看 UI"很难发现（数字看起来"在变"），但代码中清晰地写着 `0`。AI 静态扫描比人工更容易发现这类「藏在代码里的问题」 |
-| 防回归测试 | `SettlementCalculatorTest.kt`（已有 15 用例）→ PR-H2 扩展：跑 server 单测验证 `getStateForPlayer.collectedScore` 与累计的 round 收分一致 |
+| 防回归测试 | `SettlementCalculatorTest.kt`（15 用例 · 单机端） + `ServerGameManagerTest.computeAllFinishedScores_allCollectedZero_stillComputesHandScores`（PR-H2，服务端断言 playerScores=0 时仍正确计算手牌分） |
 
 ---
 
@@ -72,7 +72,7 @@
 | 根因 | `server/Application.kt`：`UUID.randomUUID().toString().take(8)` 把 36 字符 UUID 截到 8 字符；只剩 32 位熵；`sessions[id]` 与 `playerToRoom[id]` 在中等流量下产生碰撞 |
 | 修复 | commit `06d445c`（**Codex Review Bot 在 PR #29 指出**，4 天后修复） |
 | 教训 | **常用 ≈ 正确**这条假设是漏洞温床——`take(8)` 在客户端密钥中很常见，但分布式会话 ID 必须保留全部熵。CLAUDE.md 约束 5 即由此沉淀。这条 Bug **Claude 多轮审查没发现，Codex 一次发现**，是 dev_summary.md 8.3「跨 vendor 对抗审查」的最强证据 |
-| 防回归测试 | 缺失 → PR-H2 补 `ServerRoomManagerTest`：注入 1k 个 UUID，验证 `playerToRoom` 唯一性；可加 `assert id.length == 36` |
+| 防回归测试 | 缺失（不在 PR-H2 范围）→ 待补 `ServerRoomManagerTest`：注入 1k 个 UUID 验证唯一性 + `assert id.length == 36` |
 
 ---
 
@@ -84,7 +84,7 @@
 | 根因 | 多协程（玩家 action handler / 30s 超时计时器 / 断线处理器 / AI 任务）同时写 `state.hands: MutableList<Card>`；`handleAction` 与 `processAITurn` 没有同步原语 |
 | 修复 | commit `8969125`（per-room `Mutex` + `state.players` 改 `CopyOnWriteArrayList`） |
 | 教训 | **协程 + 共享可变状态**模式在低并发"看似没事"，中等并发立刻爆。CLAUDE.md 约束 2 沉淀此教训：任何修改服务端 game state 的代码都**必须**在 `mutexFor(room).withLock { ... }` 内。**广播必须在锁外**，否则慢客户端阻塞房间所有动作 |
-| 防回归测试 | 缺失 → PR-H2 补：3+ 协程并发提交 action，断言手牌张数守恒（`Σ playerHands.size + Σ collectedCards.size == 216`） |
+| 防回归测试 | 缺失（不在 PR-H2 范围 —— 单元测试覆盖不到并发；需要 stress test）→ 待 PR-H4 用 MockServer 做 3+ 协程并发 action 的张数守恒断言 |
 
 ---
 
@@ -108,7 +108,7 @@
 | 根因 | 结算公式 `赢方分 = 赢方已收 + 输方未走完玩家已收 + 输方未走完玩家手牌分`，旧版**漏了第二项**（未走完玩家已收分），只算了手牌分 |
 | 修复 | commit `8a56e14`（与 #4 playerScores 同时修复，因为漏算的本质是 playerScores 字段缺失） |
 | 教训 | **金钱相关逻辑必须 TDD**。单机版 `SettlementCalculator` 之所以 3 个月零回归，因为 15 个用例覆盖了所有触发条件；联网版没测试，反复出问题。这就是 PR-H2 必须补 `ServerGameManagerTest.computeAllFinishedScores` 的原因 |
-| 防回归测试 | `SettlementCalculatorTest.kt`（15 用例已存在）；PR-H2 在 server 端跑同一组用例验证一致 |
+| 防回归测试 | `SettlementCalculatorTest.kt`（15 用例 · 客户端） + PR-H2 服务端 `ServerGameManagerTest.computeAllFinishedScores_includesLoserUnfinishedCollected_regressions8`（直接断言"输方未走完玩家已收分"必须计入赢方） |
 
 ---
 
