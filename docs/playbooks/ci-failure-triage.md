@@ -158,7 +158,68 @@ EMERGENCY_PUSH=1 git push
 
 ---
 
-## 5. 写回 `docs/regressions.md`?
+## 5. 沙箱 / 无登录环境读不到 CI 日志？把 gradle 输出 exfil 到 PR 评论
+
+**前提**：从 Claude Code 沙箱（或任何无 GitHub 登录态的环境）通过 WebFetch
+抓 GitHub Actions job 页只能看到 step 名 + "Process completed with exit
+code 1"——真正的 gradle stderr 在登录后才能看。
+
+**结果**：调试 CI 失败时容易陷入"猜→改→push→等 4 分钟→还是猜"循环。
+PR #35 早期连烧 3 个推测性 commit 才意识到这是结构性问题。
+
+**解决方案**：在 CI workflow 里加一个 `if: failure()` 步骤，把 gradle
+log 的关键片段贴回 PR 作为评论。评论是公开的 JSON，沙箱可通过
+`mcp__github__pull_request_read method=get_comments` 直接读到。
+
+```yaml
+- name: Build Debug APK with Gradle
+  # 加 --info --stacktrace + tee 到日志文件
+  run: |
+    set -o pipefail
+    ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
+      | tee assembleDebug.log
+
+- name: Surface assembleDebug error on failure
+  if: failure() && hashFiles('assembleDebug.log') != ''
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    PR_NUMBER: ${{ github.event.pull_request.number }}
+  run: |
+    {
+      echo "## :apps:communication-card:assembleDebug 失败"
+      echo
+      echo "### Kotlin compiler errors（grep）"
+      echo '```'
+      grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED" assembleDebug.log \
+        | head -80 || echo "(no Kotlin error lines)"
+      echo '```'
+      echo
+      echo "### 末 300 行 gradle 输出"
+      echo '```'
+      tail -300 assembleDebug.log
+      echo '```'
+    } > comment.md
+    gh pr comment "$PR_NUMBER" --body-file comment.md
+```
+
+**关键设计**：
+
+- **head + grep + tail 三段输出**。Gradle 错误的 "What went wrong:" /
+  "Could not resolve" 经常在日志开头几百行；Kotlin compile 的 `e:`
+  在中段；exception stack trace 在末尾。三段都抓，下一次失败立刻定位。
+- **`if: failure() && hashFiles(...) != ''` 双重护栏**。前一步成功时
+  log 文件不存在，避免空评论刷屏。
+- **`permissions: pull-requests: write`** 放在 workflow 顶层；GITHUB_TOKEN
+  默认权限不够发评论。
+
+**PR #35 campaign 验证**：投入这一个 commit 后，剩下所有的 CI 失败都
+能"从评论里抓到错→一次精准修复"，从盲改 3 次降到平均每个错误 1 次
+push 解决。该模式是 CLAUDE.md 第三章 TDD 反向流的工具链版本——
+**反馈通道比反馈速度更值得投资**。
+
+---
+
+## 6. 写回 `docs/regressions.md`?
 
 CI 失败本身大多不是产品 Bug——除非：
 
