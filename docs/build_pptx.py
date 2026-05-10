@@ -20,10 +20,10 @@ from lxml import etree
 # 原则：每页颜色控制在 3 种以内；红色仅用于强调；不使用绿、橙、蓝、亮色
 PRIMARY = RGBColor(0xC7, 0x00, 0x0B)            # 华为红：标题 / 强调 / 表格 emphasized header
 DARK = RGBColor(0x20, 0x20, 0x20)               # 主体文字
-GRAY = RGBColor(0x60, 0x60, 0x60)               # 次要文字 / 表格 0.5pt 深灰边框
+GRAY = RGBColor(0x60, 0x60, 0x60)               # 次要文字 / 边框
 LIGHT_BG = RGBColor(0xFA, 0xFA, 0xFA)           # 大文本框浅底（接近白，不喧宾夺主）
-LIGHT_HEADER = RGBColor(0xFF, 0xFF, 0xFF)       # 表格 header 现在用白底（用户要求"表格白底"）
-BORDER_GRAY = GRAY                              # 表格 0.5pt 深灰边框统一走 GRAY
+LIGHT_HEADER = RGBColor(0xF5, 0xF5, 0xF5)       # 表格 header 浅灰底
+BORDER_GRAY = RGBColor(0xBD, 0xBD, 0xBD)        # 表格 / 卡片细边框（深灰）
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 # 兼容性别名（指向极简调色板里的同义色，方便老代码无痛切换）
 RED = PRIMARY        # 老代码里的 RED 全部统一到 PRIMARY 红
