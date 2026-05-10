@@ -25,7 +25,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AndroidApps"
+rootProject.name = "AndroidAPP"
 
 // 跨平台共享模块（协议 / 牌型规则 / 结算 / AI），所有客户端共用
 include(":shared")
