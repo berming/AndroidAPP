@@ -109,18 +109,43 @@ fun GameScreen(
             mode = mode,
         )
 
-        // ─── 中部：可滚动空白 + 等待提示（对应 Android 中央信息条） ───
+        // ─── 中部：等待提示 / 中央 fallback（防 mini card 显示失败导致看不见要压的牌） ───
+        //
+        // 防 Codex P2 (PR #50)：单机模式下早期版本 lastPlayerId=null 导致
+        // perPlayerLastPlay map 永远空，而 Stage 4 又删了原来的中央 LastPlayedRow
+        // → 玩家根本看不到要压的是什么牌。已修 SinglePlayerEngine，但保留这里
+        // 的 fallback 兜底任何 lastPlayedGroup 不在 perPlayerLastPlay 里的边界情况
+        // （重连 / state 早于事件追踪 / 服务端协议 lastPlayerId 异常）。
         Box(
             modifier = Modifier.fillMaxWidth().weight(1f).padding(8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (gs.lastPlayedGroup == null) {
-                Text(
-                    text = if (gs.consecutivePasses > 0) "等待新一轮 …" else
-                           if (isMyTurn) "请出牌" else "等待 ${currentPlayerName(gs) ?: "…"} 出牌",
-                    color = GreenTableColors.textMuted,
-                    fontSize = 14.sp,
-                )
+            val lastGroup = gs.lastPlayedGroup
+            val lastPid = gs.lastPlayerId
+            val miniCardSizeMid = miniCardSize
+            when {
+                lastGroup == null -> {
+                    Text(
+                        text = if (gs.consecutivePasses > 0) "等待新一轮 …" else
+                               if (isMyTurn) "请出牌" else "等待 ${currentPlayerName(gs) ?: "…"} 出牌",
+                        color = GreenTableColors.textMuted,
+                        fontSize = 14.sp,
+                    )
+                }
+                lastPid == null || lastPid !in state.perPlayerLastPlay -> {
+                    // Owner 未知或缩图未追上 → 中央兜底显示
+                    val owner = lastPid?.let { id -> gs.players.find { it.id == id } }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = owner?.let { "${it.name} 出:" } ?: "上一手:",
+                            color = GreenTableColors.textMuted,
+                            fontSize = 12.sp,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        MiniCardRow(cards = lastGroup.cards, cardSize = cardSize)
+                    }
+                }
+                // 否则什么都不显示 —— mini card 已在 PlayerStrip 下方
             }
         }
 
