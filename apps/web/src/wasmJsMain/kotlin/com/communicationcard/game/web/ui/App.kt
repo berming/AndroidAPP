@@ -44,9 +44,23 @@ fun App() {
             Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
                 when (val s = screen) {
                     is Screen.Home -> HomeScreen(
-                        onSinglePlayer = { vm.startSinglePlayer() },
-                        onMultiplayer = { vm.startMultiplayer() },
+                        onSinglePlayer = vm::startSinglePlayer,
+                        onMultiplayer = vm::startMultiplayer,
+                        onSettings = vm::openSettings,
+                        onStats = vm::openStats,
+                        onHelp = vm::openHelp,
                     )
+                    is Screen.Settings -> SettingsScreen(
+                        state = s,
+                        onUpdate = vm::updatePrefs,
+                        onBack = vm::goHome,
+                    )
+                    is Screen.Stats -> StatisticsScreen(
+                        state = s,
+                        onReset = vm::resetStats,
+                        onBack = vm::goHome,
+                    )
+                    is Screen.Help -> HelpScreen(onBack = vm::goHome)
                     is Screen.Lobby -> LobbyScreen(
                         state = s,
                         onCreateRoom = vm::createRoom,
@@ -61,6 +75,7 @@ fun App() {
                         state = s,
                         onToggleReady = vm::toggleReady,
                         onStartGame = vm::startGame,
+                        onAddAi = vm::addAI,
                         onLeave = vm::leaveRoom,
                     )
                     is Screen.Game -> GameScreen(
@@ -68,6 +83,7 @@ fun App() {
                         onPlayCards = vm::playCards,
                         onPass = vm::pass,
                         onHint = vm::hint,
+                        onToggleSelected = vm::toggleSelectedCard,
                         onLeave = vm::leaveGame,
                     )
                     is Screen.Settlement -> SettlementScreen(

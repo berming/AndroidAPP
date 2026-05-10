@@ -1,6 +1,10 @@
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.compose")
+    // PR #47 引入：Stage 1 menu parity 用 @Serializable 持久化
+    // UserPreferences / Statistics 到 localStorage。不 apply 此 plugin
+    // 则 @Serializable 注解被忽略，serializer() 不生成 → wasmJs 编译挂。
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)

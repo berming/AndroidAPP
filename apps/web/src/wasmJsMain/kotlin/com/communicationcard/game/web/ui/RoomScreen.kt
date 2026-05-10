@@ -35,12 +35,14 @@ fun RoomScreen(
     state: Screen.Room,
     onToggleReady: () -> Unit,
     onStartGame: () -> Unit,
+    onAddAi: () -> Unit,
     onLeave: () -> Unit,
 ) {
     val isHost = state.room.hostId == state.localPlayerId
     val allReadyExceptHost = state.room.players
         .filter { it.id != state.room.hostId }
         .all { it.isReady || it.isAI }
+    val canAddAi = isHost && state.room.players.size < state.room.maxPlayers
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
         Column(modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(24.dp)) {
@@ -74,6 +76,21 @@ fun RoomScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+
+            // 添加 AI（仅房主可见，且房间未满时启用）—— 与 Android RoomActivity 对齐
+            if (isHost) {
+                OutlinedButton(
+                    onClick = onAddAi,
+                    enabled = canAddAi,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                ) {
+                    Text(
+                        if (canAddAi) "+ 添加一个 AI 玩家" else "房间已满",
+                        color = if (canAddAi) Color.White else Color(0xFFB0BEC5),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
 
             // 准备按钮 / 开始游戏按钮
             if (isHost) {

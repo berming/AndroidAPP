@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,9 +48,11 @@ fun SettlementScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E3812))) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
         ) {
             Text(winnerText, color = Color(0xFFFFC107), fontSize = 40.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -74,7 +78,13 @@ fun SettlementScreen(
                 }
             }
 
-            Spacer(Modifier.height(40.dp))
+            // 各玩家明细 —— 与 Android 端结算对齐
+            if (state.playerBreakdown.isNotEmpty()) {
+                Spacer(Modifier.height(20.dp))
+                PlayerBreakdownCard(state.playerBreakdown)
+            }
+
+            Spacer(Modifier.height(32.dp))
 
             Button(
                 onClick = onPlayAgain,
@@ -92,6 +102,55 @@ fun SettlementScreen(
                 modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth().height(52.dp),
             ) {
                 Text("返回主菜单", color = Color.White, fontSize = 16.sp)
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun PlayerBreakdownCard(players: List<Screen.Settlement.PlayerSummary>) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("各玩家明细", color = Color(0xFFFFC107), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            // 表头
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("座位", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(0.6f))
+                Text("玩家", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(1.4f))
+                Text("队", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(0.5f))
+                Text("已收", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(0.7f))
+                Text("剩牌", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(0.7f))
+                Text("名次", color = Color(0xFFB2DFDB), fontSize = 12.sp, modifier = Modifier.weight(0.6f))
+            }
+            Spacer(Modifier.height(4.dp))
+            players.sortedBy { it.seatIndex }.forEach { p ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("${p.seatIndex + 1}", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(0.6f))
+                    Text(p.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.4f))
+                    Text(
+                        if (p.team == "TEAM_A") "A" else "B",
+                        color = if (p.team == "TEAM_A") Color(0xFFEF5350) else Color(0xFF42A5F5),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(0.5f),
+                    )
+                    Text("${p.collectedScore}", color = Color(0xFFFFC107), fontSize = 13.sp, modifier = Modifier.weight(0.7f))
+                    Text("${p.handSize}", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(0.7f))
+                    Text(
+                        if (p.hasFinished && p.finishOrder > 0) "#${p.finishOrder}" else if (p.hasFinished) "走完" else "—",
+                        color = if (p.hasFinished) Color(0xFF66BB6A) else Color(0xFF9E9E9E),
+                        fontSize = 13.sp,
+                        modifier = Modifier.weight(0.6f),
+                    )
+                }
             }
         }
     }

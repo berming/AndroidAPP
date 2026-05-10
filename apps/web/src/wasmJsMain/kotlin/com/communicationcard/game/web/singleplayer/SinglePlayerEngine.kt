@@ -39,6 +39,11 @@ import kotlinx.coroutines.launch
 class SinglePlayerEngine(
     private val playerCount: Int = 6,
     aiDifficulty: AIDifficulty = AIDifficulty.MEDIUM,
+    /**
+     * AI 出牌之间的延迟（毫秒），由 [com.communicationcard.game.web.storage.UserPreferences.gameSpeed]
+     * 决定。50ms = 极速、800ms = 正常、1500ms = 慢。
+     */
+    private val aiDelayMs: Long = AI_TURN_DELAY_DEFAULT_MS,
 ) {
     private val engine = GameEngine(playerCount, aiDifficulty)
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -115,7 +120,7 @@ class SinglePlayerEngine(
                 delay(50)
                 continue
             }
-            delay(AI_TURN_DELAY_MS)
+            delay(aiDelayMs)
             engine.executeAITurn()
             publishState()
         }
@@ -146,7 +151,7 @@ class SinglePlayerEngine(
     }
 
     companion object {
-        private const val AI_TURN_DELAY_MS = 800L
+        private const val AI_TURN_DELAY_DEFAULT_MS = 800L
     }
 }
 

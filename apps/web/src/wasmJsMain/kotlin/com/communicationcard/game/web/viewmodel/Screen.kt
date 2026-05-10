@@ -4,6 +4,8 @@ import com.communicationcard.game.network.RoomInfo
 import com.communicationcard.game.network.SerializedGameResult
 import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.web.net.WebSocketTransport
+import com.communicationcard.game.web.storage.Statistics
+import com.communicationcard.game.web.storage.UserPreferences
 
 /**
  * 整个 Web 客户端的屏幕状态，由 [AppViewModel] 持有并切换。
@@ -13,8 +15,17 @@ import com.communicationcard.game.web.net.WebSocketTransport
  */
 sealed class Screen {
 
-    /** 入口：选择单机 AI / 联网多人。 */
+    /** 入口：5 大菜单（与 Android MainActivity 对齐）。 */
     data object Home : Screen()
+
+    /** 设置：音效 / 震动 / 出牌动画 / 速度 / 昵称（持久化到 localStorage）。 */
+    data class Settings(val prefs: UserPreferences) : Screen()
+
+    /** 统计：总场次 / 胜率 / 连胜 / 累计得分（持久化到 localStorage）。 */
+    data class Stats(val stats: Statistics) : Screen()
+
+    /** 帮助：规则 / 关于 / 项目链接。 */
+    data object Help : Screen()
 
     /** 联网模式：服务端 URL / 昵称输入 + 房间列表 + 创建/加入。 */
     data class Lobby(
@@ -39,14 +50,29 @@ sealed class Screen {
         val localSeatIndex: Int,
         val mode: Mode,
         val selectedCardIds: Set<String> = emptySet(),
+        /** 提示按钮高亮的卡 IDs（与 selectedCardIds 共存：提示后用户可微调选择）。 */
+        val hintedCardIds: Set<String> = emptySet(),
         val message: String? = null,
     ) : Screen() {
         enum class Mode { SinglePlayer, Multiplayer }
     }
 
-    /** 结算：显示队伍最终分数。 */
+    /** 结算：显示队伍最终分数 + 各玩家明细（与 Android 端结算页对齐）。 */
     data class Settlement(
         val result: SerializedGameResult,
         val mode: Game.Mode,
-    ) : Screen()
+        /** 每个玩家的最终状态：座位、名字、队伍、已收分、是否走完、完成顺序。 */
+        val playerBreakdown: List<PlayerSummary> = emptyList(),
+    ) : Screen() {
+        data class PlayerSummary(
+            val seatIndex: Int,
+            val name: String,
+            val team: String,
+            val collectedScore: Int,
+            val handSize: Int,
+            val hasFinished: Boolean,
+            val finishOrder: Int,
+        )
+    }
 }
+
