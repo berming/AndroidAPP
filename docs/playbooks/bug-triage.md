@@ -90,6 +90,29 @@ CI 没红 → 测试没复现到 Bug → 让 Opus 改测试再来。
 
 只修 L1 就上线 = 修了又坏的开始。**至少修到 L2**，**最好同时审查 L3 / L4**。
 
+### 常见反模式：`delay()` 后状态过期
+
+任何"先 sleep / delay 再做事"的代码块都要审查"延迟期间状态变化的影响"。
+最近一例（[`docs/regressions.md` #11](../regressions.md#11-ai-接管延迟期内的-substitute-状态过期codex-p2)）：
+
+```kotlin
+delay(effectiveAiDelayMs(...))     // 玩家在这一秒里把 isAISubstitute 翻 false 了
+mutexFor(room).withLock {
+    if (state.currentPlayerIndex != playerIndex) return  // 只重检了 currentPlayerIndex
+    decideAIAction(...)             // 然而 isAISubstitute 已变 → AI 不该再代打
+}
+```
+
+**审查清单**（任何 `delay()` 块醒来后必须重检的事）：
+- 玩家 / session 状态（`isAISubstitute` / `isConnected` / `isAI`）
+- 房间状态（`status != IN_GAME` 时早返回）
+- 当前玩家索引（最显眼的，但**不止这一个**）
+- 业务相关的"前提条件"——延迟前真，醒来后未必真
+
+**修法**：抽取 `internal fun shouldYieldToHumanPlayer(...)` 之类的谓词，
+把"延迟期可能变化的所有状态"打包检查；processAITurn 锁内调用；同 commit
+加单测覆盖每一种状态过期路径。
+
 ---
 
 ## 4. 实施第一层修复（Sonnet 4.6）

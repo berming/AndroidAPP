@@ -58,8 +58,23 @@ git checkout -b feat/<short-name>
 
 切到 Sonnet：`/model claude-sonnet-4-6`
 
-把 Opus 的文件清单交给 Sonnet，按文件顺序实现。**每改一组**（≤3 个
-相关文件）跑一次 `/test-fast`：
+把 Opus 的文件清单交给 Sonnet，按文件顺序实现。
+
+> **大特性请用 Phase 分段提交**（`docs/dev_summary.md §9.1`）：
+> 跨协议层 + 服务端 + 客户端 + 测试的特性（>200 行 / >5 文件）应拆成
+> 2-3 个 Phase 各自 commit：
+> - Phase 1：协议层 + 服务端 + 单测（**底层稳了再动客户端**）
+> - Phase 2：主客户端（Android）
+> - Phase 3：次客户端（Web）+ 跨端协议 roundtrip 测
+>
+> 每个 Phase 独立 commit + 独立 review 周期，CI 红 / Codex 评论范围更小。
+> 协议先行的副作用：Phase 2/3 即便 UI 没写完，server 已经能跑（新客户端
+> 连老服务端用默认值兼容）。
+>
+> 每个 Phase 内部还要按"编译单元"切——Android 与 Web 拆 commit，能更早
+> 抓到平台特定编译错误（参考 PR #53 wasmJs psi2ir 教训）。
+
+**每改一组**（≤3 个相关文件）跑一次 `/test-fast`：
 
 ```
 /test-fast

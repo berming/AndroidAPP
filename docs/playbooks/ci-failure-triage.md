@@ -100,6 +100,13 @@ PR-H2 之后会变成 hard gate。本地复现：
 - Compose Multiplatform 版本与 Kotlin 版本不匹配
 - `kotlinx-browser` 等 wasmJs-only 依赖未声明
 - `@JsFun` interop 写错（`kotlin.js.JsFun` 包导入）
+- **`Backend Internal error: Exception during psi2ir` + `NullPointerException`**
+  → wasmJs 后端编译器 bug，详见 [`docs/regressions.md` #12](../regressions.md#12-wasmjs-psi2ir-npe可空-lambda--compose-smart-cast-触发后端崩溃)。
+  典型触发：可空 lambda 参数在 `if (x != null) { compose(onClick = x) }` 模式下 smart-cast；
+  `vm::method` KFunction reference 自动转 `(() -> Unit)?`。**修法**：
+  (1) 用 local val 固化非空，让 smart-cast 发生在 immutable 局部变量上；
+  (2) 函数引用改写成显式 `{ vm.method() }` lambda。jvmTest 一定不报这个错——
+  必须 push 到 CI 才能验。
 
 ### Step 8: `Upload artifacts` 失败 / `if-no-files-found: warn`
 

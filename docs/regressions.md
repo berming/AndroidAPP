@@ -161,6 +161,30 @@
 
 ---
 
+## #11  AI 接管延迟期内的 substitute 状态过期（Codex P2）
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | 多人模式下玩家点"AI 接管"开启托管后，**在 effectiveAiDelayMs（最长 1000ms）期内点"我回来了"取消托管**，AI 仍然代打了一手，而后才让回控制权。玩家肉眼可见自己被偷了一手。 |
+| 根因 | `ServerGameManager.processAITurn` 在 `delay(effectiveAiDelayMs(...))` 之后只在 `mutexFor(room).withLock {}` 内重检了 `currentPlayerIndex`，**没有重检 `isAISubstitute / isConnected`**。延迟期间玩家虽然把 isAISubstitute 翻成 false，回合也没推进，所以 AI 决策路径仍然完整执行。这是 feature_spec G34/G35 "即时收回控制权"语义的隐藏 race。 |
+| 修复 | PR #53 commit `c9988fd`：抽取 `internal fun shouldYieldToHumanPlayer(player): Boolean` = `!isAI && !isAISubstitute && isConnected`；`processAITurn` 的 mutex 块内、`decideAIAction` 之前调用，true 则 `return@withLock` 不出牌。 |
+| 教训 | **凡是涉及 `delay()` 的状态机，醒来后必须重检"延迟前所有依赖项"**，不只检查最显眼的那个。这条规律普适：网络重连 / WebSocket 心跳 / 任何"sleep then act"模式都该问一句"我醒来时这些前提还成立吗"。Phase 3 commit 时只重检 currentPlayerIndex 是凭直觉，没系统化清单——Codex 替补了清单审查这一关。 |
+| 防回归测试 | `ServerGameManagerTest.kt`：4 个 `shouldYieldToHumanPlayer_*` 用例覆盖（纯 AI 不让位 / substitute 不让位 / disconnected 不让位 / 真人 resume 必让位）。同 commit 加测，tdd-gate 强制通过。 |
+
+---
+
+## #12  wasmJs psi2ir NPE：可空 lambda + Compose smart-cast 触发后端崩溃
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | 加 feature G34（AI 接管按钮）到 Web 端时，`./gradlew :apps:web:wasmJsBrowserDistribution` 在 CI 失败，`compileKotlinWasmJs` 报 `org.jetbrains.kotlin.backend.common.BackendException: Backend Internal error: Exception during psi2ir` + `Caused by: java.lang.NullPointerException`。本地 jvmTest 全过；纯 wasmJs 后端的内部错误。 |
+| 根因 | 两处代码组合触发 wasmJs 编译器内部 bug：(1) GameScreen.kt 里 `if (imAiSubstitute != null && onToggleAITakeover != null) { OutlinedButton(onClick = onToggleAITakeover, ...) }`——把 smart-cast 后的可空 lambda 直接传给 `@Composable` 期待的 `() -> Unit`；(2) App.kt 里 `onToggleAITakeover = if (...) vm::toggleAITakeover else null`——`KFunction0<Unit>` 自动转 `(() -> Unit)?`。两个模式都是合法 Kotlin，jvmTarget 没事，但 wasmJs 后端 psi2ir 阶段对这两种"可空 + 函数引用"的组合存在已知 NPE。 |
+| 修复 | PR #53 commit `8171283`：(1) GameScreen.kt 用 local `val` 固化非空再用，让 smart-cast 发生在 immutable 局部变量上（编译器最稳定的形式）；(2) App.kt 把 `vm::toggleAITakeover` 改成显式 `{ vm.toggleAITakeover() }` lambda。语义不变，纯编译期形态调整。 |
+| 教训 | wasmJs target 还在快速演进，**不能假设"jvmTest 过 = wasmJs 过"**。任何涉及 Compose @Composable + 可空 lambda + smart-cast 组合的代码都要在 CI 上跑一次 `wasmJsBrowserDistribution` 才算数。沙箱里 AGP / wasmJs 编译器拉不到的环境下，**写完 Web UI 必须 push 跑 CI 才能收到反馈**——这是 Web 比 Android 更脆的一点。防御性编码 pattern：可空 lambda 用 local val，函数引用宁可写 lambda。 |
+| 防回归测试 | 缺失（编译器 bug 不易写单测；只能等 Kotlin 升级修复或在 codestyle / detekt 加规则）。流程层面：(1) `docs/playbooks/ci-failure-triage.md` 已加 wasmJs psi2ir 排查项；(2) 写 Web UI 的代码评审 checklist 加一条"可空 lambda 是否用了 local val"。 |
+
+---
+
 ## 防回归策略（PR-H2 起逐步落地）
 
 | 类别 | 落地点 |

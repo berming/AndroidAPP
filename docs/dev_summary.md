@@ -558,3 +558,141 @@ PR 阶段（强制 4 道关）：
 
 **异构换覆盖率的边际收益最大**，应作为关键代码的标配。
 
+---
+
+## 第九章：harness 跨会话经验（PR-H 系列 + AI 托管特性）
+
+> 本章记录 PR-H1 / PR-H2 / PR-H3 之后的**跨大会话**协同经验。每条都来自
+> 一次真实的"AI 与人协作出 bug → 复盘 → 沉淀回 harness"的闭环。
+
+### 9.1 大特性的"Phase 分段"模式（PR #53 G34-G38 实战）
+
+**问题**：PR #53 一次性想把 `feature_spec G34-G38`（5 个 AI 托管 + 速度配置
+特性）打包发出，触及协议层（PROTOCOL_VERSION 升 2→3）/ 服务端（4 处 delay
+重写 + 3 个 handler）/ Android 双 Activity / Web 双层 / 测试 4 个层面，跨
+~700 行。一次提交风险面太大，PR 描述过长 reviewer 看不动。
+
+**实践**：拆 3 个 Phase，每个 Phase 独立 commit + 自带说明：
+- Phase 1：协议层 + 服务端 + 单测（**底层稳了再动客户端**）
+- Phase 2：Android UI（一份客户端先吃通，验证 server 正常 work）
+- Phase 3：Web UI + 跨端协议 roundtrip 测（最后补齐）
+
+**沉淀**：
+- Phase split 让每个 commit 的 review 半径可控（Codex / Claude /review-pr 都
+  在单 phase 上跑，反馈精确）
+- 协议先行：Phase 1 落地后，Phase 2/3 即便 UI 没写完，server 已经能跑
+  （新客户端连老服务端会被踢，老客户端连新服务端用默认值兼容）
+- 测试与代码同 commit：tdd-gate 不会因"先 commit code 再 commit test"误判
+
+**反例**：本次 Phase 3 一次塞下 SP UI + Room speed picker + Web wiring +
+12 个测试 ~320 行，结果 wasmJs 一个 psi2ir 隐藏 bug 把 CI 红了 2 轮（详见
+9.3）。**教训**：Phase 内部还能再切，按"编译单元"切（Android / Web 拆成两个
+commit）能更早发现编译错误。
+
+### 9.2 同 commit `*Test.kt` 配对（tdd-gate 实战）
+
+PR #53 共 6 个 commit，每次改 `CardRules.kt` / `ServerGameManager.kt` /
+`SettlementCalculator.kt` 都在**同一 commit** 内附测试。`.github/workflows/
+android-ci.yml` 的 `tdd-gate` job mechanically 校验"关键路径文件改动 ⇒ 对应
+*Test.kt 同改动"——一次都没误报，也一次都没漏报。
+
+**跨会话经验**：
+- 在 hook（`.claude/hooks/PostToolUse.sh`）里看到"⚠️ TDD 提醒"时**不要
+  立刻另开 commit 写测试**——只要保证最终 commit 同时包含两份就行
+- 反过来：如果先写了测试 commit，后再 commit 实现，tdd-gate 在"实现
+  commit"时仍会过（因为它看的是单 commit 内是否同改）—— 这个语义偶尔
+  让人误以为 tdd-gate 被绕过，实则 OK
+
+### 9.3 wasmJs 的 "jvmTest 过 ≠ wasmJs 过" 教训（PR #53 第二轮 CI 红）
+
+Phase 3 commit `d976e81` 在 jvmTest 全过、Android 端编译过的前提下，wasmJs
+target 编译报 `Backend Internal error: Exception during psi2ir +
+NullPointerException`。详细根因 / 修法见
+[`docs/regressions.md` #12](regressions.md#12-wasmjs-psi2ir-npe可空-lambda--compose-smart-cast-触发后端崩溃)。
+
+**跨会话经验**：
+- 沙箱（含 Codespaces / 一些 dev container）拉不到 AGP / wasmJs 编译器，
+  本地永远跑不全；**写完 Web UI 必须 push 跑 CI 才能验**
+- 拿到"build failure" comment 时，第一手要**只看 `e:` 开头的硬错误行**，
+  忽略 `w:` 警告。本次错误被 ~50 行 unused-parameter 警告淹没了几秒
+- 防御性编码 pattern：**可空 lambda → local val 固化 → 再用**；
+  函数引用宁可写显式 lambda（`{ vm.foo() }` 而非 `vm::foo`）
+
+### 9.4 Codex bot 与 Claude /review-pr 的互补（PR #53 双 P2 实战）
+
+PR #53 push 完，Codex bot 30-90s 出 2 个 P2：
+- P2-A：`processAITurn` 在 `delay()` 后没重检 `isAISubstitute`（race，详见
+  regressions #11）
+- P2-B：`btnAiTakeover` 在 SP 没接（**实际已在 Phase 3 d976e81 接好，Codex
+  评论时间戳早于 push 时间戳**）
+
+Claude /review-pr (Opus 4.7 subagent) 第一轮**没找到 P2-A**——视角偏向
+"功能性是否完整"+"协议契约是否一致"，对"延迟期内状态过期"这种 race
+condition 不敏感。Codex 视角偏"读完代码逐行问'这里的边界在哪？'"，反而抓住了。
+
+**跨会话经验**：
+- **Codex 与 Claude reviewer 角色不可互替代**：Codex 抓"语句级边界"，
+  Claude 抓"功能性完整 / 跨文件契约"。两个都过才算稳
+- 评论时间戳要看清楚：Codex 在 push 后~30s 出评论时，可能还在 review 旧
+  commit（如本次 P2-B）。回复时**直接列 commit hash 证明已修**比辩论更快
+- Codex 评论的格式（`P2 Badge` + 分析 + "Useful? React with 👍 / 👎"）让
+  忽略 / 接纳门槛对称——即便误报也不浪费时间，给 👎 即可
+
+### 9.5 push 后自动 review-check（hook 实战）
+
+PR-H4 之后 `.claude/hooks/PostToolUse.sh` 在每次 `git push` 后注入"应主动
+拉 review_comments + check_runs 修 P0/P1"提醒。本会话 8+ 次 push，每次
+触发：`mcp__github__pull_request_read method=get_check_runs` 拉 build 状态、
+`get_review_comments` 拉 Codex 评论。
+
+**跨会话经验**：
+- 不要 `sleep 60` 等 Codex——直接拉，拿到空就报"暂无评论"，下次 push 再拉
+- CI 红时**第一手是去 `get_comments` 拉 PR comment 里 exfil 的 gradle 日志**
+  （`docs/playbooks/ci-failure-triage.md` §5 模式），不去 `gh` / 不开浏览器
+- 单 commit 推 push → 60s 内 build 通常还在 queued，**别在 push 之后立刻
+  报"全绿"**；至少看到 `conclusion: success` 才算
+
+### 9.6 PR 流转的"分支 vs PR" 错位（PR #52 → #53 实战）
+
+PR #52 在 `claude/docs-architecture-refresh` 分支上合并后，**本会话又在
+同一分支上 push 了 5 个 commit**（Phase 1+2+3+2 个修），但 PR #52 已 closed。
+用户问"PR 怎么没看到"时才发现需要新开 PR #53。
+
+**跨会话经验**：
+- 一个分支 = 一个 PR。**PR merge 后，下一组改动开新分支**（不要再往老
+  分支 push 期望"会自动出 PR"）
+- 本会话的"修复"链：fix → fix → fix 全堆同分支，但**因为 PR #52 已合**，
+  这些 fix 必须新分支 + 新 PR 才能进 main。早识别能省一轮 confusion
+- AI 看不到 GitHub 的"分支与 PR 关联状态"——必须主动 `list_pull_requests
+  state=all head=branch:name` 查清楚
+
+### 9.7 文档单一真相 + 自动同步检测（PR #53 P1 #1 实战）
+
+`pr-reviewer` 第一轮发现 `docs/game_rules.md §2.3` 误写"起手玩家随机
+（`randomFirstPlayer`）"，但服务端 `ServerGameManager.startGame#L68-L71`
+实际是 ♠3 先出。这是文档与代码漂移的经典案例：**新写的 game_rules.md
+明确声明自己是"权威定义"，反而比旧文档更危险**——因为后续维护者会信。
+
+**沉淀**：
+- 新 doc 自称"权威"前，做一次"代码 grep 验证"：所有 anchor 函数名
+  必须在 repo 中存在（`randomFirstPlayer` 不存在就是红旗）
+- 用户面文档（HelpScreen / strings.xml `rules_content`）跟 game_rules.md
+  必须**同 commit 改**——和 server 的 canBeat 约束类似，是同一类"两份
+  必须一致"的隐性契约
+- 后续可考虑：写一个 detekt 规则 / CI step grep `randomFirstPlayer` 类
+  fabricated symbol，但 ROI 不高
+
+### 9.8 AI 接管 / 速度档位的设计取舍（feature_spec G36-G38 实战）
+
+最初讨论时考虑了"slider"（任意 50-2000ms 连续值），最终选 3 档预设。
+
+**取舍**：
+- slider：UI 复杂，玩家容易 fiddling，服务端要 clamp 任意值
+- 3 档预设：UI 简单（radio button 即可），服务端 clamp 简单，玩家心理负担低
+- "默认 400ms"：取自"看清 + 不无聊"经验值，比老 1000ms 缩短 60% 但仍可
+  辨识 AI 决策过程
+- 单机 50/400/1000；多人最低 100ms（不让网络抖动 + AI 雪崩压垮慢客户端）
+
+**跨会话经验**：当一个特性"看起来 slider 更灵活"时，先问"用户真的需要
+连续值么？"——多数情况下 3 档够用，且压缩了边界情况测试矩阵。
+
