@@ -1,0 +1,63 @@
+# 沟通牌 · Caddy 配置
+#
+# 二选一：把不要的那段整段删掉。
+#
+# 只用 IP（无域名）→ 用方案 A
+# 有域名（例：cards.example.com）→ 把方案 A 删掉，用方案 B（Caddy 自动申请 HTTPS）
+
+# ============================================================
+# 方案 A：纯 IP，HTTP（默认 :80）
+# ============================================================
+:80 {
+    # 静态前端（CI 部署的 wasmJs 产物）
+    root * /var/www/communication-card-web
+    encode gzip zstd
+    file_server
+
+    # WebSocket 反代到本地 :server（Ktor）
+    @ws {
+        path /game
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @ws 127.0.0.1:8080
+
+    # 给 .wasm / .js / 字体 设置正确 MIME（Caddy 默认基本对，显式列出更稳）
+    @wasm path *.wasm
+    header @wasm Content-Type application/wasm
+
+    # SPA-ish fallback：不存在的路径回 index.html（沟通牌目前是单 HTML，可选）
+    try_files {path} /index.html
+
+    log {
+        output file /var/log/caddy/communication-card.log
+        format console
+    }
+}
+
+# ============================================================
+# 方案 B：有域名 + 自动 HTTPS（Let's Encrypt）
+# 把上面 :80 那段删掉，启用下面：
+# ============================================================
+# cards.example.com {
+#     root * /var/www/communication-card-web
+#     encode gzip zstd
+#     file_server
+#
+#     @ws {
+#         path /game
+#         header Connection *Upgrade*
+#         header Upgrade websocket
+#     }
+#     reverse_proxy @ws 127.0.0.1:8080
+#
+#     @wasm path *.wasm
+#     header @wasm Content-Type application/wasm
+#
+#     try_files {path} /index.html
+#
+#     log {
+#         output file /var/log/caddy/communication-card.log
+#         format console
+#     }
+# }

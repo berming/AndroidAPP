@@ -299,6 +299,6 @@ private fun suitSymbol(suit: String, rank: String): String = when (suit) {
     "HEART" -> "♥"
     "CLUB" -> "♣"
     "DIAMOND" -> "♦"
-    "JOKER" -> if (rank == "BIG_JOKER") "王" else "王"
+    "JOKER" -> if (rank == "BIG_JOKER") "★" else "☆"
     else -> ""
 }

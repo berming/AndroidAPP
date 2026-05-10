@@ -215,3 +215,56 @@ jobs:
             build/reports/detekt/
           if-no-files-found: warn
           retention-days: 7
+
+  # ============================================================
+  # 同步 PR 描述里"CI 绿"那一行的勾选状态。
+  #
+  # 只动这一格 —— 其他三关（Codex / Claude /review / 真机）按设计仍是
+  # 人工勾，CI 不替它们打钩，避免把 4 关流程退化成单点守门。
+  #
+  # 触发：tdd-gate + build 都跑完即触发（success 或 failure 都来）。
+  # 写入：success → `- [x] **CI 绿**`；其他 → `- [ ] **CI 绿**`（回滚）。
+  # 幂等：内容已是目标态时不写。
+  # ============================================================
+  update-ci-checkbox:
+    name: Sync PR description "CI 绿" checkbox
+    runs-on: ubuntu-latest
+    needs: [tdd-gate, build]
+    # `always()` 让 needs 失败/跳过时也能执行（用来把勾恢复回未选）；
+    # 仅 PR 事件需要更新描述（push 到 main 时没 PR 可改）。
+    if: always() && github.event_name == 'pull_request'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Update CI checkbox in PR body
+        uses: actions/github-script@v7
+        env:
+          TDD_GATE_RESULT: ${{ needs.tdd-gate.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const UNTICKED = '- [ ] **CI 绿**';
+            const TICKED = '- [x] **CI 绿**';
+            const allGreen =
+              process.env.TDD_GATE_RESULT === 'success' &&
+              process.env.BUILD_RESULT === 'success';
+            const target = allGreen ? TICKED : UNTICKED;
+            const other  = allGreen ? UNTICKED : TICKED;
+            if (!body.includes(other) && !body.includes(target)) {
+              core.info('CI checkbox marker not found in PR body; nothing to do.');
+              return;
+            }
+            if (body.includes(target) && !body.includes(other)) {
+              core.info(`Already in target state (${allGreen ? 'ticked' : 'unticked'}); idempotent skip.`);
+              return;
+            }
+            const newBody = body.replace(other, target);
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              body: newBody,
+            });
+            core.info(`PR #${pr.number} body updated → ${allGreen ? 'CI 绿 ticked' : 'CI 绿 unticked (rollback)'}`);

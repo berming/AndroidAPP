@@ -1,0 +1,29 @@
+[Unit]
+Description=Communication Card · Ktor server
+After=network.target
+
+[Service]
+Type=simple
+User=cards
+Group=cards
+WorkingDirectory=/opt/communication-card/server
+# `gradle :server:installDist` 输出到 build/install/server/，部署脚本把它 rsync 到这里
+ExecStart=/opt/communication-card/server/bin/server
+Restart=on-failure
+RestartSec=3
+
+# JVM 调优（4 核 / 4G 起够；按机型调）
+Environment="JAVA_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
+
+# 安全收紧
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/communication-card
+ProtectHome=true
+
+StandardOutput=append:/var/log/communication-card/server.log
+StandardError=append:/var/log/communication-card/server.err.log
+
+[Install]
+WantedBy=multi-user.target
