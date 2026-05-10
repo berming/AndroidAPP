@@ -1,6 +1,8 @@
 package com.communicationcard.game.web.storage
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
@@ -27,12 +29,12 @@ data class UserPreferences(
 
         fun load(): UserPreferences {
             val raw = LocalStorage.getString(KEY) ?: return UserPreferences()
-            return runCatching { json.decodeFromString(serializer(), raw) }
+            return runCatching { json.decodeFromString<UserPreferences>(raw) }
                 .getOrElse { UserPreferences() }
         }
 
         fun save(prefs: UserPreferences) {
-            LocalStorage.setString(KEY, json.encodeToString(serializer(), prefs))
+            LocalStorage.setString(KEY, json.encodeToString(prefs))
         }
     }
 }
