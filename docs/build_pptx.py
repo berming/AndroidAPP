@@ -802,6 +802,156 @@ add_textbox(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.4),
             align=PP_ALIGN.CENTER)
 
 # =================================================================
+# Slide 14: 八、harness 跨会话经验 (1/3) — Phase 分段 + wasmJs 教训
+# =================================================================
+s = add_slide()
+add_header(s, "八、harness 跨会话经验（1/3）")
+
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
+            "📦 大特性的 Phase 分段提交",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+
+phase_rows = [
+    ["Phase 1", "协议 + 服务端 + 单测", "底层稳了再动客户端"],
+    ["Phase 2", "主客户端 (Android)", "一份吃通验证 server"],
+    ["Phase 3", "次客户端 (Web) + 跨端测", "最后补齐"],
+]
+add_table(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(2.2),
+            ["Phase", "内容", "价值"], phase_rows, font_size=BODY_SM,
+            col_widths=[Inches(1.0), Inches(2.6), Inches(2.6)])
+
+add_textbox(s, Inches(0.5), Inches(3.85), Inches(6.2), Inches(1.0),
+            "跨协议+服务端+双客户端>200行 / >5文件 → 必须拆 Phase\n"
+            "每 Phase 内再按编译单元切（Android / Web 拆 commit）",
+            font_size=BODY_SM, color=DARK)
+
+add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
+            "⚠️  wasmJs 编译器的隐藏陷阱",
+            font_size=BODY_LG, bold=True, color=RED)
+
+add_code_block(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(1.4),
+               "Backend Internal error:\n"
+               "  Exception during psi2ir\n"
+               "Caused by: NullPointerException",
+               font_size=BODY_SM)
+
+add_textbox(s, Inches(7.0), Inches(3.05), Inches(6.0), Inches(2.5),
+            "根因：可空 lambda + Compose smart-cast；\n"
+            "vm::method KFunction → (() -> Unit)?\n\n"
+            "修法：\n"
+            "• 可空 lambda → local val 固化非空\n"
+            "• 函数引用 → 显式 { vm.foo() } lambda\n\n"
+            "沙箱拉不到 wasmJs 编译器；写完 Web UI 必须 push CI 才算",
+            font_size=BODY_SM, color=DARK)
+
+add_callout(s, Inches(0.5), Inches(5.0), Inches(12.3), Inches(1.7),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(5.15), Inches(12.0), Inches(0.4),
+            "💡 实战教训：",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(5.5), Inches(12.0), Inches(1.2),
+            "•  jvmTest 过 ≠ wasmJs 过 —— Web UI 改完必须跑 CI 才算\n"
+            "•  Phase 内还要按编译单元切，平台特定编译错误更早暴露\n"
+            "•  CI 红时先看 e: 开头的硬错误行，忽略 ~50 行 w: 警告噪音",
+            font_size=BODY_SM, color=DARK)
+
+# =================================================================
+# Slide 15: 八、harness 跨会话经验 (2/3) — Codex 互补 + delay 重检
+# =================================================================
+s = add_slide()
+add_header(s, "八、harness 跨会话经验（2/3）")
+
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+            "🔍 Codex bot 与 Claude /review-pr 盲区互补（PR #53 实证）",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+
+reviewer_rows = [
+    ["Claude /review-pr", "docs 误写「随机起手」+ 引用不存在的函数（**跨文件契约**）", "delay() 后 race"],
+    ["Codex bot", "delay() 后没重检 isAISubstitute 的 race（**语句级边界**）", "文档与代码语义对齐"],
+]
+add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(1.5),
+            ["Reviewer", "找到", "漏掉"], reviewer_rows, font_size=BODY_SM,
+            col_widths=[Inches(2.5), Inches(6.3), Inches(3.5)])
+
+add_callout(s, Inches(0.5), Inches(3.15), Inches(12.3), Inches(0.85),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(3.3), Inches(12.0), Inches(0.6),
+            "盲区不重叠 → 单独跑一个至少漏一类问题。Codex + Claude 必须都跑。",
+            font_size=BODY_MD, bold=True, color=DARK)
+
+add_textbox(s, Inches(0.5), Inches(4.2), Inches(12.3), Inches(0.4),
+            "⏰ delay() 后状态过期反请（regressions #11）",
+            font_size=BODY_LG, bold=True, color=RED)
+
+add_code_block(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(1.4),
+               "delay(effectiveAiDelayMs(...))     // 玩家此时取消了托管\n"
+               "mutexFor(room).withLock {\n"
+               "    if (state.currentPlayerIndex != playerIndex) return  // 只检查了这一项\n"
+               "    decideAIAction(...)             // isAISubstitute 已变 → 不该再代打\n"
+               "}", font_size=BODY_SM)
+
+add_textbox(s, Inches(0.5), Inches(6.1), Inches(12.3), Inches(0.7),
+            "审查清单：醒来后必须重检「延迟前所有依赖项」，不只检查最显眼的那个\n"
+            "修法：抽 internal fun shouldYieldToHumanPlayer(...) 谓词 + 同 commit 加测",
+            font_size=BODY_SM, color=DARK)
+
+# =================================================================
+# Slide 16: 八、harness 跨会话经验 (3/3) — TDD-gate / PR 流转 / 设计取舍
+# =================================================================
+s = add_slide()
+add_header(s, "八、harness 跨会话经验（3/3）")
+
+# Left column
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
+            "✅ 同 commit *Test.kt 配对",
+            font_size=BODY_LG, bold=True, color=GREEN)
+add_textbox(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(1.0),
+            "PR #53 6 commit，每改关键路径都同 commit 附测。\n"
+            "tdd-gate 一次没误报、一次没漏。\n\n"
+            "hook 弹「TDD 提醒」时不必立刻另开 commit 写测——\n"
+            "保证最终单 commit 同时含两份即可。",
+            font_size=BODY_SM, color=DARK)
+
+add_textbox(s, Inches(0.5), Inches(3.55), Inches(6.2), Inches(0.4),
+            "🔀 PR 流转：分支 vs PR 错位",
+            font_size=BODY_LG, bold=True, color=ORANGE)
+add_textbox(s, Inches(0.5), Inches(4.0), Inches(6.2), Inches(1.6),
+            "PR #52 合并后本会话同分支又 push 了 5 commit——但 PR #52 已 closed，\n"
+            "push 不会自动出 PR。直到用户问 \"PR 呢？\" 才意识到需要新分支 + PR #53。\n\n"
+            "原则：一个分支 = 一个 PR。PR merge 后下一组改动开新分支。",
+            font_size=BODY_SM, color=DARK)
+
+# Right column
+add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
+            "📚 文档单一真相 + 自动同步",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+add_textbox(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(1.6),
+            "pr-reviewer 抓到 game_rules.md 误写「随机起手」+\n"
+            "引用 randomFirstPlayer 但代码无此符号。\n\n"
+            "沉淀：新文档自称「权威」前必须 grep 验证所有\n"
+            "anchor 函数名实际存在。",
+            font_size=BODY_SM, color=DARK)
+
+add_textbox(s, Inches(7.0), Inches(3.55), Inches(6.0), Inches(0.4),
+            "🎚️  设计取舍：slider vs 3 档预设",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+add_textbox(s, Inches(7.0), Inches(4.0), Inches(6.0), Inches(1.8),
+            "AI 速度最初考虑 slider（任意 50-2000ms 连续值），\n"
+            "最终选 3 档预设（feature_spec G36-G38）。\n\n"
+            "原则：当特性「看似 slider 更灵活」时，先问\n"
+            "「用户真需要连续值么？」——多数情况 3 档够用，\n"
+            "且压缩了边界情况测试矩阵。",
+            font_size=BODY_SM, color=DARK)
+
+add_callout(s, Inches(0.5), Inches(5.95), Inches(12.3), Inches(0.8),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(6.1), Inches(12.0), Inches(0.6),
+            "💎 跨会话经验的核心：harness（hook / playbook / regression DB）让"
+            "教训跨 session 沉淀，"
+            "而不是每次新人新 AI 都从头踩一遍坑。",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
+
+# =================================================================
 total = len(prs.slides)
 for i, slide in enumerate(prs.slides, start=1):
     if i == 1:
