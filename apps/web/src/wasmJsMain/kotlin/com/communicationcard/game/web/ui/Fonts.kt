@@ -51,12 +51,18 @@ private const val FONT_URL = "fonts/NotoSansSC-Subset.ttf"
 )
 private external fun fetchAsBase64(url: String): Promise<JsString>
 
+/**
+ * 用 try/catch 而非 runCatching：runCatching 的 block 不是 suspend 函数，
+ * 在里面调 [await] 会编译失败（Type mismatch / 推断不出 T）。
+ */
 @OptIn(ExperimentalEncodingApi::class)
-private suspend fun loadCJKFontBytes(): ByteArray? = runCatching {
-    val b64 = fetchAsBase64(FONT_URL).await().toString()
-    Base64.decode(b64)
-}.onFailure { consoleError("loadCJKFontBytes failed: ${it.message}") }
-    .getOrNull()
+private suspend fun loadCJKFontBytes(): ByteArray? = try {
+    val jsStr: JsString = fetchAsBase64(FONT_URL).await()
+    Base64.decode(jsStr.toString())
+} catch (e: Throwable) {
+    consoleError("loadCJKFontBytes failed: ${e.message}")
+    null
+}
 
 /**
  * 给 [App] 用的 Composable：在后台异步加载字体；返回的 State 一旦非 null
@@ -67,10 +73,12 @@ fun rememberCJKFontFamily(): State<FontFamily?> {
     val state = remember { mutableStateOf<FontFamily?>(null) }
     LaunchedEffect(Unit) {
         val bytes = loadCJKFontBytes() ?: return@LaunchedEffect
-        runCatching {
+        try {
             val font = Font(identity = "NotoSansSC", data = bytes)
             state.value = FontFamily(font)
-        }.onFailure { consoleError("Font registration failed: ${it.message}") }
+        } catch (e: Throwable) {
+            consoleError("Font registration failed: ${e.message}")
+        }
     }
     return state
 }
