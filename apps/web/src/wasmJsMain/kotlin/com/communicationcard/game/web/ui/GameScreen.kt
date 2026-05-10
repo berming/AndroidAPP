@@ -25,10 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,11 +42,13 @@ fun GameScreen(
     onPlayCards: (List<SerializedCard>) -> Unit,
     onPass: () -> Unit,
     onHint: () -> Unit,
+    onToggleSelected: (String) -> Unit,
     onLeave: () -> Unit,
 ) {
-    var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     val me = state.state.players.find { it.id == state.localSeatIndex }
     val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
+    val selected = state.selectedCardIds
+    val hinted = state.hintedCardIds
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
         // 顶栏：分数 + 当前轮 + 离开
@@ -66,9 +64,8 @@ fun GameScreen(
             HandRow(
                 me = me,
                 selected = selected,
-                onToggle = { cardKey ->
-                    selected = if (cardKey in selected) selected - cardKey else selected + cardKey
-                },
+                hinted = hinted,
+                onToggle = onToggleSelected,
             )
 
             Spacer(Modifier.height(8.dp))
@@ -84,10 +81,7 @@ fun GameScreen(
                     modifier = Modifier.weight(1f).height(48.dp),
                 ) { Text("提示", color = Color.White) }
                 OutlinedButton(
-                    onClick = {
-                        onPass()
-                        selected = emptySet()
-                    },
+                    onClick = onPass,
                     enabled = isMyTurn && state.state.lastPlayedGroup != null,
                     modifier = Modifier.weight(1f).height(48.dp),
                 ) { Text("过牌", color = Color.White) }
@@ -96,7 +90,6 @@ fun GameScreen(
                         if (selected.isEmpty() || me == null) return@Button
                         val toPlay = me.hand.filter { keyOf(it) in selected }
                         onPlayCards(toPlay)
-                        selected = emptySet()
                     },
                     enabled = isMyTurn && selected.isNotEmpty(),
                     modifier = Modifier.weight(1.4f).height(48.dp),
@@ -226,6 +219,7 @@ private fun LastPlayedRow(group: SerializedCardGroup, owner: SerializedPlayer?) 
 private fun HandRow(
     me: SerializedPlayer?,
     selected: Set<String>,
+    hinted: Set<String>,
     onToggle: (String) -> Unit,
 ) {
     if (me == null) {
@@ -241,6 +235,7 @@ private fun HandRow(
             CardView(
                 card = card,
                 selected = key in selected,
+                hinted = key in hinted,
                 modifier = Modifier
                     .size(56.dp, 80.dp)
                     .clickable { onToggle(key) },
@@ -250,17 +245,27 @@ private fun HandRow(
 }
 
 @Composable
-private fun CardView(card: SerializedCard, selected: Boolean, modifier: Modifier = Modifier) {
+private fun CardView(
+    card: SerializedCard,
+    selected: Boolean,
+    hinted: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     val isRed = card.suit == "HEART" || card.suit == "DIAMOND" ||
         (card.suit == "JOKER" && card.rank == "BIG_JOKER")
     val textColor = if (isRed) Color(0xFFE53935) else Color.Black
     val offset = if (selected) -16.dp else 0.dp
-    val borderColor = if (selected) Color(0xFFFFC107) else Color(0xFF424242)
+    // 选中：金黄高亮 / 仅提示：绿色微光提示 / 未选：默认深灰
+    val borderColor = when {
+        selected -> Color(0xFFFFC107)
+        hinted -> Color(0xFF66BB6A)
+        else -> Color(0xFF424242)
+    }
     Box(
         modifier = modifier
             .offset(y = offset)
             .background(Color.White, RoundedCornerShape(6.dp))
-            .border(2.dp, borderColor, RoundedCornerShape(6.dp)),
+            .border(if (hinted || selected) 3.dp else 2.dp, borderColor, RoundedCornerShape(6.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Column(

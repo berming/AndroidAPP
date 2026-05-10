@@ -1,10 +1,18 @@
 package com.communicationcard.game.web.viewmodel
 
+import com.communicationcard.game.engine.CardRules
+import com.communicationcard.game.model.Card
+import com.communicationcard.game.model.CardRank
+import com.communicationcard.game.model.CardSuit
 import com.communicationcard.game.network.SerializedCard
+import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.web.net.GameSyncManager
 import com.communicationcard.game.web.net.NetworkClient
 import com.communicationcard.game.web.net.RoomManager
 import com.communicationcard.game.web.singleplayer.SinglePlayerEngine
+import com.communicationcard.game.web.storage.GameSpeed
+import com.communicationcard.game.web.storage.Statistics
+import com.communicationcard.game.web.storage.UserPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,6 +29,7 @@ import kotlinx.coroutines.launch
  * - 持有 [Screen] StateFlow 供 App.kt 渲染
  * - 协调单机引擎 / 联网管理器
  * - 把异步事件（房间更新、游戏状态、结算）映射到屏幕切换
+ * - 持久化用户偏好（[UserPreferences]）与战绩（[Statistics]）到 localStorage
  *
  * 设计原则：所有跨屏幕的状态都集中在这里；屏幕 Composable 只接收一个 Screen 数据类。
  */
@@ -50,17 +59,23 @@ class AppViewModel {
         return CoroutineScope(scope.coroutineContext + job)
     }
 
-    // ---------- 用户偏好（暂存内存；后续可以接 localStorage） ----------
-    private var nickname = "玩家"
+    // ---------- 持久化偏好 / 战绩（构造时从 localStorage 加载） ----------
+    private var prefs: UserPreferences = UserPreferences.load()
+    private var stats: Statistics = Statistics.load()
+
     private var serverUrl = defaultServerUrl()
 
     // ============================================================
-    //  入口动作
+    //  入口动作（Home → 各子屏）
     // ============================================================
 
     fun startSinglePlayer() {
         val sessionScope = newSessionScope()
-        val engine = SinglePlayerEngine(playerCount = 6).also { single = it }
+        // 用户偏好里的速度 → AI 出牌延迟
+        val engine = SinglePlayerEngine(
+            playerCount = 6,
+            aiDelayMs = prefs.gameSpeed.aiDelayMs,
+        ).also { single = it }
         engine.start()
         sessionScope.launch {
             engine.state.collect { state ->
@@ -75,21 +90,35 @@ class AppViewModel {
         }
         sessionScope.launch {
             engine.gameEnd.collect { result ->
-                _screen.value = Screen.Settlement(result, Screen.Game.Mode.SinglePlayer)
+                val state = engine.state.value
+                val breakdown = state?.let(::buildPlayerBreakdown).orEmpty()
+                recordStatsForResult(result, mySeatIndex = engine.humanSeatIndex, players = state?.players)
+                _screen.value = Screen.Settlement(result, Screen.Game.Mode.SinglePlayer, breakdown)
             }
         }
     }
 
     fun startMultiplayer() {
-        // 进入联网入口时立刻取消之前可能残留的 single-player collectors
         sessionJob?.cancel()
         sessionJob = null
         _screen.value = Screen.Lobby(
             serverUrl = serverUrl,
-            nickname = nickname,
+            nickname = prefs.nickname,
             connectionState = com.communicationcard.game.web.net.WebSocketTransport.State.Disconnected,
             rooms = emptyList(),
         )
+    }
+
+    fun openSettings() {
+        _screen.value = Screen.Settings(prefs)
+    }
+
+    fun openStats() {
+        _screen.value = Screen.Stats(stats)
+    }
+
+    fun openHelp() {
+        _screen.value = Screen.Help
     }
 
     fun goHome() {
@@ -104,6 +133,56 @@ class AppViewModel {
     }
 
     // ============================================================
+    //  Settings 屏：每次改值即写 localStorage（小数据，写频率低，OK）
+    // ============================================================
+
+    fun updatePrefs(transform: (UserPreferences) -> UserPreferences) {
+        prefs = transform(prefs)
+        UserPreferences.save(prefs)
+        if (_screen.value is Screen.Settings) _screen.value = Screen.Settings(prefs)
+    }
+
+    // ============================================================
+    //  Stats 屏
+    // ============================================================
+
+    fun resetStats() {
+        Statistics.reset()
+        stats = Statistics()
+        if (_screen.value is Screen.Stats) _screen.value = Screen.Stats(stats)
+    }
+
+    private fun recordStatsForResult(
+        result: com.communicationcard.game.network.SerializedGameResult,
+        mySeatIndex: Int,
+        players: List<com.communicationcard.game.network.SerializedPlayer>?,
+    ) {
+        if (mySeatIndex < 0 || players == null) return
+        val myTeam = players.find { it.id == mySeatIndex }?.team ?: return
+        val myTeamWon: Boolean? = when (result.winner) {
+            null -> null
+            myTeam -> true
+            else -> false
+        }
+        val myTeamScore = if (myTeam == "TEAM_A") result.teamAScore else result.teamBScore
+        stats = stats.afterGame(myTeamWon, myTeamScore)
+        Statistics.save(stats)
+    }
+
+    private fun buildPlayerBreakdown(state: SerializedGameState): List<Screen.Settlement.PlayerSummary> =
+        state.players.map { p ->
+            Screen.Settlement.PlayerSummary(
+                seatIndex = p.id,
+                name = p.name,
+                team = p.team,
+                collectedScore = p.collectedScore,
+                handSize = p.handSize,
+                hasFinished = p.hasFinished,
+                finishOrder = p.finishOrder,
+            )
+        }
+
+    // ============================================================
     //  Lobby
     // ============================================================
 
@@ -113,12 +192,11 @@ class AppViewModel {
     }
 
     fun setNickname(name: String) {
-        nickname = name
+        updatePrefs { it.copy(nickname = name) }
         updateLobby { it.copy(nickname = name) }
     }
 
     fun connectServer() {
-        // 关闭/丢弃上一次连接的 transport 与 collectors，避免双连接
         net?.close()
         val sessionScope = newSessionScope()
 
@@ -126,7 +204,6 @@ class AppViewModel {
         val r = RoomManager(n).also { room = it }
         val s = GameSyncManager(n).also { sync = it }
 
-        // 监听连接状态
         sessionScope.launch {
             n.connectionState.collect { st ->
                 updateLobby { it.copy(connectionState = st) }
@@ -135,19 +212,15 @@ class AppViewModel {
                 }
             }
         }
-
-        // 监听房间列表
         sessionScope.launch {
             r.roomList.collect { list -> updateLobby { it.copy(rooms = list) } }
         }
-
-        // 监听 currentRoom 变化 -> 进入 Room 屏幕
         sessionScope.launch {
             combine(r.currentRoom, r.localPlayerId) { cr, pid -> cr to pid }
                 .collect { (cr, pid) ->
                     if (cr != null && pid != null) {
                         if (cr.status == com.communicationcard.game.network.RoomStatus.IN_GAME) {
-                            // 房间进入对局后，等 GameSync/GameStart 推到 Game 屏幕
+                            // 等 GameSync/GameStart 推到 Game 屏
                         } else {
                             val isReady = cr.players.find { it.id == pid }?.isReady ?: false
                             _screen.value = Screen.Room(cr, pid, isReady)
@@ -155,8 +228,6 @@ class AppViewModel {
                     }
                 }
         }
-
-        // 监听联网游戏状态 -> 进入 Game 屏幕
         sessionScope.launch {
             s.gameState.collect { state ->
                 if (state == null) return@collect
@@ -168,28 +239,21 @@ class AppViewModel {
                 )
             }
         }
-
-        // 监听游戏结束
         sessionScope.launch {
             s.gameEnd.collect { result ->
-                _screen.value = Screen.Settlement(result, Screen.Game.Mode.Multiplayer)
+                val state = s.gameState.value
+                val breakdown = state?.let(::buildPlayerBreakdown).orEmpty()
+                recordStatsForResult(result, mySeatIndex = s.localSeatIndex.value, players = state?.players)
+                _screen.value = Screen.Settlement(result, Screen.Game.Mode.Multiplayer, breakdown)
             }
         }
 
         n.connect()
     }
 
-    fun createRoom() {
-        room?.createRoom(playerName = nickname)
-    }
-
-    fun joinRoom(code: String) {
-        room?.joinRoom(roomCode = code, playerName = nickname)
-    }
-
-    fun refreshRooms() {
-        room?.refreshRoomList()
-    }
+    fun createRoom() { room?.createRoom(playerName = prefs.nickname) }
+    fun joinRoom(code: String) { room?.joinRoom(roomCode = code, playerName = prefs.nickname) }
+    fun refreshRooms() { room?.refreshRoomList() }
 
     // ============================================================
     //  Room
@@ -202,15 +266,14 @@ class AppViewModel {
         _screen.value = current.copy(isReady = newReady)
     }
 
-    fun startGame() {
-        room?.startGame()
-    }
+    fun startGame() { room?.startGame() }
+    fun addAI() { room?.addAI() }
 
     fun leaveRoom() {
         room?.leaveRoom()
         _screen.value = Screen.Lobby(
             serverUrl = serverUrl,
-            nickname = nickname,
+            nickname = prefs.nickname,
             connectionState = net?.connectionState?.value
                 ?: com.communicationcard.game.web.net.WebSocketTransport.State.Disconnected,
             rooms = emptyList(),
@@ -242,8 +305,46 @@ class AppViewModel {
         }
     }
 
+    /**
+     * 提示：调 [CardRules.findValidPlays]，从所有合法出法中挑"最小"的一手高亮在 UI。
+     *
+     * - 若我没轮到、或非 Game 屏：no-op
+     * - 若是首发回合（lastPlayedGroup == null）：选最小的有效组合（保留好牌）
+     * - 否则：选最小的能压过 last 的组合
+     * - 若一个都找不到：清空 hint（提醒用户应过牌）
+     */
     fun hint() {
-        // TODO: 实现提示功能（调 CardRules.findValidPlays 选最优）
+        val s = (_screen.value as? Screen.Game) ?: return
+        val state = s.state
+        val mySeat = s.localSeatIndex
+        if (state.currentPlayerIndex != mySeat) return
+        val me = state.players.find { it.id == mySeat } ?: return
+
+        val handCards = me.hand.mapNotNull(::deserializeCard)
+        if (handCards.size != me.hand.size) return // 反序列化失败 → 放弃，避免错提示
+
+        val lastGroup = state.lastPlayedGroup?.let { lg ->
+            val cards = lg.cards.mapNotNull(::deserializeCard)
+            if (cards.size != lg.cards.size) null else CardRules.identifyCardGroup(cards)
+        }
+
+        val validPlays = CardRules.findValidPlays(handCards, lastGroup)
+        // 选 primaryRank 最小的，张数次之；保留大牌
+        val pick = validPlays.minByOrNull { it.primaryRank.value * 100 + it.cards.size } ?: return
+
+        val keys = pick.cards.map { keyOf(it) }.toSet()
+        _screen.value = s.copy(hintedCardIds = keys, selectedCardIds = keys)
+    }
+
+    fun toggleSelectedCard(cardId: String) {
+        val s = (_screen.value as? Screen.Game) ?: return
+        val newSel = if (cardId in s.selectedCardIds) s.selectedCardIds - cardId else s.selectedCardIds + cardId
+        _screen.value = s.copy(selectedCardIds = newSel, hintedCardIds = emptySet())
+    }
+
+    fun clearSelection() {
+        val s = (_screen.value as? Screen.Game) ?: return
+        _screen.value = s.copy(selectedCardIds = emptySet(), hintedCardIds = emptySet())
     }
 
     fun leaveGame() {
@@ -259,7 +360,7 @@ class AppViewModel {
             Screen.Game.Mode.SinglePlayer -> startSinglePlayer()
             Screen.Game.Mode.Multiplayer -> _screen.value = Screen.Lobby(
                 serverUrl = serverUrl,
-                nickname = nickname,
+                nickname = prefs.nickname,
                 connectionState = net?.connectionState?.value
                     ?: com.communicationcard.game.web.net.WebSocketTransport.State.Disconnected,
                 rooms = emptyList(),
@@ -278,17 +379,26 @@ class AppViewModel {
         val current = _screen.value as? Screen.Lobby ?: return
         _screen.value = transform(current)
     }
+
+    /** 与 GameScreen.kt 的 keyOf 保持一致：suit|rank|deckIndex 唯一标识一张实例。 */
+    private fun keyOf(c: Card): String = "${c.suit.name}|${c.rank.name}|${c.deckIndex}"
+
+    private fun deserializeCard(s: SerializedCard): Card? = try {
+        Card(
+            rank = CardRank.valueOf(s.rank),
+            suit = CardSuit.valueOf(s.suit),
+            deckIndex = s.deckIndex,
+        )
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 }
 
 /**
  * 默认服务器 URL：
  *
  * - 本地 dev（hostname=localhost / 127.0.0.1 / 空）→ `ws://localhost:8080/game`
- *   直连 `:server`，跳过反代。
- * - 部署到带反代的服务器（Caddy / Nginx 等）→ `ws[s]://<host>/game` 同源同端口，
- *   由反代转发到本机 8080。这样对外只需 80/443，wss 复用同一张证书。
- *
- * 用户在 Lobby 的输入框可以手动覆盖。
+ * - 部署到带反代的服务器 → `ws[s]://<host>/game` 同源同端口
  */
 private fun defaultServerUrl(): String {
     val proto = currentProtocol()

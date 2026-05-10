@@ -57,13 +57,14 @@ npx http-server -c-1                  # 推荐：MIME 完整 + 禁缓存
 | 路径 | 职责 |
 |---|---|
 | `src/wasmJsMain/kotlin/.../web/Main.kt` | `ComposeViewport` 入口 + 移除 loader |
-| `src/wasmJsMain/kotlin/.../web/ui/` | Home / Lobby / Room / Game / Settlement 五个屏幕 |
+| `src/wasmJsMain/kotlin/.../web/ui/` | Home / Settings / Stats / Help / Lobby / Room / Game / Settlement 八个屏幕 |
 | `src/wasmJsMain/kotlin/.../web/ui/Fonts.kt` | 中文字体加载（fetch + base64 + Skia interop） |
 | `src/wasmJsMain/kotlin/.../web/viewmodel/` | `AppViewModel` 状态机 + sessionJob 生命周期 |
+| `src/wasmJsMain/kotlin/.../web/storage/` | localStorage interop + UserPreferences + Statistics 持久化 |
 | `src/wasmJsMain/kotlin/.../web/net/` | `WebSocketTransport`（@JsFun 直 interop） + Network/Room/GameSync |
 | `src/wasmJsMain/kotlin/.../web/singleplayer/` | 单机模式：包装 `:shared` 的 `GameEngine` |
 | `src/wasmJsMain/resources/index.html` | 加载页 + loader（`#loader` 由 wasm 启动后 fade-out 移除） |
-| `src/wasmJsMain/resources/fonts/NotoSansSC-Subset.ttf` | 中文子集字体（GB2312 7540 字，~3 MB） |
+| `src/wasmJsMain/resources/fonts/NotoSansSC-Subset.ttf` | 中文子集字体（GB2312 7540 字 + ♠♣♥♦ · — 等项目符号，~3 MB） |
 | `fonts/build-subset.sh` | 字体子集重生成脚本（默认 GB2312；`SUBSET_MODE=project` 切到 ~200 KB 仅项目用字版） |
 
 依赖 Kotlin 1.9.24 + CMP 1.6.10；不引入 `kotlinx-browser:0.1`（要求 Kotlin 2.0+），
