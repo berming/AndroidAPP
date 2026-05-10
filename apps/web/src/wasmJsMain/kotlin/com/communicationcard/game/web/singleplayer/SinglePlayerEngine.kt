@@ -10,6 +10,7 @@ import com.communicationcard.game.model.Player
 import com.communicationcard.game.model.PlayerType
 import com.communicationcard.game.network.SerializedCard
 import com.communicationcard.game.network.SerializedCardGroup
+import com.communicationcard.game.network.SerializedGameEvent
 import com.communicationcard.game.network.SerializedGameResult
 import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.network.SerializedPlayer
@@ -54,6 +55,14 @@ class SinglePlayerEngine(
     private val _gameEnd = MutableSharedFlow<SerializedGameResult>(replay = 1)
     val gameEnd: SharedFlow<SerializedGameResult> = _gameEnd.asSharedFlow()
 
+    /**
+     * Stage F：与 [com.communicationcard.game.web.net.GameSyncManager.events] 等价的
+     * 事件流，让 ViewModel 可统一订阅 RoundWon / CardsPlayed / PlayerPassed 等
+     * 用于"出牌记录"和"中央瞬时消息"。
+     */
+    private val _events = MutableSharedFlow<SerializedGameEvent>(replay = 0, extraBufferCapacity = 16)
+    val events: SharedFlow<SerializedGameEvent> = _events.asSharedFlow()
+
     /** 人类玩家固定为座位 0（GameEngine.initializeGame 默认安排）。 */
     val humanSeatIndex: Int get() = 0
 
@@ -69,6 +78,9 @@ class SinglePlayerEngine(
 
     init {
         engine.addEventListener { event ->
+            // Stage F：把 :shared GameEvent 镜像成 SerializedGameEvent 推到 _events，
+            // 让 ViewModel 用与 GameSyncManager.events 一致的接口订阅。
+            mapToSerialized(event)?.let { se -> scope.launch { _events.emit(se) } }
             when (event) {
                 is GameEvent.GameEnded -> {
                     val r = event.result
@@ -106,6 +118,20 @@ class SinglePlayerEngine(
                 }
             }
         }
+    }
+
+    private fun mapToSerialized(event: GameEvent): SerializedGameEvent? = when (event) {
+        is GameEvent.CardsDealt -> SerializedGameEvent.CardsDealt(event.playerCount)
+        is GameEvent.TurnStart -> SerializedGameEvent.TurnStart(event.player.id)
+        is GameEvent.CardsPlayed -> SerializedGameEvent.CardsPlayed(
+            playerId = event.player.id,
+            cardGroup = event.cardGroup.toSerialized(),
+        )
+        is GameEvent.PlayerPassed -> SerializedGameEvent.PlayerPassed(event.player.id)
+        is GameEvent.RoundWon -> SerializedGameEvent.RoundWon(event.player.id, event.score)
+        is GameEvent.PlayerFinished -> SerializedGameEvent.PlayerFinished(event.player.id, event.order)
+        is GameEvent.ScoreUpdate -> SerializedGameEvent.ScoreUpdate(event.teamAScore, event.teamBScore)
+        is GameEvent.GameEnded, is GameEvent.AICommunication, GameEvent.StateRefresh -> null
     }
 
     fun start() {

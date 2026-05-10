@@ -58,6 +58,14 @@ object GreenTableColors {
     val cardOutline = Color(0xFF424242)
     val hintBorder = Color(0xFF66BB6A)
     val selectedBorder = Color(0xFFFFC107)
+
+    // Stage F：与 Android `current_round_background` / `player_area_background` 对齐
+    val goldBorder = Color(0xFFFFC107)             // 中央面板黄色描边
+    val centralPanelBg = Color(0x33000000)         // 中央面板半透明黑底
+    val playerStripBg = Color(0x40000000)          // 玩家卡片半透明黑底（Android view_player_with_cards 同款）
+    val handAreaBg = Color(0x40000000)             // 手牌区底色（Android playerHandArea 同款 #40000000）
+    val transientBg = Color(0xCC000000)            // 瞬时消息背景（Android tvMessage 同款 #CC000000）
+    val bombBorder = Color(0xFFFF8F00)             // 炸弹卡片高亮橙边
 }
 
 private fun greenTableScheme() = darkColorScheme(

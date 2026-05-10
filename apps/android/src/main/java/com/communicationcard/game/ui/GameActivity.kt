@@ -58,8 +58,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var btnPass: Button
     private lateinit var btnHint: Button
     private lateinit var btnAiTakeover: Button
-    private lateinit var btnAfk: Button
-    private lateinit var btnHistory: Button
+    // Stage G：btnMore 取代 btnHistory / btnAfk / btnAutoPlay；后三者已从 activity_game.xml 删除
+    private lateinit var btnMore: Button
     private lateinit var gameOverOverlay: FrameLayout
     private lateinit var tvGameOverTitle: TextView
     private lateinit var tvGameOverResult: TextView
@@ -107,9 +107,9 @@ class GameActivity : AppCompatActivity() {
     private var isHintShowing = false
     private var lastHintCards: List<Card> = emptyList()
 
-    // AI auto-play mode
+    // AI auto-play mode（btnAutoPlay 已删除；状态切换通过 btnAiTakeover 触发，
+    // syncAutoPlayUi 只更新 btnAiTakeover 文字）
     private var isAutoPlayEnabled = false
-    private lateinit var btnAutoPlay: Button
 
     // Replay feature
     private lateinit var replayOverlay: FrameLayout
@@ -182,10 +182,7 @@ class GameActivity : AppCompatActivity() {
         btnPass = findViewById(R.id.btnPass)
         btnHint = findViewById(R.id.btnHint)
         btnAiTakeover = findViewById(R.id.btnAiTakeover)
-        btnAfk = findViewById(R.id.btnAfk)
-        // 单机模式不需要"暂离"语义；隐藏（layout 默认已 gone，这里显式确保）
-        btnAfk.visibility = View.GONE
-        btnHistory = findViewById(R.id.btnHistory)
+        btnMore = findViewById(R.id.btnMore)
         gameOverOverlay = findViewById(R.id.gameOverOverlay)
         tvGameOverTitle = findViewById(R.id.tvGameOverTitle)
         tvGameOverResult = findViewById(R.id.tvGameOverResult)
@@ -213,12 +210,9 @@ class GameActivity : AppCompatActivity() {
         // Hand cards area for click to deselect
         handCardsArea = findViewById(R.id.handCardsArea)
 
-        // Auto-play button
-        // 单机模式下 btnAutoPlay 与 btnAiTakeover 功能重复（feature_spec G34 引入后者
-        // 作为统一的 v3 spec 按钮）；隐藏旧按钮避免 UI 上两个"托管"重复。
-        // OnlineGameActivity 仍然把同一个 btnAutoPlay 复用为"离开"按钮（不受影响）。
-        btnAutoPlay = findViewById(R.id.btnAutoPlay)
-        btnAutoPlay.visibility = View.GONE
+        // Stage G：btnAutoPlay 已从 XML 删除；isAutoPlayEnabled 由 btnAiTakeover 单独
+        // 控制。OnlineGameActivity 之前把 btnAutoPlay 借作"离开"按钮的功能也已迁移到
+        // "更多…"菜单的"离开房间"项。
 
         // Replay overlay
         replayOverlay = findViewById(R.id.replayOverlay)
@@ -282,8 +276,16 @@ class GameActivity : AppCompatActivity() {
             showHint()
         }
 
-        btnHistory.setOnClickListener {
-            showHistory()
+        // Stage G：btnHistory 已删除；"查看出牌记录"由"更多…"菜单第 1 项触发
+        btnMore.setOnClickListener {
+            MoreMenuDialog.show(
+                activity = this,
+                preferences = preferences,
+                isMultiplayer = false,
+                imAiSubstitute = false,
+                onShowHistory = { showHistory() },
+                onLeave = { finish() },
+            )
         }
 
         btnShowHistory.setOnClickListener {
@@ -305,12 +307,8 @@ class GameActivity : AppCompatActivity() {
             finish()
         }
 
-        // Auto-play toggle button (legacy "托管" / "取消" 按钮，feature_spec G34
-        // 引入 btnAiTakeover 后两者同步 isAutoPlayEnabled 状态)
-        btnAutoPlay.setOnClickListener {
-            toggleAutoPlay()
-        }
         // AI 接管按钮（feature_spec G34，单机也支持）
+        // Stage G：btnAutoPlay 已删除；状态切换仅由 btnAiTakeover 触发
         btnAiTakeover.setOnClickListener {
             toggleAutoPlay()
         }
@@ -1314,19 +1312,14 @@ class GameActivity : AppCompatActivity() {
     }
 
     /**
-     * 同步两个托管按钮的视觉状态（feature_spec G34）。
-     * btnAutoPlay 是历史按钮（"托管/取消"）；btnAiTakeover 是 v3 引入的统一按钮。
+     * 同步 AI 接管按钮的视觉状态（feature_spec G34）。
+     * Stage G：btnAutoPlay 已删除（"更多…"菜单的"AI 出牌速度"占其位）；只剩 btnAiTakeover。
      */
     private fun syncAutoPlayUi() {
-        if (isAutoPlayEnabled) {
-            btnAutoPlay.text = "取消"
-            btnAutoPlay.setBackgroundResource(R.drawable.button_primary)
-            btnAiTakeover.text = getString(R.string.btn_ai_takeover_off)
-        } else {
-            btnAutoPlay.text = "托管"
-            btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
-            btnAiTakeover.text = getString(R.string.btn_ai_takeover_on)
-        }
+        btnAiTakeover.text = if (isAutoPlayEnabled)
+            getString(R.string.btn_ai_takeover_off)
+        else
+            getString(R.string.btn_ai_takeover_on)
     }
 
     private fun scheduleAutoPlayTurn() {
