@@ -103,9 +103,13 @@ jobs:
         run: |
           ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" '
             set -e
-            sudo /bin/systemctl restart communication-card-server
-            sudo /bin/systemctl reload caddy
-            sudo /bin/systemctl status communication-card-server --no-pager | head -20
+            # 必须与 install.sh 写入 sudoers 的路径一致 —— 都用 command -v 解析。
+            # Ubuntu 22.04 是 /usr/bin/systemctl（/bin 是 usrmerge symlink，
+            # sudo 字符串匹配命令路径，写错了 NOPASSWD 失效）。
+            SYSCTL=$(command -v systemctl)
+            sudo "$SYSCTL" restart communication-card-server
+            sudo "$SYSCTL" reload caddy
+            sudo "$SYSCTL" status communication-card-server --no-pager | head -20
           '
 
       - name: Health check

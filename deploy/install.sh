@@ -128,18 +128,28 @@ cat "$KEY_PATH"
 cat <<EOF
 ------------------------------------------------------------
 
-2) 编辑 /etc/caddy/Caddyfile：
+2) 同一页 → Variables tab → New repository variable
+   Name:   DEPLOY_ENABLED
+   Value:  true
+   （opt-in 开关；不为 true 时 deploy workflow 直接 skip。
+    没设这个，下面第 5 步无论怎么按都不会跑。）
+
+3) 编辑 /etc/caddy/Caddyfile：
    - 用 IP 访问：保留 ":80" 那段，删掉域名段
    - 用域名访问：把 cards.example.com 改成你的域名，删掉 ":80" 段
    然后：sudo systemctl reload caddy
 
-3) 腾讯云安全组：放行 22 / 80 / 443，关闭 8080（只在本机 127.0.0.1 用）
+4) 腾讯云安全组：放行 22 / 80 / 443，关闭 8080（只在本机 127.0.0.1 用）
 
-4) 触发首次部署：
-   git commit --allow-empty -m "deploy: bootstrap"
-   git push origin main
+5) 触发首次部署：
+   GitHub repo → Actions 页 → 选 "Deploy to server" workflow
+   → 点 "Run workflow" 按钮（branch: main）
 
-5) 验证：
+   ⚠️ 不要用 git commit --allow-empty —— deploy.yml 有 paths: 过滤器，
+   空 commit 不命中任何路径，workflow 不会触发。workflow_dispatch
+   是绕过 paths 的唯一方式。
+
+6) 验证：
    curl -I http://$PUBLIC_IP/         # 应 200
    journalctl -u communication-card-server -f
 ============================================================
