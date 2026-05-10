@@ -235,9 +235,9 @@
 ## 代码验证
 
 ### 单机
-- `apps/communication-card/src/main/java/.../engine/SettlementCalculator.kt` - 独立的结算计算器
-- `apps/communication-card/src/test/.../engine/SettlementCalculatorTest.kt` - 单元测试（15 个用例）
-- `apps/communication-card/src/main/java/.../engine/SettlementVerification.kt` - 验证程序（可直接运行）
+- `apps/android/src/main/java/.../engine/SettlementCalculator.kt` - 独立的结算计算器
+- `apps/android/src/test/.../engine/SettlementCalculatorTest.kt` - 单元测试（15 个用例）
+- `apps/android/src/main/java/.../engine/SettlementVerification.kt` - 验证程序（可直接运行）
 
 关键代码：
 ```kotlin

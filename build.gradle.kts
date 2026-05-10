@@ -18,7 +18,7 @@ detekt {
     // 测试代码允许 !! 等模式（assertNotNull 后立即 !! 访问），不在 detekt 范围内
     source.setFrom(
         files(
-            "apps/communication-card/src/main/java",
+            "apps/android/src/main/java",
             "apps/web/src/wasmJsMain/kotlin",
             "shared/src/commonMain/kotlin",
             "server/src/main/kotlin",

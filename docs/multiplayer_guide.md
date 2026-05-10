@@ -22,7 +22,7 @@ cd server
 修改 `LobbyActivity.kt` 的 `SERVER_URL`：
 
 ```kotlin
-// apps/communication-card/src/main/java/com/communicationcard/game/ui/multiplayer/LobbyActivity.kt
+// apps/android/src/main/java/com/communicationcard/game/ui/multiplayer/LobbyActivity.kt
 companion object {
     // 模拟器连本机
     private const val SERVER_URL = "ws://10.0.2.2:8080/game"

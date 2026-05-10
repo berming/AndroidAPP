@@ -15,7 +15,7 @@
 ## 项目结构
 
 ```
-apps/communication-card/
+apps/android/
 ├── src/main/java/com/communicationcard/game/
 │   ├── model/          # 数据模型
 │   │   ├── Card.kt         # 卡牌定义（花色、点数、分值）
@@ -306,13 +306,13 @@ data class ReplayStep(
 
 ```bash
 # 构建 Debug APK
-./gradlew :apps:communication-card:assembleDebug
+./gradlew :apps:android:assembleDebug
 
 # 运行测试
-./gradlew :apps:communication-card:test
+./gradlew :apps:android:test
 
 # APK 输出路径
-apps/communication-card/build/outputs/apk/debug/communication-card-debug.apk
+apps/android/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
