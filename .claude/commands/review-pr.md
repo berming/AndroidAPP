@@ -16,15 +16,37 @@ overhead, lost scrollback, fragmented review history.
 
 `pr-reviewer` is a subagent (`.claude/agents/pr-reviewer.md`) that
 preserves the only thing that matters about "new session" —
-**context isolation** — without the ergonomic cost:
+**context isolation** — without the ergonomic cost. The isolation is
+real because the subagent has its own properties (none of which
+depend on this slash-command frontmatter):
 
-- Subagent runs in its own context window; cannot see this session's
-  history.
-- Its system prompt + rubric is **locked in the agent file**; the
-  caller cannot reframe the question.
-- It pulls the diff from `mcp__github__pull_request_read` — never
-  from the caller's narrative.
-- Returns to this session as a structured P0/P1/P2 list.
+- **Independent context window** — subagent literally cannot see this
+  session's history. Enforced by the harness.
+- **System prompt + rubric in the agent file** — what the reviewer
+  "knows" at invocation is whatever's committed to
+  `.claude/agents/pr-reviewer.md` plus the user-visible prompt sent
+  to it; nothing leaks in from the caller's conversation.
+- **Diff sourced from `mcp__github__pull_request_read`** — the agent's
+  own procedure forces this. Even if a caller pasted a diff into the
+  prompt, the agent is instructed to ignore it and re-pull from
+  GitHub.
+- **Output returns as a structured P0/P1/P2 list** — the calling
+  session displays it; doesn't get to "edit before posting".
+
+> ⚠️ **The `allowed-tools: Agent(pr-reviewer)` line above is _only_
+> permission pre-approval**, not isolation. Per Claude Code's
+> slash-command spec, frontmatter `allowed-tools` controls which tool
+> calls bypass the user's approval prompt — it does **not** restrict
+> which tools the calling session can invoke. The caller could still
+> invoke Read / Bash / Grep / WebFetch from the same session by
+> approving each prompt manually.
+>
+> So this command's safety against author-side bias rests on
+> **discipline + the subagent's intrinsic properties**, not on
+> frontmatter as a security boundary. If you (the human or the
+> calling session) summarize the PR before invoking, you've leaked
+> bias regardless of frontmatter. The "Don't do" section below is
+> a contract, not a guard.
 
 This satisfies the **same-vendor different-context** layer of the
 adversarial pyramid. **Codex (different-vendor) and physical real-
