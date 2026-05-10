@@ -84,7 +84,7 @@ class AppViewModel {
                     state = state,
                     localSeatIndex = engine.humanSeatIndex,
                     mode = Screen.Game.Mode.SinglePlayer,
-                    selectedCardIds = currentSelection(),
+                    selectedCardIds = currentSelectionFor(state, engine.humanSeatIndex),
                 )
             }
         }
@@ -231,11 +231,12 @@ class AppViewModel {
         sessionScope.launch {
             s.gameState.collect { state ->
                 if (state == null) return@collect
+                val mySeat = s.localSeatIndex.value
                 _screen.value = Screen.Game(
                     state = state,
-                    localSeatIndex = s.localSeatIndex.value,
+                    localSeatIndex = mySeat,
                     mode = Screen.Game.Mode.Multiplayer,
-                    selectedCardIds = currentSelection(),
+                    selectedCardIds = currentSelectionFor(state, mySeat),
                 )
             }
         }
@@ -286,22 +287,23 @@ class AppViewModel {
     // ============================================================
 
     fun playCards(cards: List<SerializedCard>) {
-        when (val s = _screen.value) {
-            is Screen.Game -> when (s.mode) {
-                Screen.Game.Mode.Multiplayer -> sync?.playCards(cards)
-                Screen.Game.Mode.SinglePlayer -> single?.humanPlay(cards)
-            }
-            else -> Unit
+        val s = _screen.value as? Screen.Game ?: return
+        // 出牌前先把这些卡当作"已发出"，乐观清空选择 + 提示。否则下一帧 state collector
+        // 会把旧 selectedCardIds 复制进新 Screen.Game，里面的 IDs 指向已离开手牌的卡，
+        // 但 selected.isNotEmpty() 仍 true → "出牌"按钮可点 → 发空 list（Codex P2 抓的）。
+        _screen.value = s.copy(selectedCardIds = emptySet(), hintedCardIds = emptySet())
+        when (s.mode) {
+            Screen.Game.Mode.Multiplayer -> sync?.playCards(cards)
+            Screen.Game.Mode.SinglePlayer -> single?.humanPlay(cards)
         }
     }
 
     fun pass() {
-        when (val s = _screen.value) {
-            is Screen.Game -> when (s.mode) {
-                Screen.Game.Mode.Multiplayer -> sync?.pass()
-                Screen.Game.Mode.SinglePlayer -> single?.humanPass()
-            }
-            else -> Unit
+        val s = _screen.value as? Screen.Game ?: return
+        _screen.value = s.copy(selectedCardIds = emptySet(), hintedCardIds = emptySet())
+        when (s.mode) {
+            Screen.Game.Mode.Multiplayer -> sync?.pass()
+            Screen.Game.Mode.SinglePlayer -> single?.humanPass()
         }
     }
 
@@ -373,7 +375,19 @@ class AppViewModel {
     //  helpers
     // ============================================================
 
-    private fun currentSelection(): Set<String> = (_screen.value as? Screen.Game)?.selectedCardIds ?: emptySet()
+    /**
+     * 拿当前 selectedCardIds，但**过滤掉**已经不在新手牌里的 IDs。
+     * 防御 Codex P2 的同类 race：如果 selection 跨过 server 推送的状态变化没被清，
+     * 至少不能让"已不在手牌的 ID"留在 selection 里造成出牌按钮错误 enable。
+     */
+    private fun currentSelectionFor(state: SerializedGameState, mySeat: Int): Set<String> {
+        val current = (_screen.value as? Screen.Game)?.selectedCardIds ?: return emptySet()
+        if (current.isEmpty()) return emptySet()
+        val handKeys = state.players.find { it.id == mySeat }?.hand
+            ?.map { "${it.suit}|${it.rank}|${it.deckIndex}" }?.toSet()
+            ?: return emptySet()
+        return current intersect handKeys
+    }
 
     private inline fun updateLobby(transform: (Screen.Lobby) -> Screen.Lobby) {
         val current = _screen.value as? Screen.Lobby ?: return
