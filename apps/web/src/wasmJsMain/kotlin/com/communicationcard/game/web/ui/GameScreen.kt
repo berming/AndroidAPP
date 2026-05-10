@@ -73,6 +73,9 @@ fun GameScreen(
     onHint: () -> Unit,
     onToggleSelected: (String) -> Unit,
     onLeave: () -> Unit,
+    /** 多人模式传非 null；单机模式 null = 不显示托管按钮（feature_spec G34/G35） */
+    imAiSubstitute: Boolean? = null,
+    onToggleAITakeover: (() -> Unit)? = null,
 ) {
     val mode = LocalLayoutMode.current
     val gs = state.state
@@ -98,6 +101,8 @@ fun GameScreen(
                 val toPlay = me.hand.filter { keyOf(it) in state.selectedCardIds }
                 onPlayCards(toPlay)
             },
+            imAiSubstitute = imAiSubstitute,
+            onToggleAITakeover = onToggleAITakeover,
         )
 
         // ─── 玩家行：紧凑卡片 + 每个下方最近出牌缩图 ───

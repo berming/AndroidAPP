@@ -217,6 +217,29 @@
             android:textColor="@color/text_primary"
             android:textSize="16sp" />
 
+        <!-- 房间 AI 速度（仅房主显示，feature_spec G37） -->
+        <Button
+            android:id="@+id/btnRoomAiSpeed"
+            android:layout_width="120dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/button_secondary"
+            android:text="@string/settings_room_ai_speed"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- 我的托管速度（每个玩家可见，feature_spec G38） -->
+        <Button
+            android:id="@+id/btnMyTakeoverSpeed"
+            android:layout_width="120dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/button_secondary"
+            android:text="@string/settings_my_takeover_speed"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
+
     </LinearLayout>
 
     <!-- 聊天按钮 - 可拖动，半透明 -->

@@ -83,6 +83,13 @@ fun App() {
                             onHint = vm::hint,
                             onToggleSelected = vm::toggleSelectedCard,
                             onLeave = vm::leaveGame,
+                            // feature_spec G34/G35：仅多人模式传非 null（GameScreen 据此显示按钮）
+                            imAiSubstitute = if (s.mode == Screen.Game.Mode.Multiplayer) {
+                                s.imAiSubstitute ?: false
+                            } else null,
+                            onToggleAITakeover = if (s.mode == Screen.Game.Mode.Multiplayer) {
+                                vm::toggleAITakeover
+                            } else null,
                         )
                         is Screen.Settlement -> SettlementScreen(
                             state = s,

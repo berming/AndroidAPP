@@ -53,7 +53,7 @@ class ServerGameManager(
      * - 否则（补位 AI）→ 用 room.serverAiDelayMs（feature_spec G37）
      * 找不到玩家时回退到房间默认值。
      */
-    private fun effectiveAiDelayMs(room: ServerRoom, seatIndex: Int): Long {
+    internal fun effectiveAiDelayMs(room: ServerRoom, seatIndex: Int): Long {
         val player = room.players.find { it.seatIndex == seatIndex }
         val ms = if (player?.isAISubstitute == true) player.takeoverAiDelayMs else room.serverAiDelayMs
         // 防御性 clamp，避免被恶意 / 旧客户端推到 0 / 负 / 无穷大

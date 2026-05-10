@@ -426,4 +426,68 @@ class ServerGameManagerTest {
         assertEquals(1000, rp.takeoverAiDelayMs)
         assertTrue(rp.isAISubstitute, "isAISubstitute 必须随 RoomUpdate 广播给客户端")
     }
+
+    // ============================================================
+    //  effectiveAiDelayMs —— feature_spec G37/G38 行为测试
+    //  规约：isAISubstitute=true → player.takeoverAiDelayMs；否则 room.serverAiDelayMs
+    // ============================================================
+
+    @Test
+    fun effectiveAiDelayMs_filledAi_usesRoomDelay() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 200
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 1, team = "TEAM_B"
+        )
+        aiPlayer.takeoverAiDelayMs = 999  // 不应被读取（不是 substitute）
+        room.players.add(aiPlayer)
+        assertEquals(200L, gm.effectiveAiDelayMs(room, seatIndex = 1))
+    }
+
+    @Test
+    fun effectiveAiDelayMs_substitute_usesPlayerTakeoverDelay() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 200  // 不应被读取（玩家自己的 takeover 优先）
+        val substitute = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 2, team = "TEAM_A"
+        )
+        substitute.takeoverAiDelayMs = 800
+        substitute.isAISubstitute = true
+        room.players.add(substitute)
+        assertEquals(800L, gm.effectiveAiDelayMs(room, seatIndex = 2))
+    }
+
+    @Test
+    fun effectiveAiDelayMs_clampsBelowMin() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 5  // 远低于 MIN_MULTIPLAYER_MS=100
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        room.players.add(aiPlayer)
+        // 防御：恶意 / 旧客户端把值推到 < 100ms 时，effectiveAiDelayMs 必须 clamp 到 100
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MIN_MULTIPLAYER_MS.toLong(),
+            gm.effectiveAiDelayMs(room, seatIndex = 0),
+            "速度低于 MIN 应被 clamp 到 100ms 防止 AI 雪崩"
+        )
+    }
+
+    @Test
+    fun effectiveAiDelayMs_clampsAboveMax() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 99999  // 远高于 MAX_MS=1000
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        room.players.add(aiPlayer)
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MAX_MS.toLong(),
+            gm.effectiveAiDelayMs(room, seatIndex = 0)
+        )
+    }
 }
