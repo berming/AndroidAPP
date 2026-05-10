@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.communicationcard.game.network.GameMessage
 
 /**
  * 与 Android 端 MainActivity 「帮助」面板对齐：游戏规则 / 关于 / 项目仓库链接。
@@ -65,7 +66,8 @@ fun HelpScreen(onBack: () -> Unit) {
                 BulletText("沟通牌 · Web 客户端")
                 BulletText("基于 Compose Multiplatform / Wasm-JS")
                 BulletText("与 Android 客户端共享 :shared 模块（牌型规则 / 结算 / AI / 协议 DTO）")
-                BulletText("协议 PROTOCOL_VERSION = 1（与服务端握手时校验）")
+                // 实际从 :shared 读，避免 hardcode 漂移（per pr-reviewer nit on PR #47）
+                BulletText("协议 PROTOCOL_VERSION = ${GameMessage.PROTOCOL_VERSION}（与服务端握手时校验）")
                 Spacer(Modifier.padding(top = 8.dp))
                 LinkButton("源代码 / Issues  ↗") {
                     openUrl("https://github.com/berming/AndroidAPP")
@@ -120,13 +122,26 @@ private fun LinkButton(label: String, onClick: () -> Unit) {
 @JsFun("(url) => { try { window.open(url, '_blank'); } catch (e) {} }")
 private external fun openUrl(url: String)
 
+/**
+ * 在浏览器 DevTools Console 打两条彩色提示。
+ *
+ * @JsFun body **必须 ASCII-only**（同 Main.kt:30 注释；过去某些 wasmJs / webpack 工具链
+ * 对 UTF-8 字面量处理不一致）。把中文文案作为 Kotlin 参数传入，JS 内只做拼接。
+ */
+private fun openConsole() {
+    consoleLogStyled(
+        styledMsg = "%c[沟通牌] 调试日志输出在浏览器 DevTools Console。",
+        css = "color: #FFC107; font-size: 14px; font-weight: bold;",
+        plainMsg = "打开方式：F12 / 右键 → 检查 / Cmd+Option+I",
+    )
+}
+
 @JsFun(
-    """() => {
+    """(styledMsg, css, plainMsg) => {
         try {
-            console.log('%c[沟通牌] 调试日志输出在浏览器 DevTools Console。',
-                'color: #FFC107; font-size: 14px; font-weight: bold;');
-            console.log('打开方式：F12 / 右键 → 检查 / Cmd+Option+I');
+            console.log(styledMsg, css);
+            console.log(plainMsg);
         } catch (e) {}
     }""",
 )
-private external fun openConsole()
+private external fun consoleLogStyled(styledMsg: String, css: String, plainMsg: String)

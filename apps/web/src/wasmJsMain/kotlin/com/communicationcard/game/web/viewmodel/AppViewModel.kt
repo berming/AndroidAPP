@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,6 +63,14 @@ class AppViewModel {
     // ---------- 持久化偏好 / 战绩（构造时从 localStorage 加载） ----------
     private var prefs: UserPreferences = UserPreferences.load()
     private var stats: Statistics = Statistics.load()
+
+    // 防御 pr-reviewer P2#1: nickname OutlinedTextField 每次 keystroke 走 updatePrefs
+    // 会触发同步 localStorage 写 + 全字段 JSON 序列化，重 + 阻塞主线程。
+    // 这里 debounce 500ms：连续打字时取消上一个 save，只在静止后真正写盘。
+    // 副作用：浏览器在 500ms 内关闭可能丢最后一帧 prefs；toggles/radios 写一次就静止，
+    // 实际不会受影响；nickname 输入后 500ms 才落盘，可接受。
+    private var savePrefsJob: Job? = null
+    private val PREFS_SAVE_DEBOUNCE_MS = 500L
 
     private var serverUrl = defaultServerUrl()
 
@@ -129,6 +138,7 @@ class AppViewModel {
         room = null
         sync = null
         single = null
+        flushPrefs()  // 离开任何屏 → 立刻落盘 pending prefs（防 debounce 窗口丢失）
         _screen.value = Screen.Home
     }
 
@@ -138,8 +148,20 @@ class AppViewModel {
 
     fun updatePrefs(transform: (UserPreferences) -> UserPreferences) {
         prefs = transform(prefs)
-        UserPreferences.save(prefs)
         if (_screen.value is Screen.Settings) _screen.value = Screen.Settings(prefs)
+        // Debounced persist (see PREFS_SAVE_DEBOUNCE_MS comment above)
+        savePrefsJob?.cancel()
+        savePrefsJob = scope.launch {
+            delay(PREFS_SAVE_DEBOUNCE_MS)
+            UserPreferences.save(prefs)
+        }
+    }
+
+    /** 立即把任何 pending 的 prefs 改动落盘（goHome / 关页前调）。 */
+    private fun flushPrefs() {
+        savePrefsJob?.cancel()
+        savePrefsJob = null
+        UserPreferences.save(prefs)
     }
 
     // ============================================================
@@ -331,8 +353,12 @@ class AppViewModel {
         }
 
         val validPlays = CardRules.findValidPlays(handCards, lastGroup)
-        // 选 primaryRank 最小的，张数次之；保留大牌
-        val pick = validPlays.minByOrNull { it.primaryRank.value * 100 + it.cards.size } ?: return
+        // 选 primaryRank 最小的（保留大牌）；张数作为 tiebreaker（也优先少张）。
+        // 用 Comparator 链替代 `value*100 + size` 这种容易溢出的 magic-number 复合键
+        // （pr-reviewer P2#6）。
+        val pick = validPlays.minWithOrNull(
+            compareBy({ it.primaryRank.value }, { it.cards.size }),
+        ) ?: return
 
         val keys = pick.cards.map { keyOf(it) }.toSet()
         _screen.value = s.copy(hintedCardIds = keys, selectedCardIds = keys)
@@ -342,11 +368,6 @@ class AppViewModel {
         val s = (_screen.value as? Screen.Game) ?: return
         val newSel = if (cardId in s.selectedCardIds) s.selectedCardIds - cardId else s.selectedCardIds + cardId
         _screen.value = s.copy(selectedCardIds = newSel, hintedCardIds = emptySet())
-    }
-
-    fun clearSelection() {
-        val s = (_screen.value as? Screen.Game) ?: return
-        _screen.value = s.copy(selectedCardIds = emptySet(), hintedCardIds = emptySet())
     }
 
     fun leaveGame() {
