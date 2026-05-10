@@ -194,7 +194,7 @@ add_textbox(s, Inches(0.8), Inches(1.2), Inches(11.5), Inches(0.6),
 add_textbox(s, Inches(0.8), Inches(1.8), Inches(11.5), Inches(1.0),
             "完整实践总结", font_size=44, bold=True, color=PRIMARY)
 add_textbox(s, Inches(0.8), Inches(3.0), Inches(11.5), Inches(0.5),
-            "沟通牌  ×  Claude Code  ×  约 3 个月实践",
+            "沟通牌  ×  Claude Code  ×  54 PR · 有效开发 18 天",
             font_size=BODY_LG, color=DARK)
 
 add_textbox(s, Inches(0.8), Inches(4.0), Inches(11.5), Inches(0.4),
@@ -219,105 +219,116 @@ s = add_slide()
 add_header(s, "一、项目背景与开发全貌")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
-            "沟通牌：4 副牌 216 张，6 人 3v3 卡牌游戏（单机 + 联网对抗）",
+            "沟通牌：4 副牌 216 张，6 人 3v3 卡牌游戏（单机 + 联网 + Web 三模式）",
             font_size=BODY_MD, color=DARK)
 
 add_textbox(s, Inches(0.5), Inches(1.55), Inches(6.0), Inches(0.4),
             "技术栈", font_size=BODY_LG, bold=True, color=PRIMARY)
 tech = [
-    ["客户端", "Kotlin + Coroutines + OkHttp + XML 布局"],
-    ["服务端", "Ktor + Netty + WebSockets"],
-    ["序列化", "kotlinx.serialization (JSON)"],
-    ["构建", "AGP 8.5 / Gradle 8.14 + 8.4"],
+    ["共享逻辑", "Kotlin Multiplatform (android+jvm+wasmJs)"],
+    ["Android", "Kotlin + Coroutines + Flow + OkHttp + XML"],
+    ["Web", "Compose Multiplatform 1.6.10 / Wasm-JS"],
+    ["服务端", "Ktor 2.3.6 + Netty + :shared 依赖"],
+    ["反代部署", "Caddy 80/443 → :8080 + systemd auto-deploy"],
 ]
-add_table(s, Inches(0.5), Inches(2.0), Inches(6.0), Inches(1.9),
+add_table(s, Inches(0.5), Inches(2.0), Inches(6.0), Inches(2.3),
             ["层", "技术"], tech, font_size=BODY_SM,
-            col_widths=[Inches(1.3), Inches(4.7)])
+            col_widths=[Inches(1.5), Inches(4.5)])
 
 add_textbox(s, Inches(7.0), Inches(1.55), Inches(6.0), Inches(0.4),
-            "代码规模  ·  90 文件 / ~14,865 行",
+            "代码规模 (PR #54 后)  ·  约 19,250 行",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 vol = [
-    ["客户端 Kotlin", "28 文件 · 8,909 行"],
-    ["客户端 XML 布局", "56 文件 · 3,279 行"],
-    ["服务端 Kotlin", "5 文件 · 2,161 行"],
-    ["测试", "1 文件 · 516 行"],
+    [":apps:android (UI+网络)", "19 文件 · ~6,300 行"],
+    [":apps:web (Compose MP)", "23 文件 · ~3,470 行"],
+    [":shared (KMP commonMain)", "9 文件 · ~2,670 行"],
+    [":server (Ktor)", "4 文件 · ~1,960 行"],
+    ["测试 + Android XML", "24 文件 · ~4,850 行"],
 ]
-add_table(s, Inches(7.0), Inches(2.0), Inches(6.0), Inches(1.9),
+add_table(s, Inches(7.0), Inches(2.0), Inches(6.0), Inches(2.3),
             ["模块", "规模"], vol, font_size=BODY_SM,
-            col_widths=[Inches(2.2), Inches(3.8)])
+            col_widths=[Inches(2.4), Inches(3.6)])
 
-add_textbox(s, Inches(0.5), Inches(4.1), Inches(12.3), Inches(0.4),
-            "5 阶段时间线  ·  33 PR  ·  123 commit  ·  3 个月",
+add_textbox(s, Inches(0.5), Inches(4.45), Inches(12.3), Inches(0.4),
+            "12 阶段时间线  ·  54 PR  ·  ~170 commit  ·  有效开发 18 天",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 phases = [
-    ["2026-02", "单机游戏开发 (PRs #1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
-    ["2026-04-30", "联网模式首次完整实现 (#16)", "服务端 + 网络层 + 联网UI · 一次性 6,529 行"],
-    ["2026-05-01", "构建与编译修复 (#17–21)", "CI 失败 / Gradle 缺失 / 编译错误"],
-    ["2026-05-03", "部署与连通性修复 (#22–31)", "服务器URL / cleartext / 503 / Lobby UI"],
-    ["2026-05-04~07", "游戏逻辑深度修复 (#32–33+)", "AI 全量审查×4轮 / 8 commit / 50+ Bug"],
+    ["2026-02-02 / 07~12 / 24", "单机游戏 (#1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
+    ["2026-04-30", "联网首版 (#16)", "服务端 + 网络层 · 一次性 6,529 行"],
+    ["2026-05-01~03", "部署 (#17–31)", "CI/Gradle/cleartext/503/Lobby UI"],
+    ["2026-05-07", "深度修复 (#34)", "AI 全量审查×4轮 / 8 commit / ~50 Bug"],
+    ["2026-05-08", "KMP 重构 + Web (#35)", "抽 :shared / Compose MP wasmJs"],
+    ["2026-05-08", "Harness H1–H5 (#36–43)", "hooks / TDD-gate / pr-reviewer"],
+    ["2026-05-09", "Web UI 4 阶段 (#47–50)", "菜单/响应式/视觉/Android 同等"],
+    ["2026-05-10", "AI 接管 + 单机修复 (#51–54)", "G34-G38 · PROTOCOL_VERSION 3"],
 ]
-add_table(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(2.4),
+add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
             ["时间", "阶段", "主要内容"], phases, font_size=BODY_SM,
-            col_widths=[Inches(2.0), Inches(4.0), Inches(6.3)])
+            col_widths=[Inches(2.6), Inches(3.7), Inches(6.0)])
 
 # =================================================================
 # Slide 3: Architecture (diagram + decisions + regrets)
 # =================================================================
 s = add_slide()
-add_header(s, "二、架构设计：双模式共生")
+add_header(s, "二、架构设计：多端共享 + 服务端权威")
 
-arch_code = """┌──────────────────────────────────────┐
-│  Android 客户端                      │
-│   GameActivity (单机)                │
-│   OnlineGameActivity (联网)          │
-│                                      │
-│   engine/  CardRules                 │
-│            SettlementCalculator      │
-│            GameEngine /              │
-│            MultiplayerGameEngine     │
-│                                      │
-│   network/ NetworkManager            │
-│            RoomManager               │
-│            GameSyncManager           │
-└──────────────────────────────────────┘
-              ▲ WebSocket /game (JSON)
-              ▼
-┌──────────────────────────────────────┐
-│  服务端 (Ktor + Netty)               │
-│   ServerRoomManager  房间/AI填充     │
-│   ServerGameManager  权威状态        │
-│     · 每房间 Mutex                   │
-│     · 三级 AI 回退 + 兜底推进        │
-│     · 30s 回合超时                   │
-└──────────────────────────────────────┘"""
-add_code_block(s, Inches(0.5), Inches(1.05), Inches(6.0), Inches(5.2),
-                arch_code, font_size=BODY_SM)
+arch_code = """┌────────────────────────┐  ┌─────────────────┐
+│ :apps:android (XML)    │  │ :apps:web (Wasm)│
+│ GameActivity / Online- │  │ Compose MP UI   │
+│ MultiplayerGameEngine  │  │ AppViewModel    │
+└──────────┬─────────────┘  └────────┬────────┘
+           │ depends on              │
+           ▼                         ▼
+        ┌──────────────────────────────┐
+        │  :shared (KMP commonMain)    │
+        │  Card · Deck · Player        │
+        │  CardRules · Settlement      │
+        │  GameEngine · AIPlayer       │
+        │  GameMessage (DTO + sealed)  │
+        │  + commonTest (40+ 用例)     │
+        └────────────┬─────────────────┘
+                     │
+                     ▼
+        ┌──────────────────────────────┐
+        │  :server (Ktor + Netty)      │
+        │  ServerRoomManager           │
+        │  ServerGameManager           │
+        │   · 每房间 Mutex             │
+        │   · 三级 AI 回退 + 兜底推进  │
+        │   · 30s 回合超时             │
+        └────────────┬─────────────────┘
+                     │ WebSocket /game (JSON + classDiscriminator)
+                     ▼
+        Caddy 80/443 → 127.0.0.1:8080"""
+add_code_block(s, Inches(0.5), Inches(1.05), Inches(6.3), Inches(5.4),
+                arch_code, font_size=10)
 
-add_textbox(s, Inches(6.8), Inches(1.05), Inches(6.2), Inches(0.4),
+add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
             "关键架构决策", font_size=BODY_LG, bold=True, color=PRIMARY)
 decisions = [
     ["状态同步", "全量状态 + 单调 version"],
     ["并发模型", "每房间 Mutex（修改在锁内）"],
     ["重连机制", "sessionToken=playerId · 30s 内恢复"],
     ["AI 替补", "isAISubstitute 标记，不删玩家槽"],
+    ["共享逻辑", ":shared KMP（编译期保证一致）"],
+    ["协议版本", "PROTOCOL_VERSION=3 · 握手时拒老客户端"],
 ]
-add_table(s, Inches(6.8), Inches(1.5), Inches(6.2), Inches(2.3),
+add_table(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(2.8),
             ["决策", "选择"], decisions, font_size=BODY_SM,
-            col_widths=[Inches(1.5), Inches(4.7)])
+            col_widths=[Inches(1.5), Inches(4.5)])
 
-add_textbox(s, Inches(6.8), Inches(4.0), Inches(6.2), Inches(0.4),
-            "架构遗憾（后期成本）", font_size=BODY_LG, bold=True, color=RED)
-regrets = [
-    ["未提取 KMP 共享规则", "导致两端 3 处不一致"],
-    ["无协议版本号", "演进时无强制兼容检查"],
-    ["无事件溯源", "历史行为无法追溯，调试难"],
+add_textbox(s, Inches(7.0), Inches(4.5), Inches(6.0), Inches(0.4),
+            "架构演进：从遗憾到修复", font_size=BODY_LG, bold=True, color=GREEN)
+evolution = [
+    ["KMP 共享模块", "✅ PR #35 + H3：编译期唯一份"],
+    ["协议版本号", "✅ PR-H3：PROTOCOL_VERSION + 握手"],
+    ["事件溯源", "⚪ 未规划，全量同步够用"],
 ]
-add_table(s, Inches(6.8), Inches(4.45), Inches(6.2), Inches(1.7),
-            ["遗憾", "影响"], regrets, font_size=BODY_SM,
-            header_color=RED, col_widths=[Inches(2.5), Inches(3.7)])
+add_table(s, Inches(7.0), Inches(4.95), Inches(6.0), Inches(1.5),
+            ["遗憾", "状态"], evolution, font_size=BODY_SM,
+            header_color=GREEN, col_widths=[Inches(2.0), Inches(4.0)])
 
-add_callout(s, Inches(0.5), Inches(6.4), Inches(12.5), Inches(0.6),
+add_callout(s, Inches(0.5), Inches(6.6), Inches(12.5), Inches(0.55),
             "核心原则：服务端权威  ·  客户端乐观响应  ·  全量状态 + version 同步",
             bg=PRIMARY, border=PRIMARY,
             font_size=BODY_MD, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
@@ -328,55 +339,59 @@ add_callout(s, Inches(0.5), Inches(6.4), Inches(12.5), Inches(0.6),
 s = add_slide()
 add_header(s, "三、问题全景：人工 vs AI")
 
-y = 1.3
+y = 1.1
 cards = [
-    ("🔴 人工测试 / 反馈", "~30 个",
-     "UI 体验 · 部署环境 · 运行时崩溃", "", RED),
-    ("🔵 AI #1：Claude Code", "~35 个",
-     "全量扫描 · 跨文件链路 · 并发陷阱", "claude-opus-4-7 / sonnet-4-6", PRIMARY),
-    ("🟡 AI #2：ChatGPT Codex", "3 个",
-     "PR 自动审查 · 细粒度风险点", "chatgpt-codex-connector[bot]", ORANGE),
+    ("🔴 人工测试 / 反馈", "~35", "27%",
+     "UI 体验 · 部署环境 · 运行时崩溃", "真机发现", RED),
+    ("🔵 Claude Code 主会话", "~55", "43%",
+     "全量扫描 · 跨文件链路 · 并发陷阱", "opus-4-7 / sonnet-4-6", PRIMARY),
+    ("🟢 Claude pr-reviewer", "~15", "12%",
+     "独立 context · 功能完整 · 协议契约", "PR-H5 后引入", GREEN),
+    ("🟡 ChatGPT Codex Bot", "~13", "10%",
+     "语句级边界 · entropy · UI 文案", "chatgpt-codex-connector", ORANGE),
 ]
-x_positions = [0.5, 4.7, 8.9]
-for (title, num, desc, model, color), x in zip(cards, x_positions):
+x_positions = [0.5, 3.7, 6.9, 10.1]
+for (title, num, pct, desc, model, color), x in zip(cards, x_positions):
     box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
                                 Inches(x), Inches(y),
-                                Inches(4.0), Inches(2.5))
+                                Inches(3.0), Inches(2.6))
     box.fill.solid()
     box.fill.fore_color.rgb = color
     box.line.fill.background()
-    add_textbox(s, Inches(x), Inches(y + 0.15), Inches(4.0), Inches(0.4),
-                title, font_size=BODY_MD, bold=True, color=WHITE,
+    add_textbox(s, Inches(x), Inches(y + 0.1), Inches(3.0), Inches(0.4),
+                title, font_size=BODY_SM, bold=True, color=WHITE,
                 align=PP_ALIGN.CENTER)
-    add_textbox(s, Inches(x), Inches(y + 0.6), Inches(4.0), Inches(0.9),
-                num, font_size=40, bold=True, color=WHITE,
+    add_textbox(s, Inches(x), Inches(y + 0.55), Inches(3.0), Inches(0.85),
+                num, font_size=36, bold=True, color=WHITE,
                 align=PP_ALIGN.CENTER)
-    add_textbox(s, Inches(x), Inches(y + 1.65), Inches(4.0), Inches(0.35),
-                desc, font_size=BODY_SM, color=WHITE, align=PP_ALIGN.CENTER)
-    add_textbox(s, Inches(x), Inches(y + 2.05), Inches(4.0), Inches(0.35),
-                model, font_size=10, color=WHITE,
+    add_textbox(s, Inches(x), Inches(y + 1.45), Inches(3.0), Inches(0.3),
+                pct, font_size=BODY_SM, color=WHITE, align=PP_ALIGN.CENTER)
+    add_textbox(s, Inches(x), Inches(y + 1.8), Inches(3.0), Inches(0.4),
+                desc, font_size=10, color=WHITE, align=PP_ALIGN.CENTER)
+    add_textbox(s, Inches(x), Inches(y + 2.2), Inches(3.0), Inches(0.3),
+                model, font_size=9, color=WHITE,
                 align=PP_ALIGN.CENTER)
 
-add_callout(s, Inches(0.5), Inches(4.1), Inches(12.4), Inches(2.85),
+add_callout(s, Inches(0.5), Inches(4.0), Inches(12.4), Inches(3.0),
             "", bg=LIGHT_BG, border=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.3), Inches(12.0), Inches(0.5),
-            "💡 核心发现",
+add_textbox(s, Inches(0.8), Inches(4.15), Inches(12.0), Inches(0.5),
+            "💡 核心发现：4 种视角几乎不重叠 → 总计 ~128 个问题",
             font_size=BODY_LG, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.85), Inches(12.0), Inches(0.5),
-            "人工看见「症状」 · Claude 挖「根因」 · Codex 找「细节风险」 — 三者几乎不重叠",
-            font_size=BODY_MD, bold=True, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.35), Inches(12.0), Inches(0.5),
-            "·  人工：截图 / 真机崩溃 / 部署环境问题",
+add_textbox(s, Inches(0.8), Inches(4.75), Inches(12.0), Inches(0.4),
+            "·  人工：截图 / 真机崩溃 / 部署环境（动态运行时问题）",
             font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.7), Inches(12.0), Inches(0.5),
-            "·  Claude Code Agent：跨文件链路 / 并发陷阱 / 协议一致性",
+add_textbox(s, Inches(0.8), Inches(5.15), Inches(12.0), Inches(0.4),
+            "·  Claude 主会话：跨文件链路 / 并发陷阱 / 工具链兼容（静态全量扫描）",
             font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.8), Inches(6.05), Inches(12.0), Inches(0.5),
-            "·  ChatGPT Codex Bot：UUID 截断 / loading 卡死 / UI/服务端不一致",
+add_textbox(s, Inches(0.8), Inches(5.55), Inches(12.0), Inches(0.4),
+            "·  Claude pr-reviewer：独立 context · 功能完整性 · 跨文件契约（PR #53 P1 #1：fabricated symbol）",
             font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.8), Inches(6.45), Inches(12.0), Inches(0.5),
-            "→  多 AI 交叉审查比单一审查更可靠",
-            font_size=BODY_SM, bold=True, color=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(5.95), Inches(12.0), Inches(0.4),
+            "·  Codex bot：UUID 截断 / loading 卡死 / processAITurn race（语句级边界）",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(6.45), Inches(12.0), Inches(0.4),
+            "→  4 视角缺一不可：盲区互补，单独跑一个至少漏一类问题",
+            font_size=BODY_MD, bold=True, color=PRIMARY)
 
 # =================================================================
 # Slide 5: Human-discovered Issues (3 phases compacted)
@@ -712,39 +727,80 @@ add_callout(s, Inches(0.5), Inches(7.0), Inches(12.4), Inches(0.4),
             font_size=10, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
-# Slide 12: Key Technical Fixes (3 in 1)
+# Slide 12: Key Technical Fixes (6 in 1, compacted)
 # =================================================================
 s = add_slide()
-add_header(s, "七、关键技术修复（3 处核心）")
+add_header(s, "七、关键技术修复（6 处典型）")
 
-add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+# 左半：3 个游戏逻辑层修复
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
+            "🎮 游戏逻辑层", font_size=BODY_LG, bold=True, color=PRIMARY)
+
+add_textbox(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(0.35),
             "1️⃣ 游戏卡死 — 四层防御",
-            font_size=BODY_MD, bold=True, color=PRIMARY)
-fix1 = """[层1] canBeat 炸弹比较错误：大张数应直接胜（修复前要求同张数）
-[层2] AI 失败无回退：增加三级回退（首选 → 过牌 → 最小单张）
-[层3] 多协程无锁并发写 state.hands：每房间一把 Mutex（改在锁内/广播在锁外）
-[层4] 三级回退仍失败：broadcastForceAdvance 强制推进兜底"""
-add_code_block(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(1.7),
-                fix1, font_size=BODY_SM)
+            font_size=BODY_SM, bold=True, color=DARK)
+fix1 = """L1 canBeat 炸弹大张数胜
+L2 AI 三级回退
+L3 每房间 Mutex
+L4 broadcastForceAdvance 兜底"""
+add_code_block(s, Inches(0.5), Inches(1.85), Inches(6.2), Inches(1.2),
+                fix1, font_size=10)
 
-add_textbox(s, Inches(0.5), Inches(3.3), Inches(12.3), Inches(0.4),
+add_textbox(s, Inches(0.5), Inches(3.15), Inches(6.2), Inches(0.35),
             "2️⃣ 重连失效 — 异步时序陷阱",
-            font_size=BODY_MD, bold=True, color=PRIMARY)
-fix2 = """❌ 修复前：newWebSocket() 后立即 send(Reconnect)，ws 仍在 CONNECTING → 静默丢弃
-✅ 修复后：在 onOpen 回调内 send，确保 ws 已 OPEN
-教训：「创建连接」≠「连接已建立」，异步 API 必须在回调中操作"""
-add_code_block(s, Inches(0.5), Inches(3.75), Inches(12.3), Inches(1.4),
-                fix2, font_size=BODY_SM)
+            font_size=BODY_SM, bold=True, color=DARK)
+fix2 = """❌ newWebSocket() 后立即 send → 静默丢弃
+✅ 在 onOpen 回调内 send，确保 ws OPEN"""
+add_code_block(s, Inches(0.5), Inches(3.5), Inches(6.2), Inches(0.85),
+                fix2, font_size=10)
 
-add_textbox(s, Inches(0.5), Inches(5.25), Inches(12.3), Inches(0.4),
+add_textbox(s, Inches(0.5), Inches(4.45), Inches(6.2), Inches(0.35),
             "3️⃣ 两端结算不一致 — 统一公式",
+            font_size=BODY_SM, bold=True, color=DARK)
+fix3 = """playerScores 实时追踪每人已收
+赢方 = 赢方已收 + 输方未走完(已收+手牌)
+✓ 15 个验证用例全部通过"""
+add_code_block(s, Inches(0.5), Inches(4.8), Inches(6.2), Inches(1.1),
+                fix3, font_size=10)
+
+# 右半：3 个部署 / 平台陷阱
+add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
+            "🚀 部署 / 平台层", font_size=BODY_LG, bold=True, color=ORANGE)
+
+add_textbox(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(0.35),
+            "4️⃣ Web 中文豆腐块（CJK）",
+            font_size=BODY_SM, bold=True, color=DARK)
+fix4 = """根因：浏览器无系统中文字体
+方案：打包 ~3MB GB2312 子集字体
+教训：跨端要测真实终端环境"""
+add_code_block(s, Inches(7.0), Inches(1.85), Inches(6.0), Inches(1.2),
+                fix4, font_size=10)
+
+add_textbox(s, Inches(7.0), Inches(3.15), Inches(6.0), Inches(0.35),
+            "5️⃣ 双层防火墙 — 部署对称陷阱",
+            font_size=BODY_SM, bold=True, color=DARK)
+fix5 = """ufw 开了 ≠ 公网通：腾讯云安全组也要开
+教训：私有云常有"两层防火墙"，必须都查"""
+add_code_block(s, Inches(7.0), Inches(3.5), Inches(6.0), Inches(0.85),
+                fix5, font_size=10)
+
+add_textbox(s, Inches(7.0), Inches(4.45), Inches(6.0), Inches(0.35),
+            "6️⃣ Android URL 漂移 — 拓扑变更盲区",
+            font_size=BODY_SM, bold=True, color=DARK)
+fix6 = """PR #41 改 Caddy 反代后，Web 改了 URL
+但 Android 硬编码 :8080 没改 → 完全连不上
+教训：拓扑变更必须 grep 所有客户端 URL"""
+add_code_block(s, Inches(7.0), Inches(4.8), Inches(6.0), Inches(1.1),
+                fix6, font_size=10)
+
+add_callout(s, Inches(0.5), Inches(6.05), Inches(12.5), Inches(1.0),
+            "", bg=LIGHT_BG, border=PRIMARY)
+add_textbox(s, Inches(0.8), Inches(6.2), Inches(12.0), Inches(0.4),
+            "💡 共同规律：游戏逻辑层错在「假设」，部署层错在「跨端 / 跨拓扑同步」",
             font_size=BODY_MD, bold=True, color=PRIMARY)
-fix3 = """根因：collectedScore 硬编码为 0；服务端漏算「输方未走完已收分」
-统一公式：赢方 = 赢方所有已收 + 输方未走完(已收 + 手牌分)；输方 = 输方已走完已收
-新增 state.playerScores: MutableMap<Int,Int> 实时追踪每人已收分
-✓ 15 个验证用例全部通过（含提前结算、速度流、极端场景）"""
-add_code_block(s, Inches(0.5), Inches(5.7), Inches(12.3), Inches(1.5),
-                fix3, font_size=BODY_SM)
+add_textbox(s, Inches(0.8), Inches(6.6), Inches(12.0), Inches(0.4),
+            "防御：(1) 关键路径强制 TDD；(2) 跨端共享 KMP 模块；(3) 拓扑变更 grep 所有 client 配置",
+            font_size=BODY_SM, color=DARK)
 
 # =================================================================
 # Slide 13: Lessons + Action Items + Closing
@@ -756,44 +812,50 @@ add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
             "🎯 核心经验",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 lessons = [
-    "1. 「修了又坏」的根因：只修表层，没往深挖",
-    "2. 单机/联网共享逻辑必须保持一致",
-    "3. AI 静态扫描 + 人工真机验证不可互相替代",
-    "4. 协议与环境问题必须人工打通",
+    "1. 「修了又坏」的根因：只修表层，没往深挖（需要分层根因审查）",
+    "2. 跨端共享逻辑必须用 KMP 强制（已实现 :shared 模块）",
+    "3. AI 静态扫描 + 人工真机 + Codex bot 不可互相替代（4 视角全跑）",
+    "4. 协议 / 环境 / 部署拓扑变更必须人工打通（grep 所有客户端）",
+    "5. 大特性 Phase 分段提交（协议 → 主客户端 → 次客户端）",
+    "6. delay() 之后必须重检所有依赖项，不只 currentPlayerIndex",
 ]
-y = 1.55
+y = 1.5
 for l in lessons:
-    add_textbox(s, Inches(0.6), Inches(y), Inches(6.2), Inches(0.4),
+    add_textbox(s, Inches(0.6), Inches(y), Inches(6.2), Inches(0.35),
                 l, font_size=BODY_SM, color=DARK)
-    y += 0.5
+    y += 0.4
 
 add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
-            "🚀 后续建议行动",
+            "🚀 后续建议行动（已部分落地）",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 actions = [
-    ["P0", "自动化集成测试（炸弹/结算/重连）"],
-    ["P0", "共享规则层（KMP 模块）"],
-    ["P1", "force-advance 监控告警"],
-    ["P2", "弱网回归测试"],
-    ["P2", "协议版本号兼容检查"],
+    ["✅ 已实现", ":shared KMP 共享模块（PR #35）"],
+    ["✅ 已实现", "PROTOCOL_VERSION + 握手（PR-H3）"],
+    ["✅ 已实现", "harness L0-L4（hooks/playbook/regression）"],
+    ["✅ 已实现", "tdd-gate CI 硬关（PR-H2）"],
+    ["✅ 已实现", "pr-reviewer subagent（PR-H5）"],
+    ["⚪ 待规划", "force-advance 监控告警 / 弱网 e2e"],
 ]
-add_table(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(2.5),
-            ["优先级", "行动"], actions, font_size=BODY_SM,
-            col_widths=[Inches(1.2), Inches(4.8)])
+add_table(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(2.6),
+            ["状态", "行动"], actions, font_size=BODY_SM,
+            col_widths=[Inches(1.5), Inches(4.5)])
 
-add_callout(s, Inches(0.5), Inches(4.2), Inches(12.4), Inches(2.5),
+add_callout(s, Inches(0.5), Inches(4.4), Inches(12.4), Inches(2.3),
             "", bg=LIGHT_BG, border=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.4), Inches(12.0), Inches(0.5),
-            "🏆 本次交付成果",
+add_textbox(s, Inches(0.8), Inches(4.55), Inches(12.0), Inches(0.5),
+            "🏆 全程交付成果",
             font_size=BODY_LG, bold=True, color=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(4.95), Inches(12.0), Inches(0.4),
-            "·  全程 33 PR / 123 commit  ·  修复约 67 个问题  ·  本次深度调试 8 commit / 重写 700 行",
+add_textbox(s, Inches(0.8), Inches(5.05), Inches(12.0), Inches(0.4),
+            "·  全程 54 PR / ~170 commit  ·  有效开发 18 天  ·  发现 ~128 个问题",
             font_size=BODY_SM, color=DARK)
-add_textbox(s, Inches(0.8), Inches(5.4), Inches(12.0), Inches(0.4),
-            "·  游戏永不卡死 ✓  ·  重连无缝恢复 ✓  ·  两端结算一致 ✓",
+add_textbox(s, Inches(0.8), Inches(5.45), Inches(12.0), Inches(0.4),
+            "·  Android + Web 双端  ·  KMP 共享模块（编译期保证一致）  ·  Caddy 自托管自动部署",
+            font_size=BODY_SM, color=DARK)
+add_textbox(s, Inches(0.8), Inches(5.85), Inches(12.0), Inches(0.4),
+            "·  游戏永不卡死 ✓  ·  重连无缝恢复 ✓  ·  两端结算一致 ✓  ·  PROTOCOL_VERSION = 3 ✓",
             font_size=BODY_SM, color=GREEN, bold=True)
-add_textbox(s, Inches(0.8), Inches(5.95), Inches(12.0), Inches(0.5),
-            "💡 核心结论：AI 静态全量审查 + 人工动态真机验证 = 互补提速 10 倍",
+add_textbox(s, Inches(0.8), Inches(6.3), Inches(12.0), Inches(0.4),
+            "💡 核心结论：4 视角覆盖率 + harness 跨会话沉淀 = 教训不浪费",
             font_size=BODY_MD, bold=True, color=PRIMARY)
 
 add_textbox(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.4),
@@ -802,10 +864,10 @@ add_textbox(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.4),
             align=PP_ALIGN.CENTER)
 
 # =================================================================
-# Slide 14: 八、harness 跨会话经验 (1/3) — Phase 分段 + wasmJs 教训
+# Slide 14: 九、harness 跨会话经验 (1/3) — Phase 分段 + wasmJs
 # =================================================================
 s = add_slide()
-add_header(s, "八、harness 跨会话经验（1/3）")
+add_header(s, "九、harness 跨会话经验（1/3）")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
             "📦 大特性的 Phase 分段提交",
@@ -816,17 +878,18 @@ phase_rows = [
     ["Phase 2", "主客户端 (Android)", "一份吃通验证 server"],
     ["Phase 3", "次客户端 (Web) + 跨端测", "最后补齐"],
 ]
-add_table(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(2.2),
+add_table(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(2.0),
             ["Phase", "内容", "价值"], phase_rows, font_size=BODY_SM,
             col_widths=[Inches(1.0), Inches(2.6), Inches(2.6)])
 
-add_textbox(s, Inches(0.5), Inches(3.85), Inches(6.2), Inches(1.0),
-            "跨协议+服务端+双客户端>200行 / >5文件 → 必须拆 Phase\n"
-            "每 Phase 内再按编译单元切（Android / Web 拆 commit）",
+add_textbox(s, Inches(0.5), Inches(3.65), Inches(6.2), Inches(1.2),
+            "适用：跨协议 + 服务端 + 双客户端 > 200 行 / > 5 文件\n"
+            "每 Phase 内还按编译单元切（Android / Web 拆 commit）\n"
+            "PR #53 G34-G38（5 特性, ~700 行）3 phase 实战验证",
             font_size=BODY_SM, color=DARK)
 
 add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
-            "⚠️  wasmJs 编译器的隐藏陷阱",
+            "⚠️  wasmJs 编译器隐藏陷阱",
             font_size=BODY_LG, bold=True, color=RED)
 
 add_code_block(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(1.4),
@@ -835,13 +898,13 @@ add_code_block(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(1.4),
                "Caused by: NullPointerException",
                font_size=BODY_SM)
 
-add_textbox(s, Inches(7.0), Inches(3.05), Inches(6.0), Inches(2.5),
+add_textbox(s, Inches(7.0), Inches(3.05), Inches(6.0), Inches(2.3),
             "根因：可空 lambda + Compose smart-cast；\n"
-            "vm::method KFunction → (() -> Unit)?\n\n"
+            "vm::method KFunction → (() -> Unit)? 自动转换\n\n"
             "修法：\n"
             "• 可空 lambda → local val 固化非空\n"
             "• 函数引用 → 显式 { vm.foo() } lambda\n\n"
-            "沙箱拉不到 wasmJs 编译器；写完 Web UI 必须 push CI 才算",
+            "沙箱拉不到 wasmJs 编译器；写完 Web UI 必须 push CI",
             font_size=BODY_SM, color=DARK)
 
 add_callout(s, Inches(0.5), Inches(5.0), Inches(12.3), Inches(1.7),
@@ -856,17 +919,17 @@ add_textbox(s, Inches(0.8), Inches(5.5), Inches(12.0), Inches(1.2),
             font_size=BODY_SM, color=DARK)
 
 # =================================================================
-# Slide 15: 八、harness 跨会话经验 (2/3) — Codex 互补 + delay 重检
+# Slide 15: 九、harness 跨会话经验 (2/3) — Codex 互补 + delay 重检
 # =================================================================
 s = add_slide()
-add_header(s, "八、harness 跨会话经验（2/3）")
+add_header(s, "九、harness 跨会话经验（2/3）")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
             "🔍 Codex bot 与 Claude /review-pr 盲区互补（PR #53 实证）",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 
 reviewer_rows = [
-    ["Claude /review-pr", "docs 误写「随机起手」+ 引用不存在的函数（**跨文件契约**）", "delay() 后 race"],
+    ["Claude /review-pr", "docs 误写 + 引用不存在函数（**跨文件契约**）", "delay() 后 race"],
     ["Codex bot", "delay() 后没重检 isAISubstitute 的 race（**语句级边界**）", "文档与代码语义对齐"],
 ]
 add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(1.5),
@@ -880,7 +943,7 @@ add_textbox(s, Inches(0.8), Inches(3.3), Inches(12.0), Inches(0.6),
             font_size=BODY_MD, bold=True, color=DARK)
 
 add_textbox(s, Inches(0.5), Inches(4.2), Inches(12.3), Inches(0.4),
-            "⏰ delay() 后状态过期反请（regressions #11）",
+            "⏰ delay() 后状态过期 — race 反请（regressions #11）",
             font_size=BODY_LG, bold=True, color=RED)
 
 add_code_block(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(1.4),
@@ -896,60 +959,44 @@ add_textbox(s, Inches(0.5), Inches(6.1), Inches(12.3), Inches(0.7),
             font_size=BODY_SM, color=DARK)
 
 # =================================================================
-# Slide 16: 八、harness 跨会话经验 (3/3) — TDD-gate / PR 流转 / 设计取舍
+# Slide 16: 九、harness 跨会话经验 (3/3) — L0-L4 体系 + 4 教训
 # =================================================================
 s = add_slide()
-add_header(s, "八、harness 跨会话经验（3/3）")
+add_header(s, "九、harness 跨会话经验（3/3）— L0–L4 体系")
 
-# Left column
-add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.2), Inches(0.4),
-            "✅ 同 commit *Test.kt 配对",
+add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
+            "🏗️  Harness 5 层防御体系（PR-H1..H5 + #35 web 重构 实战搭建）",
+            font_size=BODY_LG, bold=True, color=PRIMARY)
+
+l_rows = [
+    ["L0", "Settings / hooks", "PostToolUse 注入「关键路径 TDD 提醒」+ push 后自动 review-check"],
+    ["L1", "Slash commands", "/test-fast · /pre-commit-scan · /ship-check · /review-pr"],
+    ["L2", "Subagents", "pr-reviewer (Opus) · protocol-syncer · tdd-scaffolder"],
+    ["L3", "CI gates", "tdd-gate（关键路径必同改 *Test.kt）+ build + detekt"],
+    ["L4", "Documentation", "playbook（feature/bug/CI 失败/对抗审查）+ regressions DB"],
+]
+add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(2.6),
+            ["层", "工具", "说明"], l_rows, font_size=BODY_SM,
+            col_widths=[Inches(0.7), Inches(2.5), Inches(9.1)])
+
+add_textbox(s, Inches(0.5), Inches(4.3), Inches(12.3), Inches(0.4),
+            "🎯 跨会话经验的核心原则",
             font_size=BODY_LG, bold=True, color=GREEN)
-add_textbox(s, Inches(0.5), Inches(1.5), Inches(6.2), Inches(1.0),
-            "PR #53 6 commit，每改关键路径都同 commit 附测。\n"
-            "tdd-gate 一次没误报、一次没漏。\n\n"
-            "hook 弹「TDD 提醒」时不必立刻另开 commit 写测——\n"
-            "保证最终单 commit 同时含两份即可。",
-            font_size=BODY_SM, color=DARK)
 
-add_textbox(s, Inches(0.5), Inches(3.55), Inches(6.2), Inches(0.4),
-            "🔀 PR 流转：分支 vs PR 错位",
-            font_size=BODY_LG, bold=True, color=ORANGE)
-add_textbox(s, Inches(0.5), Inches(4.0), Inches(6.2), Inches(1.6),
-            "PR #52 合并后本会话同分支又 push 了 5 commit——但 PR #52 已 closed，\n"
-            "push 不会自动出 PR。直到用户问 \"PR 呢？\" 才意识到需要新分支 + PR #53。\n\n"
-            "原则：一个分支 = 一个 PR。PR merge 后下一组改动开新分支。",
-            font_size=BODY_SM, color=DARK)
+other_lessons = [
+    ["同 commit *Test.kt 配对", "tdd-gate 一次没误报、一次没漏；hook 弹\"TDD 提醒\"时不必另开 commit"],
+    ["分支 vs PR 一一对应", "PR merge 后开新分支；老分支再 push 不会自动出 PR（PR #52→#53 实战）"],
+    ["文档单一真相 grep 验证", "新 doc 自称\"权威\"前必 grep 验证 anchor 函数名实际存在"],
+    ["速度档位用 3 档预设", "slider 看似灵活；实际多数场景 3 档够用 + 测试矩阵更小"],
+]
+add_table(s, Inches(0.5), Inches(4.7), Inches(12.3), Inches(2.0),
+            ["经验", "说明"], other_lessons, font_size=BODY_SM,
+            col_widths=[Inches(3.0), Inches(9.3)])
 
-# Right column
-add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
-            "📚 文档单一真相 + 自动同步",
-            font_size=BODY_LG, bold=True, color=PRIMARY)
-add_textbox(s, Inches(7.0), Inches(1.5), Inches(6.0), Inches(1.6),
-            "pr-reviewer 抓到 game_rules.md 误写「随机起手」+\n"
-            "引用 randomFirstPlayer 但代码无此符号。\n\n"
-            "沉淀：新文档自称「权威」前必须 grep 验证所有\n"
-            "anchor 函数名实际存在。",
-            font_size=BODY_SM, color=DARK)
-
-add_textbox(s, Inches(7.0), Inches(3.55), Inches(6.0), Inches(0.4),
-            "🎚️  设计取舍：slider vs 3 档预设",
-            font_size=BODY_LG, bold=True, color=PRIMARY)
-add_textbox(s, Inches(7.0), Inches(4.0), Inches(6.0), Inches(1.8),
-            "AI 速度最初考虑 slider（任意 50-2000ms 连续值），\n"
-            "最终选 3 档预设（feature_spec G36-G38）。\n\n"
-            "原则：当特性「看似 slider 更灵活」时，先问\n"
-            "「用户真需要连续值么？」——多数情况 3 档够用，\n"
-            "且压缩了边界情况测试矩阵。",
-            font_size=BODY_SM, color=DARK)
-
-add_callout(s, Inches(0.5), Inches(5.95), Inches(12.3), Inches(0.8),
-            "", bg=LIGHT_BG, border=PRIMARY)
-add_textbox(s, Inches(0.8), Inches(6.1), Inches(12.0), Inches(0.6),
-            "💎 跨会话经验的核心：harness（hook / playbook / regression DB）让"
-            "教训跨 session 沉淀，"
-            "而不是每次新人新 AI 都从头踩一遍坑。",
-            font_size=BODY_MD, bold=True, color=PRIMARY)
+add_callout(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.55),
+            "💎 核心：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑",
+            bg=PRIMARY, border=PRIMARY,
+            font_size=BODY_MD, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
 total = len(prs.slides)

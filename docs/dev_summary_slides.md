@@ -30,7 +30,7 @@ style: |
 
 <br>
 
-**沟通牌 × Claude Code × 约 3 个月实践**
+**沟通牌 × Claude Code × 54 PR · 有效开发 18 天**
 
 <br>
 
@@ -40,87 +40,103 @@ style: |
 
 ## 目录
 
-1. **项目背景** — 技术栈 · 代码规模
-2. **开发全貌** — 5 个阶段 · 33 PR · 3 个月
-3. **架构设计** — 双模式架构 · 关键决策 · 妥协与遗憾
-4. **问题全景** — 人工 32 个 vs AI 35 个，如何互补
+1. **项目背景** — Kotlin Multiplatform · 代码规模 · 三模式
+2. **开发全貌** — 12 阶段 · 54 PR · ~170 commit · 有效开发 18 天
+3. **架构设计** — 多端共享 + 服务端权威 · 关键决策 · 演进路径
+4. **问题全景** — 4 视角发现 ~128 个问题，如何互补
 5. **人机协同** — 4 个层次 · 分工矩阵 · 反模式 · 最佳实践
-6. **关键技术修复** — 四层防卡死 · 重连时序 · 结算公式
-7. **经验与行动** — 核心结论 · 后续建议
+6. **关键技术修复** — 6 处典型（游戏逻辑 / 部署 / 平台陷阱）
+7. **经验与行动** — 核心结论 · 已落地 · 待规划
+8. **harness 跨会话经验** — Phase 分段 · Codex 互补 · L0–L4 体系
 
 ---
 
 ## 一、项目背景
 
 ### 产品
-**沟通牌**：4 副牌 216 张，6 人 3v3 卡牌游戏
-- 单机模式（本机 AI 对手）
-- **联网对抗**（WebSocket 实时对战）← 本次重点
+**沟通牌**：4 副牌 216 张，6 人 3v3 卡牌游戏，**三种运行模式**：
+- 单机模式（本机 5 AI 对手）
+- 联网对抗（WebSocket 实时 6 人对战）
+- **Web 浏览器版**（同一套游戏逻辑，Compose Multiplatform / Wasm-JS）
 
 ### 技术栈
 
 | 层 | 技术 |
 |----|------|
-| 客户端 | Kotlin + Coroutines + Flow + OkHttp WebSocket |
-| 服务端 | Ktor + Netty + WebSockets + kotlinx.serialization |
-| 构建 | AGP 8.5 / Gradle 8.14（客户端）+ Gradle 8.4（服务端）|
+| **共享逻辑** | **Kotlin Multiplatform** (android + jvm + wasmJs) |
+| Android 客户端 | Kotlin + Coroutines + Flow + OkHttp + XML 布局 |
+| Web 客户端 | **Compose Multiplatform 1.6.10 / Wasm-JS** + 浏览器原生 WebSocket (`@JsFun`) |
+| 服务端 | Ktor 2.3.6 + Netty + WebSockets + 依赖 `:shared` |
+| 反代部署 | Caddy 80/443 → `127.0.0.1:8080` + systemd + GitHub Actions auto-deploy |
+| 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x |
 
-### 代码规模：共 **90 个文件 / ~14,865 行**
+### 代码规模（PR #54 后）：约 **19,250 行**
 
-| 客户端 Kotlin | 客户端 XML | 服务端 Kotlin | 测试 |
-|----|----|----|----|
-| 28 文件 · 8,909 行 | 56 文件 · 3,279 行 | 5 文件 · 2,161 行 | 1 文件 · 516 行 |
-
----
-
-## 二、开发全貌：5 阶段 · 33 PR · 3 个月
-
-```
-2026-02        单机游戏开发（PRs #1–14）
-               游戏引擎 / 牌型规则 / AI / 结算 / 单机UI
-               ← 约11轮人工 UI 反馈
-
-2026-04-30     联网模式首次完整实现（PR #16）
-               服务端 + 客户端网络层 + 联网UI
-               ← 一次性交付：6,529 行新增，48 个文件
-
-2026-05-01     构建与编译修复（PRs #17–21）
-               CI 失败 / Gradle 缺失 / 编译错误
-
-2026-05-03     部署与连通性修复（PRs #22–31）
-               服务器URL / Android cleartext / 503调试 / Lobby UI
-
-2026-05-04~07  游戏逻辑深度修复（PRs #32–33 + 本次）
-               AI 全量审查×4轮 / 8次commit / 50+ Bug
-```
-
-**总计：33 PR · 123 commit · 修复约 67 个问题**
+| 模块 | 规模 |
+|----|----|
+| `:apps:android` | 19 文件 · ~6,300 行 |
+| `:apps:web` (Compose MP) | 23 文件 · ~3,470 行 |
+| `:shared` (KMP commonMain) | 9 文件 · ~2,670 行 |
+| `:server` (Ktor) | 4 文件 · ~1,960 行 |
+| 测试 + Android XML | 24 文件 · ~4,850 行 |
 
 ---
 
-## 三、架构：双模式共生
+## 二、开发全貌：12 阶段 · 54 PR · 有效开发 **18 天**
+
+> **18 天分布**：2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 7 天
+> 月份间存在大量空档（产品节奏 / 个人时间）；密集开发集中在 5 月
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ Android 客户端                                      │
-│  GameActivity (单机) ←→ OnlineGameActivity (联网)   │
-│                                                     │
-│  engine/  CardRules · SettlementCalculator (共享)   │
-│           GameEngine (单机) · MultiplayerGameEngine  │
-│  network/ NetworkManager · RoomManager              │
-│           GameSyncManager (状态同步/版本号)          │
-└─────────────────────────────────────────────────────┘
-               ▲ WebSocket /game (JSON)
-               ▼
-┌─────────────────────────────────────────────────────┐
-│ 服务端 (Ktor + Netty)                               │
-│  ServerRoomManager  房间 / AI 填充                  │
-│  ServerGameManager  权威状态 / AI 决策 / 30s 计时   │
-│       每房间一把 Mutex · 三级 AI 回退 · 兜底推进    │
-└─────────────────────────────────────────────────────┘
+2026-02-02 / 02-07~12 / 02-24
+               单机游戏 (#1–14)         引擎/牌型/AI/结算 · 11 轮 UI 反馈
+2026-04-30     联网首版 (#16)           服务端+网络层 · 一次性 6,529 行
+2026-05-01~03  部署 (#17–31)            CI/Gradle/cleartext/503/Lobby UI
+2026-05-07     深度修复 (#34)           AI 审查×4轮 / 8 commit / ~50 Bug
+2026-05-08     KMP 重构 + Web (#35)     抽 :shared / Compose MP wasmJs
+2026-05-08     Harness H1–H5 (#36–43)   hooks / TDD-gate / pr-reviewer
+2026-05-08     部署自动化 (#41–44)      Caddy 反代 / systemd / GH Actions
+2026-05-09     Web UI 4 阶段 (#47–50)   菜单/响应式/视觉/Android 同等
+2026-05-09     Web CJK / Android URL    中文豆腐块修复 · 拓扑 URL 漂移
+2026-05-10     AI 接管 (#52–53)         G34-G38 · PROTOCOL_VERSION = 3
+2026-05-10     单机修复 + 文档 (#51–54) CI 折叠 · SP 重复按钮 · L0-L4 沉淀
 ```
 
-**核心原则：服务端权威，客户端乐观响应，全量状态 + version 同步**
+**总计：54 PR · ~170 commit · 发现 ~128 个问题（4 视角）**
+
+---
+
+## 三、架构：多端共享 + 服务端权威
+
+```
+┌──────────────────────┐  ┌──────────────────────┐
+│ :apps:android (XML)  │  │ :apps:web (Wasm-JS)  │
+│ Game/Online Activity │  │ Compose MP UI        │
+│ MultiplayerGameEngine│  │ AppViewModel         │
+└────────┬─────────────┘  └────────┬─────────────┘
+         │ depends on              │
+         ▼                         ▼
+       ┌──────────────────────────────┐
+       │ :shared (KMP commonMain)     │
+       │ Card · Deck · Player         │
+       │ CardRules · Settlement       │
+       │ GameEngine · AIPlayer        │
+       │ GameMessage (DTO)            │
+       │ + commonTest (40+ 用例)      │
+       └────────────┬─────────────────┘
+                    │
+                    ▼
+       ┌──────────────────────────────┐
+       │ :server (Ktor + Netty)       │
+       │  每房间 Mutex · AI 三级回退  │
+       │  30s 超时 · 兜底推进         │
+       └────────────┬─────────────────┘
+                    │ WebSocket /game
+                    ▼
+        Caddy 80/443 → 127.0.0.1:8080
+```
+
+**核心：KMP 共享逻辑（PR #35 + H3 编译期保证一致）+ 服务端权威 + 全量状态同步**
 
 ---
 
@@ -143,26 +159,31 @@ style: |
 | ⚠ 无协议版本号 | 协议演进无强制兼容检查 |
 | ⚠ 无事件溯源 | 历史行为无法追溯，调试困难 |
 
+### 架构演进：从遗憾到修复
+
+| 遗憾 | 状态 | 修复 |
+|------|------|------|
+| KMP 共享模块 | ✅ 已解决 | PR #35 + H3：`:shared` 编译期唯一份 |
+| 协议版本号 | ✅ 已解决 | PR-H3：`PROTOCOL_VERSION` + 握手 |
+| 事件溯源 | ⚪ 未规划 | 全量同步够用 |
+
 ---
 
-## 四、问题全景：人工 vs AI
+## 四、问题全景：4 视角 ~128 个问题
 
-<br>
+| 来源 | 数量 | 占比 | 特点 |
+|------|------|------|------|
+| 🔴 **人工测试 / 反馈** | **~35** | 27% | UI 体验 · 部署环境 · 运行时崩溃（真机发现）|
+| 🔵 **Claude Code 主会话** | **~55** | 43% | 全量扫描 · 跨文件链路 · 并发陷阱 |
+| 🟢 **Claude pr-reviewer** | **~15** | 12% | 独立 context · 功能完整性 · 协议契约 |
+| 🟡 **ChatGPT Codex Bot** | **~13** | 10% | PR 自动 · 语句级边界 · entropy / UI 文案 |
+| 重叠联合 | ~10 | 8% | Codex 标记 → Claude 深挖根因 |
 
-| 来源 | 发现数量 | 覆盖范围 |
-|------|---------|---------|
-| 🔴 **人工测试/反馈** | **~32 个** | UI体验、部署环境、运行时崩溃 |
-| 🔵 **AI 静态审查** | **~35 个** | 逻辑错误、并发、协议细节 |
-| 🟡 代码 Review Bot | 2 个 | PR 自动审查额外发现 |
-
-<br>
-
-> ### 核心发现
-> **人工看见"症状"，AI 挖出"根因"——两者几乎不重叠，而是互补。**
-
-<br>
-
-接下来逐阶段展开 ↓
+> ### 核心发现：4 种视角几乎不重叠
+> **人工**：截图 / 真机崩溃（动态）·  **Claude 主会话**：跨文件链路（静态全量）
+> **pr-reviewer**：跨文件契约（独立 context）·  **Codex**：语句级边界（PR 自动）
+>
+> **盲区互补**——单独跑一个**至少漏一类问题**（PR #53 实证：Codex 抓 race，pr-reviewer 抓 fabricated symbol）
 
 ---
 
@@ -406,6 +427,63 @@ override fun onOpen(ws: WebSocket, response: Response) {
 
 ---
 
+## 六、关键技术修复（4/6）— Web 中文豆腐块（CJK）
+
+**症状**：Web 端打开后所有中文显示成 □□□
+
+**根因**：浏览器 Wasm 环境无系统中文字体；Compose Multiplatform 默认字体不含 CJK
+
+**方案**：
+- 打包 ~3MB GB2312 子集中文字体（仅 game UI 用到的字符）
+- 通过 `LocalCompositionLocal` 注入字体 family 到所有 Composable
+
+```kotlin
+@Composable
+fun CommunicationCardTheme(cjkFamily: FontFamily, content: @Composable () -> Unit) {
+    val typography = with(MaterialTheme.typography) {
+        copy(bodyMedium = bodyMedium.copy(fontFamily = cjkFamily), ...)
+    }
+    MaterialTheme(typography = typography, content = content)
+}
+```
+
+> **教训**：跨端测试要覆盖**真实终端环境**——浏览器与 Android 系统字体可用性差异巨大
+
+---
+
+## 六、关键技术修复（5/6）— 双层防火墙陷阱
+
+**症状**：腾讯云部署后 Android 客户端 connection timeout；服务端日志显示连不进来
+
+**根因**：
+- ufw 已开 `8080/tcp`（**主机层** ✓）
+- 但腾讯云**安全组**只开 22/80/443，**8080 被外网拦截**（**云控制台层**）
+- 私有云常有"两层防火墙"：主机 ufw + 云厂商安全组，必须**都开**
+
+**修复**：
+- 短期：腾讯云控制台开 8080（不推荐——直暴 Ktor）
+- 长期：Caddy 80 反代 → `127.0.0.1:8080`，**`:8080` 仅 loopback**（PR #41）
+
+> **教训**：私有云部署完必须**双层验证**：本机 `curl localhost:8080` ✓ 后还要从外网测一次
+
+---
+
+## 六、关键技术修复（6/6）— Android URL 拓扑漂移
+
+**症状**：PR #41 改 Caddy 反代后 Android 客户端连不上（Web 客户端正常）
+
+**根因**：
+- PR #41 把 Web 客户端改成同源 `/game`（走 80）✓
+- 但 **Android 端 `LobbyActivity.kt` 和 `MainActivity.kt` 的 `SERVER_URL` 仍硬编码 `:8080`**
+- `:8080` 不再外网可达 → Android 必然 timeout
+
+**修复**：去掉 `:8080`，改走默认 80 经 Caddy 反代
+
+> **教训**：拓扑变更必须 **grep 所有客户端 URL 硬编码**——Web、移动端、桌面端、未来 iOS 都要查
+> **结构性根因**：URL 应该集中（资源文件 / BuildConfig / 远程配置），而非两处 `private const val`
+
+---
+
 ## 七、工程经验总结
 
 ### 1. "修了又坏"的根因：只修表层症状
@@ -418,131 +496,132 @@ override fun onOpen(ws: WebSocket, response: Response) {
 ```
 **原则**：找到最小可复现场景，分层排除，验证到底
 
-### 2. 单机/联网共享逻辑必须保持一致
-- 炸弹比较 / 结算公式 / 回合归属：三处均发生不一致
-- **建议**：提取共享规则层（KMP 模块），或用自动化测试约束两端
+### 2. 跨端共享逻辑必须用 KMP 强制
+- 炸弹比较 / 结算公式 / 回合归属：早期三处均不一致
+- **已实现**：PR #35 + H3 把规则抽到 `:shared` KMP 模块，编译期保证一致
 
-### 3. 协议与环境问题必须人工打通
-- Android cleartext、腾讯云 503——纯代码审查看不出来
+### 3. 4 视角全跑：AI 静态 + 人工真机 + Codex bot 不可替代
+- Claude 主会话 / pr-reviewer / Codex / 人工真机：盲区互补，单独跑漏一类问题
+
+### 4. 协议 / 环境 / 拓扑变更必须人工打通
+- Android cleartext / 503 / Caddy 反代 / 双层防火墙：纯代码审查看不出来
+
+### 5. 大特性 Phase 分段提交
+- 协议 → 主客户端 → 次客户端，每 Phase 独立 commit + review
+
+### 6. delay() 之后必须重检所有依赖项
+- 不只 currentPlayerIndex；isAISubstitute / isConnected 也要查（regressions #11）
 
 ---
 
 ## 七、交付成果 & 后续行动
 
-### 成果
+### 全程交付成果
 
 | 指标 | 数值 |
 |------|------|
-| 全程 PR / commit | 33 个 / 123 次 |
-| 修复问题总数 | **~67 个** |
-| 本次深度调试 | 8 次 commit，服务端重写约 700 行 |
+| 全程 PR / commit | **54 个 / ~170 次** |
+| 发现问题总数 | **~128 个**（4 视角） |
+| 开发量 | **有效开发 18 天** |
+| 终端覆盖 | Android + Web 双端 |
+| 共享逻辑 | `:shared` KMP（编译期保证一致） |
+| 部署 | Caddy 自托管 + GitHub Actions auto-deploy |
 | 游戏永不卡死 | 四层防御已验证 ✓ |
-| 重连可用 | 30s 内无缝恢复 ✓ |
 | 两端结算一致 | 15 用例全部通过 ✓ |
+| 协议版本管理 | `PROTOCOL_VERSION = 3` ✓ |
 
-### 后续建议行动
+### 后续建议行动（已部分落地）
 
-| 优先级 | 行动 |
-|--------|------|
-| 🔴 P0 | 自动化测试：炸弹比较 / 结算 / 重连流程 |
-| 🔴 P0 | 共享规则层：`canBeat` + `SettlementCalculator` → KMP 模块 |
-| 🟠 P1 | 监控告警：`force-advance` 计数，触发即告警 |
-| 🟡 P2 | 弱网测试：集成限速工具，系统化回归重连 |
-| 🟡 P2 | 协议版本号：添加 `protocolVersion` 强制兼容检查 |
+| 状态 | 行动 |
+|------|------|
+| ✅ 已实现 | `:shared` KMP 共享模块（PR #35）|
+| ✅ 已实现 | `PROTOCOL_VERSION` + 握手检查（PR-H3） |
+| ✅ 已实现 | harness L0-L4（hooks / playbook / regression）|
+| ✅ 已实现 | tdd-gate CI 硬关（PR-H2） |
+| ✅ 已实现 | pr-reviewer subagent（PR-H5） |
+| ⚪ 待规划 | force-advance 监控告警 / 弱网 e2e |
 
 ---
 
-## 八、harness 跨会话经验（PR-H + AI 托管特性实战）
+## 八、harness 跨会话经验（1/3）— Phase 分段 + wasmJs
 
-> 来自 PR #52 / #53 / #54 的实战教训。每条都是"AI 与人协作出 bug → 复盘 → 沉淀回 harness"的闭环。
-
-### 1. 大特性的 Phase 分段提交
-
-跨协议 + 服务端 + 双客户端 + 测试的特性（>200 行 / >5 文件）必须拆 Phase：
+### 大特性 Phase 分段提交（PR #53 实战）
 
 | Phase | 内容 | 价值 |
 |-------|------|------|
-| **Phase 1** | 协议层 + 服务端 + 单测 | **底层稳了再动客户端**；server 即使没 UI 也能跑 |
-| **Phase 2** | 主客户端（Android） | 一份吃通，验证 server 正常 work |
-| **Phase 3** | 次客户端（Web）+ 跨端 roundtrip 测 | 最后补齐 |
+| **Phase 1** | 协议 + 服务端 + 单测 | 底层稳了再动客户端 |
+| **Phase 2** | 主客户端 (Android) | 一份吃通验证 server |
+| **Phase 3** | 次客户端 (Web) + 跨端测 | 最后补齐 |
 
-每 Phase 内还按"编译单元"切（Android / Web 拆 commit），更早抓平台特定编译错误。
+适用：跨协议 + 服务端 + 双客户端 > 200 行 / > 5 文件。每 Phase 内还按编译单元切（Android / Web 拆 commit）。
 
-### 2. wasmJs 的"jvmTest 过 ≠ wasmJs 过"
+### wasmJs 编译器隐藏陷阱（regressions #12）
 
-PR #53 Phase 3 在 jvmTest 全过、Android 编译过的前提下 wasmJs 报：
 ```
 Backend Internal error: Exception during psi2ir
 Caused by: java.lang.NullPointerException
 ```
 
-根因：Compose 可空 lambda + smart-cast / `vm::method` KFunction reference 自动转 `(() -> Unit)?` —— wasmJs 后端已知 NPE。
+**根因**：可空 lambda + Compose smart-cast；`vm::method` KFunction → `(() -> Unit)?` 自动转换
 
-**修法**：可空 lambda → `local val` 固化非空；函数引用宁可写 `{ vm.foo() }` 显式 lambda。
+**修法**：
+- 可空 lambda → `local val` 固化非空
+- 函数引用 → 显式 `{ vm.foo() }` lambda
 
-> 沙箱拉不到 wasmJs 编译器，**写完 Web UI 必须 push 跑 CI 才算**。
+> **教训**：jvmTest 过 ≠ wasmJs 过；写完 Web UI 必须 push CI 才算
 
 ---
 
-## 八、harness 跨会话经验（续）
+## 八、harness 跨会话经验（2/3）— Codex 互补 + delay 重检
 
-### 3. Codex bot 与 Claude /review-pr 盲区互补（PR #53 实证）
+### Codex bot 与 Claude /review-pr 盲区互补（PR #53 实证）
 
 | Reviewer | 找到 | 漏掉 |
 |----------|------|------|
-| **Claude `/review-pr`** | game_rules.md 误写"随机起手"+ 引用了不存在的函数（**功能性 / 跨文件契约**） | `processAITurn` 在 `delay()` 后没重检 `isAISubstitute` 的 race |
-| **Codex bot** | 上面那条 race（**语句级边界**） | 文档与代码语义对齐问题 |
+| **Claude /review-pr** | docs 误写 + 引用不存在函数（**跨文件契约**）| `delay()` 后 race |
+| **Codex bot** | `delay()` 后没重检 `isAISubstitute` 的 race（**语句级边界**）| 文档与代码语义对齐 |
 
-> **盲区不重叠**——这是 Codex + Claude 互补的核心价值。
-> 单独跑一个**至少漏一类问题**。
+> **盲区不重叠** → 单独跑一个**至少漏一类**。两个都跑才算双重过关。
 
-### 4. `delay()` 后状态过期反请
-
-任何"先 sleep / delay 再做事"的代码块都要重检"延迟期间状态变化"。
-最近一例（regressions #11）：
+### `delay()` 后状态过期反请（regressions #11）
 
 ```kotlin
-delay(effectiveAiDelayMs(...))     // 玩家在这一秒里取消了托管
+delay(effectiveAiDelayMs(...))     // 玩家此时取消了托管
 mutexFor(room).withLock {
-    if (state.currentPlayerIndex != playerIndex) return  // 只重检了这一项
-    decideAIAction(...)             // isAISubstitute 已变 → AI 不该再代打
+    if (state.currentPlayerIndex != playerIndex) return  // 只检查了这一项
+    decideAIAction(...)             // isAISubstitute 已变 → 不该再代打
 }
 ```
 
-**审查清单**：醒来后必须重检"延迟前所有依赖项"，不只检查最显眼的那个。
+**审查清单**：醒来后必须重检"延迟前所有依赖项"——不只 `currentPlayerIndex`。
+**修法**：抽 `internal fun shouldYieldToHumanPlayer(...)` 谓词 + 同 commit 加测。
 
 ---
 
-## 八、harness 跨会话经验（终）
+## 八、harness 跨会话经验（3/3）— L0–L4 体系
 
-### 5. 同 commit `*Test.kt` 配对 vs tdd-gate
+### Harness 5 层防御（PR-H1..H5 + #35 web 重构 实战搭建）
 
-PR #53 共 6 commit，每改 `CardRules.kt` / `ServerGameManager.kt` / `SettlementCalculator.kt` 都**同 commit** 附测。CI tdd-gate 一次没误报、一次没漏。
+| 层 | 工具 | 说明 |
+|---|------|------|
+| **L0** | Settings / hooks | PostToolUse 注入"关键路径 TDD 提醒"+ push 后自动 review-check |
+| **L1** | Slash commands | `/test-fast` · `/pre-commit-scan` · `/ship-check` · `/review-pr` |
+| **L2** | Subagents | pr-reviewer (Opus) · protocol-syncer · tdd-scaffolder |
+| **L3** | CI gates | tdd-gate（关键路径必同改 *Test.kt）+ build + detekt |
+| **L4** | Documentation | playbook + regressions DB（每条 8 字段：症状/根因/修复/教训/防回归测试）|
 
-> hook 弹"⚠️ TDD 提醒"时**不要立刻另开 commit 写测试**——只要保证最终
-> 单 commit 同时含两份就行。
+### 4 个跨会话原则
 
-### 6. PR 流转的"分支 vs PR"错位
+| 经验 | 说明 |
+|------|------|
+| **同 commit `*Test.kt` 配对** | tdd-gate 一次没误报、一次没漏；hook 弹"TDD 提醒"时不必另开 commit |
+| **分支 vs PR 一一对应** | PR merge 后开新分支；老分支再 push 不会自动出 PR（PR #52→#53 实战）|
+| **文档单一真相 grep 验证** | 新 doc 自称"权威"前必 grep 验证 anchor 函数名实际存在 |
+| **速度档位用 3 档预设** | slider 看似灵活；实际多数场景 3 档够用 + 测试矩阵更小 |
 
-PR #52 合并后**本会话又在同分支 push 了 5 个 commit**——但 PR #52 已 closed，
-push 不会自动出 PR。直到用户问"PR 呢？"才意识到需要新分支 + PR #53。
-
-> **一个分支 = 一个 PR**。PR merge 后下一组改动**开新分支**。
-
-### 7. 文档单一真相 + 自动同步
-
-`pr-reviewer` 抓到 game_rules.md 误写"随机起手"+ `randomFirstPlayer` 不存在。
-
-**沉淀**：新文档自称"权威"前必须 grep 验证所有 anchor 函数名实际存在。
-
-### 8. AI 接管速度档位的设计取舍
-
-最初考虑 slider（任意 50-2000ms）；最终选 3 档预设。
-**当一个特性"看似 slider 更灵活"时，先问"用户真需要连续值么？"**——
-多数情况 3 档够用，且压缩了边界情况测试矩阵。
+> **核心**：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑
 
 ---
-
 <!-- 结束页 -->
 
 # 谢谢
@@ -550,8 +629,8 @@ push 不会自动出 PR。直到用户问"PR 呢？"才意识到需要新分支 
 <br>
 
 > **核心结论**：
-> AI 负责"静态全量审查"，人工负责"动态真机验证"，
-> 两者互补而非替代，协同效率约 **10 倍**。
+> 4 视角覆盖（人工 / Claude 主会话 / pr-reviewer / Codex）+
+> harness 跨会话沉淀（L0–L4）= 教训不浪费、bug 不重复
 
 <br>
 
