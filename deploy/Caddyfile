@@ -1,33 +1,36 @@
 # 沟通牌 · Caddy 配置
 #
-# 二选一：把不要的那段整段删掉。
+# 二选一：把不要的那段整段删掉。两段同时保留会冲突（同一端口被两个 site block 抢）。
 #
-# 只用 IP（无域名）→ 用方案 A
-# 有域名（例：cards.example.com）→ 把方案 A 删掉，用方案 B（Caddy 自动申请 HTTPS）
+# 只用 IP（无域名）→ 保留方案 A，删掉方案 B
+# 有域名（例：cards.example.com）→ 保留方案 B（Caddy 自动申请 HTTPS），删掉方案 A
 
 # ============================================================
 # 方案 A：纯 IP，HTTP（默认 :80）
 # ============================================================
 :80 {
-    # 静态前端（CI 部署的 wasmJs 产物）
-    root * /var/www/communication-card-web
-    encode gzip zstd
-    file_server
-
-    # WebSocket 反代到本地 :server（Ktor）
+    # 用 handle 块互斥：ws 走 reverse_proxy，其他走静态文件。
+    # 不能用 `try_files {path} /index.html` —— 它会重写请求 path，
+    # 导致 @ws matcher 的 `path /game` 失配，ws 握手挂掉。
     @ws {
         path /game
         header Connection *Upgrade*
         header Upgrade websocket
     }
-    reverse_proxy @ws 127.0.0.1:8080
+    handle @ws {
+        reverse_proxy 127.0.0.1:8080
+    }
 
-    # 给 .wasm / .js / 字体 设置正确 MIME（Caddy 默认基本对，显式列出更稳）
-    @wasm path *.wasm
-    header @wasm Content-Type application/wasm
+    handle {
+        root * /var/www/communication-card-web
+        encode gzip zstd
 
-    # SPA-ish fallback：不存在的路径回 index.html（沟通牌目前是单 HTML，可选）
-    try_files {path} /index.html
+        # 显式给 .wasm 设 MIME，避免有些静态服务推断错
+        @wasm path *.wasm
+        header @wasm Content-Type application/wasm
+
+        file_server
+    }
 
     log {
         output file /var/log/caddy/communication-card.log
@@ -37,24 +40,27 @@
 
 # ============================================================
 # 方案 B：有域名 + 自动 HTTPS（Let's Encrypt）
-# 把上面 :80 那段删掉，启用下面：
+# 启用前：把 cards.example.com 替换为你的域名；删掉上面 :80 那整段。
 # ============================================================
 # cards.example.com {
-#     root * /var/www/communication-card-web
-#     encode gzip zstd
-#     file_server
-#
 #     @ws {
 #         path /game
 #         header Connection *Upgrade*
 #         header Upgrade websocket
 #     }
-#     reverse_proxy @ws 127.0.0.1:8080
+#     handle @ws {
+#         reverse_proxy 127.0.0.1:8080
+#     }
 #
-#     @wasm path *.wasm
-#     header @wasm Content-Type application/wasm
+#     handle {
+#         root * /var/www/communication-card-web
+#         encode gzip zstd
 #
-#     try_files {path} /index.html
+#         @wasm path *.wasm
+#         header @wasm Content-Type application/wasm
+#
+#         file_server
+#     }
 #
 #     log {
 #         output file /var/log/caddy/communication-card.log

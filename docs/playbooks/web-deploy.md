@@ -45,9 +45,11 @@ sudo systemctl status caddy --no-pager
 - 放行 **22**（SSH）/ **80**（HTTP）/ **443**（HTTPS）
 - **关闭 8080**（只在本机 127.0.0.1 用，不能对外）
 
-### 4. 在 GitHub repo 添加 3 个 Secret
+### 4. 在 GitHub repo 添加 3 个 Secret + 1 个 Variable
 
-`Settings → Secrets and variables → Actions → New repository secret`
+`Settings → Secrets and variables → Actions`
+
+**Secrets**（New repository secret）：
 
 | Name | Value |
 |---|---|
@@ -55,17 +57,24 @@ sudo systemctl status caddy --no-pager
 | `DEPLOY_SSH_USER` | `cards` |
 | `DEPLOY_SSH_KEY` | `install.sh` 末尾打印的私钥（含 `-----BEGIN/END-----` 两行） |
 
+**Variables**（同一页 → Variables tab → New repository variable）：
+
+| Name | Value |
+|---|---|
+| `DEPLOY_ENABLED` | `true` |
+
+> ⚠️ `DEPLOY_ENABLED=true` 是 **opt-in 开关**：没设 / 不为 `true` 时 deploy workflow 直接 skip。
+> 这样保证 Secrets 配齐前 main 上的 push 不会触发失败的部署。
+
 ---
 
 ## 触发首次部署
 
-```bash
-git checkout main
-git commit --allow-empty -m "deploy: bootstrap"
-git push origin main
-```
+打开 GitHub Actions 页面 → 选 `Deploy to server` workflow → 点 **Run workflow** 按钮（branch: main）。
 
-或在 GitHub Actions 页面点 **Run workflow** 手动触发 `Deploy to server`。
+> 注：**不要**用 `git commit --allow-empty` —— `deploy.yml` 的 `paths:` 过滤器只在
+> `apps/web/**` / `shared/**` / `server/**` / `deploy/**` 等路径有改动时才触发 push 事件，
+> 空 commit 不命中任何路径，workflow 不会被触发。`workflow_dispatch` 是绕过 paths 的唯一方式。
 
 ---
 
@@ -152,6 +161,48 @@ sudo journalctl -u communication-card-server -f
 | 多副本 | 不在本 playbook 范围；个人项目过度设计 |
 | 对外开 8080 直连（弃用反代）| 编辑 `apps/web/.../AppViewModel.kt::defaultServerUrl`，恢复 `:8080`；Caddyfile 删掉 `/game` 反代段；安全组开 8080 |
 | 回滚 | `ssh cards@host 'cd /opt/... && git ...'` 不适用（没 git）；用 GitHub Actions Re-run 上一个绿的 deploy |
+
+---
+
+## 已经跑过旧版 install.sh（PR #41 合并版本）的迁移
+
+如果你已经跑过 commit `699d94b` 那版的 `install.sh`，需要在服务器上手动 fix
+3 处问题（PR #41 review 发现的 P0/P1）：
+
+```bash
+ssh ubuntu@<host>          # 你的常用账号（不是 cards）
+
+# ① 拉新版 Caddyfile（修了 try_files 破坏 ws 反代的 P0）
+sudo curl -fsSL https://raw.githubusercontent.com/berming/AndroidAPP/main/deploy/Caddyfile \
+    -o /etc/caddy/Caddyfile
+sudo vim /etc/caddy/Caddyfile     # 重新选 A/B 方案
+sudo systemctl reload caddy
+
+# ② 重写 sudoers（修了 /bin/systemctl 路径不匹配的 P1）
+SYSCTL=$(command -v systemctl)
+sudo tee /etc/sudoers.d/communication-card-deploy >/dev/null <<EOF
+cards ALL=(root) NOPASSWD: $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server
+EOF
+sudo chmod 440 /etc/sudoers.d/communication-card-deploy
+sudo visudo -cf /etc/sudoers.d/communication-card-deploy
+
+# ③ 拉新版 systemd unit（JAVA_OPTS → SERVER_OPTS + network-online）
+sudo curl -fsSL https://raw.githubusercontent.com/berming/AndroidAPP/main/deploy/communication-card-server.service \
+    -o /etc/systemd/system/communication-card-server.service
+sudo systemctl daemon-reload
+sudo systemctl restart communication-card-server   # 已部署过 server 的话；首次部署可跳过
+
+# ④ GitHub repo 加 Variable：DEPLOY_ENABLED=true（新版 deploy.yml 改成 opt-in 了）
+#    Settings → Secrets and variables → Actions → Variables → New
+```
+
+验证 ws 反代修好了：
+```bash
+curl -i -H "Connection: Upgrade" -H "Upgrade: websocket" \
+     -H "Sec-WebSocket-Key: x" -H "Sec-WebSocket-Version: 13" \
+     http://<host>/game
+# 应返回 101 Switching Protocols（旧版会返回 200 + index.html）
+```
 
 ---
 

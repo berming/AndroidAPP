@@ -1,6 +1,7 @@
 [Unit]
 Description=Communication Card · Ktor server
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -12,8 +13,9 @@ ExecStart=/opt/communication-card/server/bin/server
 Restart=on-failure
 RestartSec=3
 
-# JVM 调优（4 核 / 4G 起够；按机型调）
-Environment="JAVA_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
+# JVM 调优：Gradle application plugin 生成的 bin/server 启动脚本读 SERVER_OPTS
+# （脚本里是 `<APP_BASE_NAME>_OPTS`，本应用名为 server），不读 JAVA_OPTS。
+Environment="SERVER_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
 
 # 安全收紧
 NoNewPrivileges=true
