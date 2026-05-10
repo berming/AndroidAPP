@@ -250,10 +250,10 @@ add_table(s, Inches(7.0), Inches(2.0), Inches(6.0), Inches(2.3),
             col_widths=[Inches(2.4), Inches(3.6)])
 
 add_textbox(s, Inches(0.5), Inches(4.45), Inches(12.3), Inches(0.4),
-            "12 阶段时间线  ·  54 PR  ·  ~170 commit  ·  约 4 个月",
+            "12 阶段时间线  ·  54 PR  ·  ~170 commit  ·  跨 4 个月  ·  有效开发 18 天",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 phases = [
-    ["2026-02", "单机游戏 (#1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
+    ["2026-02-02 / 07~12 / 24", "单机游戏 (#1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
     ["2026-04-30", "联网首版 (#16)", "服务端 + 网络层 · 一次性 6,529 行"],
     ["2026-05-01~03", "部署 (#17–31)", "CI/Gradle/cleartext/503/Lobby UI"],
     ["2026-05-07", "深度修复 (#34)", "AI 全量审查×4轮 / 8 commit / ~50 Bug"],
@@ -264,7 +264,7 @@ phases = [
 ]
 add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
             ["时间", "阶段", "主要内容"], phases, font_size=BODY_SM,
-            col_widths=[Inches(2.0), Inches(4.0), Inches(6.3)])
+            col_widths=[Inches(2.6), Inches(3.7), Inches(6.0)])
 
 # =================================================================
 # Slide 3: Architecture (diagram + decisions + regrets)
@@ -846,7 +846,7 @@ add_textbox(s, Inches(0.8), Inches(4.55), Inches(12.0), Inches(0.5),
             "🏆 全程交付成果",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 add_textbox(s, Inches(0.8), Inches(5.05), Inches(12.0), Inches(0.4),
-            "·  全程 54 PR / ~170 commit  ·  约 4 个月  ·  发现 ~128 个问题",
+            "·  全程 54 PR / ~170 commit  ·  跨 4 个月（有效开发 18 天）  ·  发现 ~128 个问题",
             font_size=BODY_SM, color=DARK)
 add_textbox(s, Inches(0.8), Inches(5.45), Inches(12.0), Inches(0.4),
             "·  Android + Web 双端  ·  KMP 共享模块（编译期保证一致）  ·  Caddy 自托管自动部署",
