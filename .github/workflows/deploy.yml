@@ -29,8 +29,10 @@ jobs:
   deploy:
     name: Build + rsync to server
     runs-on: ubuntu-latest
-    # 没配 secrets 时 silently skip（避免 fork 或新 clone 的 main push 总是红）
-    if: ${{ vars.DEPLOY_ENABLED != 'false' }}
+    # opt-in：仅当 repo Variable DEPLOY_ENABLED 设为 'true' 时才跑。
+    # 这样即使 PR 合并到 main 但 Secrets 还没配，也不会触发失败的 deploy。
+    # 配好 Secrets 后在 Settings → Variables 加 DEPLOY_ENABLED=true 即可启用。
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
