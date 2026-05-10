@@ -39,11 +39,82 @@ sudo systemctl reload caddy
 sudo systemctl status caddy --no-pager
 ```
 
-### 3. 腾讯云安全组
+### 3. 防火墙（两层都要配，缺一不可）
 
-进腾讯云控制台 → 云服务器 → 安全组：
-- 放行 **22**（SSH）/ **80**（HTTP）/ **443**（HTTPS）
-- **关闭 8080**（只在本机 127.0.0.1 用，不能对外）
+> 历史教训：这一步**已踩过 2 次坑**。两层防火墙互不知道对方存在；
+> 只配一层另一层照样拦，表现都是"公网 timeout"。
+
+#### 3a. ufw（host 层；新版 install.sh **已自动配好**）
+
+`install.sh` 第 5/7 步会自动把 ufw 配成 expected state：
+
+| 端口 | 状态 | 备注 |
+|---|---|---|
+| 22/tcp | allow | SSH |
+| 80/tcp | allow | HTTP（Caddy） |
+| 443/tcp | allow | HTTPS（Caddy） |
+| 8080/tcp | **deny** | 应仅 127.0.0.1 用，**对外开就是漏洞面** |
+
+如果你跑过旧版 install.sh，自检并修正：
+
+```bash
+sudo ufw status verbose
+# 期望 80/tcp + 443/tcp ALLOW，8080/tcp 不在 allow 列表
+# 修正：
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw delete allow 8080/tcp 2>/dev/null || true
+sudo ufw delete allow 8080/tcp 2>/dev/null || true   # v6 那条再删一次
+sudo ufw --force enable
+```
+
+> ⚠️ **先 allow 22 再 enable**，否则 SSH 立刻断，下次连不上。
+
+#### 3b. 云厂商安全组（网络边界层；**必须手动配**）
+
+ufw 在 server 内部，云厂商安全组在 server **进入网络之前**的边界。
+两者完全独立，腾讯云就算 ufw 全开放，安全组没放行公网照样不通。
+
+**腾讯云**（其他云厂商等同）：
+
+```
+控制台 → 云服务器 → 实例 → 行尾 "更多" → "安全组" → 当前安全组
+→ 修改规则 → 入站规则 → 新增：
+```
+
+| 来源 | 协议端口 | 策略 | 备注 |
+|---|---|---|---|
+| `0.0.0.0/0` | TCP:22 | 允许 | SSH |
+| `0.0.0.0/0` | TCP:80 | 允许 | HTTP |
+| `0.0.0.0/0` | TCP:443 | 允许 | HTTPS（未来切方案 B 用） |
+
+并删除任何对外开放 **8080** 的旧规则（早期开发可能加过）。
+
+#### 3c. 自检：定位是哪一层在拦
+
+按这个**顺序**测，能 0 歧义指出问题层：
+
+```bash
+# 1) 在服务器内部，绕过两层防火墙，直接打 Caddy
+ssh ubuntu@<host>
+curl -I --max-time 5 http://127.0.0.1/
+# 通 → Caddy + Caddyfile OK，进下一层
+# 不通 → 不是防火墙问题；看 Caddy: sudo systemctl status caddy
+
+# 2) 仍在服务器内部，但走公网 IP（会被 ufw 检查；NAT loop 不经云安全组）
+curl -I --max-time 5 http://<public-ip>/
+# 通 → ufw OK，剩云安全组
+# 不通 → ufw 在拦；sudo ufw status verbose 看规则
+
+# 3) 你的本机笔记本（不 SSH 进服务器）
+curl -I --max-time 5 http://<public-ip>/
+# 通 → 全部 OK
+# 不通 → 云安全组在拦（最常见，约 80% 的"timeout"都是这层）
+```
+
+每一步都通 → 进入下一节"GitHub repo 配置"。
+某一步不通 → 在该步对应的层修。
 
 ### 4. 在 GitHub repo 添加 3 个 Secret + 1 个 Variable
 
@@ -103,15 +174,19 @@ sudo systemctl status caddy --no-pager
 
 ## 排错
 
+### 公网 curl timeout（最常见 ⚠️ 已踩过 2 次）
+
+90% 概率是**两层防火墙**之一没配（或两层都没配）。**先按 §3c 自检 3 步**
+精确定位是 ufw 还是云安全组在拦，再去对应的层修。**不要直接重启服务器、
+重装 Caddy 之类**——那是治不了防火墙问题的。
+
 ### 浏览器一直转圈
 
 ```bash
 # 1. 静态文件是否服务到位
 curl -I http://<host>/communicationCardWeb.wasm
 # 应 200 + application/wasm
-```
 
-```bash
 # 2. Caddy 日志
 sudo journalctl -u caddy -n 50
 sudo tail -f /var/log/caddy/communication-card.log
@@ -194,6 +269,20 @@ sudo systemctl restart communication-card-server   # 已部署过 server 的话�
 
 # ④ GitHub repo 加 Variable：DEPLOY_ENABLED=true（新版 deploy.yml 改成 opt-in 了）
 #    Settings → Secrets and variables → Actions → Variables → New
+
+# ⑤ 修 ufw（旧版 install.sh 没自动配；公网 timeout 已踩过 2 次）
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw delete allow 8080/tcp 2>/dev/null || true
+sudo ufw delete allow 8080/tcp 2>/dev/null || true   # v6 那条再删一次
+sudo ufw --force enable
+sudo ufw status verbose
+# 确认 80/443 ALLOW，8080 不在 allow 列表
+
+# ⑥ 云厂商安全组（ufw 之外的另一层 —— 必须手动配，install.sh 管不到）
+#    腾讯云控制台 → 云服务器 → 安全组 → 入站规则：
+#    放行 TCP:22, TCP:80, TCP:443；删掉 TCP:8080（如有）
 ```
 
 验证 ws 反代修好了：
