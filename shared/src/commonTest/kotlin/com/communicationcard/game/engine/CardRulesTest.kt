@@ -22,8 +22,8 @@ import kotlin.test.assertTrue
  * 设计原则：
  *  - 每个测试只断言一件事；失败信息能直接定位问题
  *  - 使用 `card(rank)` / `group(...)` helper 收敛构造样板代码
- *  - 不测试 private helper（isStraight 等），只测公开 API（identifyCardGroup,
- *    canBeat, findValidPlays）。私有逻辑通过公开 API 间接覆盖
+ *  - 不测试 private helper，只测公开 API（identifyCardGroup, canBeat, findValidPlays）。
+ *    私有逻辑通过公开 API 间接覆盖
  */
 class CardRulesTest {
 
@@ -86,8 +86,12 @@ class CardRulesTest {
         assertEquals(5, group.size)
     }
 
+    /**
+     * 沟通牌不再支持顺子。任意"连续"组合（5+ 顺序、含 / 不含王）一律 returns null。
+     * 玩家若要打多张，只能凭炸弹（4+ 同点）。
+     */
     @Test
-    fun identifyCardGroup_fiveConsecutive_returnsStraight() {
+    fun identifyCardGroup_fiveConsecutive_returnsNull_straightRemoved() {
         val cards = listOf(
             card(CardRank.FIVE),
             card(CardRank.SIX),
@@ -95,41 +99,43 @@ class CardRulesTest {
             card(CardRank.EIGHT),
             card(CardRank.NINE),
         )
-        assertEquals(CardGroupType.STRAIGHT, CardRules.identifyCardGroup(cards)!!.type)
+        assertNull(CardRules.identifyCardGroup(cards))
+    }
+
+    @Test
+    fun identifyCardGroup_sixConsecutive_returnsNull_straightRemoved() {
+        val cards = listOf(
+            card(CardRank.FIVE),
+            card(CardRank.SIX),
+            card(CardRank.SEVEN),
+            card(CardRank.EIGHT),
+            card(CardRank.NINE),
+            card(CardRank.TEN),
+        )
+        assertNull(CardRules.identifyCardGroup(cards))
+    }
+
+    @Test
+    fun identifyCardGroup_circularSequence_returnsNull_straightRemoved() {
+        // 历史上的循环顺子 Q-K-A-2-3 也不再合法
+        val cards = listOf(
+            card(CardRank.QUEEN),
+            card(CardRank.KING),
+            card(CardRank.ACE),
+            card(CardRank.TWO),
+            card(CardRank.THREE),
+        )
+        assertNull(CardRules.identifyCardGroup(cards))
     }
 
     @Test
     fun identifyCardGroup_fourConsecutive_returnsNull() {
-        // 顺子需要至少 5 张
+        // 历史一致：4 张连续也不是合法牌型
         val cards = listOf(
             card(CardRank.FIVE),
             card(CardRank.SIX),
             card(CardRank.SEVEN),
             card(CardRank.EIGHT),
-        )
-        assertNull(CardRules.identifyCardGroup(cards))
-    }
-
-    @Test
-    fun identifyCardGroup_straightContainingJoker_returnsNull() {
-        val cards = listOf(
-            card(CardRank.JACK),
-            card(CardRank.QUEEN),
-            card(CardRank.KING),
-            card(CardRank.ACE),
-            Card.createJoker(isBig = false),
-        )
-        assertNull(CardRules.identifyCardGroup(cards))
-    }
-
-    @Test
-    fun identifyCardGroup_nonConsecutiveSequence_returnsNull() {
-        val cards = listOf(
-            card(CardRank.FIVE),
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.TEN), // 跳过 9
         )
         assertNull(CardRules.identifyCardGroup(cards))
     }
@@ -177,46 +183,6 @@ class CardRulesTest {
         assertTrue(CardRules.canBeat(triple(CardRank.SIX), triple(CardRank.QUEEN)))
     }
 
-    @Test
-    fun canBeat_straightSameLengthBiggerHead_beats() {
-        val low = group(
-            card(CardRank.FIVE),
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.NINE),
-        )
-        val high = group(
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.NINE),
-            card(CardRank.TEN),
-        )
-        assertTrue(CardRules.canBeat(low, high))
-    }
-
-    @Test
-    fun canBeat_straightDifferentLength_doesNotBeat() {
-        val short = group(
-            card(CardRank.FIVE),
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.NINE),
-        )
-        val long = group(
-            card(CardRank.FIVE),
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.NINE),
-            card(CardRank.TEN),
-        )
-        // 张数不同的同型牌（顺子）不能互压（炸弹除外）
-        assertFalse(CardRules.canBeat(short, long))
-    }
-
     // ============================================================
     //  炸弹 hierarchy —— docs/regressions.md #2 L1 防回归
     // ============================================================
@@ -234,18 +200,6 @@ class CardRulesTest {
     @Test
     fun canBeat_bombBeatsTriple() {
         assertTrue(CardRules.canBeat(triple(CardRank.ACE), bomb(CardRank.FOUR, count = 4)))
-    }
-
-    @Test
-    fun canBeat_bombBeatsStraight() {
-        val str = group(
-            card(CardRank.SIX),
-            card(CardRank.SEVEN),
-            card(CardRank.EIGHT),
-            card(CardRank.NINE),
-            card(CardRank.TEN),
-        )
-        assertTrue(CardRules.canBeat(str, bomb(CardRank.FOUR, count = 4)))
     }
 
     @Test

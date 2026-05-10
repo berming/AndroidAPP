@@ -22,7 +22,7 @@ apps/android/
 │   │   ├── Deck.kt         # 牌组管理
 │   │   └── Player.kt       # 玩家状态
 │   ├── engine/         # 游戏引擎
-│   │   ├── CardRules.kt           # 牌型规则（单张、对子、三张、顺子、炸弹）
+│   │   ├── CardRules.kt           # 牌型规则（单张、对子、三张、炸弹）
 │   │   ├── GameEngine.kt          # 游戏流程控制
 │   │   ├── SettlementCalculator.kt # 结算逻辑
 │   │   └── SettlementVerification.kt
@@ -48,7 +48,6 @@ apps/android/
 | 单张 | 任意一张牌 |
 | 对子 | 两张相同点数 |
 | 三张 | 三张相同点数 |
-| 顺子 | 5张及以上连续点数（不含王） |
 | 炸弹 | 4张及以上相同点数 |
 
 ### 计分规则

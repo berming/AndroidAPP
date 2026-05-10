@@ -22,7 +22,6 @@ object CardRules {
             isSingle(sortedCards) -> CardGroup(sortedCards, CardGroupType.SINGLE)
             isPair(sortedCards) -> CardGroup(sortedCards, CardGroupType.PAIR)
             isTriple(sortedCards) -> CardGroup(sortedCards, CardGroupType.TRIPLE)
-            isStraight(sortedCards) -> CardGroup(sortedCards, CardGroupType.STRAIGHT)
             else -> null
         }
     }
@@ -51,80 +50,6 @@ object CardRules {
      */
     private fun isBomb(cards: List<Card>): Boolean {
         return cards.size >= 4 && cards.all { it.rank == cards[0].rank }
-    }
-
-    /**
-     * 判断是否为顺子（5张或以上连续，不含大小王）
-     */
-    private fun isStraight(cards: List<Card>): Boolean {
-        if (cards.size < 5) return false
-
-        // 顺子不能包含大小王
-        if (cards.any { it.isJoker }) return false
-
-        val ranks = cards.map { it.rank }.distinct().sortedBy { it.value }
-
-        // 必须是连续的不同点数
-        if (ranks.size != cards.size) return false
-
-        // 检查是否连续
-        for (i in 0 until ranks.size - 1) {
-            val current = ranks[i].value
-            val next = ranks[i + 1].value
-
-            // 检查是否连续（支持 Q-K-A-2-3 这样的循环顺子）
-            if (next - current != 1) {
-                // 检查是否是 2->3 的循环（A之后是2，2之后是3，但3的value是1）
-                // 实际上我们的value设计: 3=1, 2=13, A=12
-                // 所以 A(12) -> 2(13) 差值为1，是连续的
-                // 但 2(13) -> 3(1) 不连续，需要特殊处理循环顺子
-                return checkCircularStraight(cards)
-            }
-        }
-
-        return true
-    }
-
-    /**
-     * 检查循环顺子（如 Q-K-A-2-3）
-     */
-    private fun checkCircularStraight(cards: List<Card>): Boolean {
-        if (cards.any { it.isJoker }) return false
-
-        val ranks = cards.map { it.rank }.distinct()
-        if (ranks.size != cards.size) return false
-
-        // 将顺子视为环形：3-4-5-6-7-8-9-10-J-Q-K-A-2-3-4-...
-        // 使用value: 3=1, 4=2, ..., A=12, 2=13
-        // 环形连接: 13(2) -> 1(3)
-
-        val values = ranks.map { it.value }.sorted()
-
-        // 检查普通连续
-        var isNormalStraight = true
-        for (i in 0 until values.size - 1) {
-            if (values[i + 1] - values[i] != 1) {
-                isNormalStraight = false
-                break
-            }
-        }
-        if (isNormalStraight) return true
-
-        // 检查跨2-3的循环顺子
-        // 如果包含2(13)和3(1)，尝试将3的值视为14
-        if (values.contains(13) && values.contains(1)) {
-            val adjustedValues = values.map { if (it <= 13 - values.size + 1 && it < 13) it + 13 else it }.sorted()
-            var isCircular = true
-            for (i in 0 until adjustedValues.size - 1) {
-                if (adjustedValues[i + 1] - adjustedValues[i] != 1) {
-                    isCircular = false
-                    break
-                }
-            }
-            if (isCircular) return true
-        }
-
-        return false
     }
 
     /**
@@ -176,7 +101,6 @@ object CardRules {
             validPlays.addAll(findAllSingles(hand))
             validPlays.addAll(findAllPairs(hand))
             validPlays.addAll(findAllTriples(hand))
-            validPlays.addAll(findAllStraights(hand))
             validPlays.addAll(findAllBombs(hand))
             return validPlays
         }
@@ -193,10 +117,6 @@ object CardRules {
             }
             CardGroupType.TRIPLE -> {
                 validPlays.addAll(findBiggerTriples(hand, lastPlay))
-                validPlays.addAll(findAllBombs(hand))
-            }
-            CardGroupType.STRAIGHT -> {
-                validPlays.addAll(findBiggerStraights(hand, lastPlay))
                 validPlays.addAll(findAllBombs(hand))
             }
             CardGroupType.BOMB -> {
@@ -253,53 +173,6 @@ object CardRules {
         return bombs.sortedWith(compareBy({ it.size }, { it.primaryRank.value }))
     }
 
-    private fun findAllStraights(hand: List<Card>): List<CardGroup> {
-        val straights = mutableListOf<CardGroup>()
-
-        // 获取非王牌的手牌
-        val nonJokerCards = hand.filter { !it.isJoker }
-        val grouped = nonJokerCards.groupBy { it.rank }
-
-        // 获取有牌的点数（按顺序）
-        val availableRanks = CardRank.straightRanks.filter { grouped.containsKey(it) }
-
-        // 尝试找出所有可能的顺子（5张及以上）
-        for (startIndex in availableRanks.indices) {
-            for (length in 5..availableRanks.size - startIndex) {
-                val endIndex = startIndex + length
-                if (endIndex > availableRanks.size) break
-
-                val selectedRanks = availableRanks.subList(startIndex, endIndex)
-
-                // 检查是否连续
-                var isConsecutive = true
-                for (i in 0 until selectedRanks.size - 1) {
-                    val currentValue = selectedRanks[i].value
-                    val nextValue = selectedRanks[i + 1].value
-                    if (nextValue - currentValue != 1) {
-                        // 检查循环: 2(13) -> 3(1)
-                        if (!(currentValue == 13 && nextValue == 1)) {
-                            isConsecutive = false
-                            break
-                        }
-                    }
-                }
-
-                if (isConsecutive) {
-                    val cards = selectedRanks.mapNotNull { rank -> grouped[rank]?.firstOrNull() }
-                    if (cards.size == selectedRanks.size) {
-                        val cardGroup = identifyCardGroup(cards)
-                        if (cardGroup != null && cardGroup.type == CardGroupType.STRAIGHT) {
-                            straights.add(cardGroup)
-                        }
-                    }
-                }
-            }
-        }
-
-        return straights
-    }
-
     private fun findBiggerSingles(hand: List<Card>, lastPlay: CardGroup): List<CardGroup> {
         return hand.filter { it.rank.value > lastPlay.primaryRank.value }
             .map { CardGroup(listOf(it), CardGroupType.SINGLE) }
@@ -327,13 +200,6 @@ object CardRules {
             }
         }
         return triples
-    }
-
-    private fun findBiggerStraights(hand: List<Card>, lastPlay: CardGroup): List<CardGroup> {
-        val straights = findAllStraights(hand)
-        return straights.filter { straight ->
-            straight.size == lastPlay.size && straight.primaryRank.value > lastPlay.primaryRank.value
-        }
     }
 
     private fun findBiggerBombs(hand: List<Card>, lastPlay: CardGroup): List<CardGroup> {

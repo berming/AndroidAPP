@@ -50,14 +50,14 @@ fun HelpScreen(onBack: () -> Unit) {
             Spacer(Modifier.padding(top = 16.dp))
 
             HelpCard("游戏规则") {
-                BulletText("3 vs 3 团队对抗，6 副 216 张牌（5 副带大小王）")
-                BulletText("队伍交替坐：座位 1/3/5 = A 队，座位 2/4/6 = B 队")
-                BulletText("找到 ♣3 的玩家先出，其他玩家依次跟牌或过牌")
-                BulletText("牌型：单 / 对 / 三 / 顺子 (≥5) / 连对 (≥3 对) / 三顺 / 炸弹 (≥4 同) / 王炸")
-                BulletText("炸弹张数多压张数少；同张数比 rank")
-                BulletText("一队全部走完结算；或任意队伍达 200 分提前结束")
+                BulletText("3 vs 3 团队对抗，4 副 216 张牌（每副带大小王）")
+                BulletText("队伍交替坐：A 队 = 座位 0/2/4，B 队 = 座位 1/3/5")
+                BulletText("起手玩家随机；其他玩家依次跟牌或过牌")
+                BulletText("合法牌型：单 / 对 / 三 / 炸弹 (≥4 同点)。不支持顺子")
+                BulletText("跟牌须同型同张数比点；炸弹压非炸弹；炸弹间先比张数再比点数")
+                BulletText("一队全部走完结算；或一队已走完玩家累计已收 ≥ 200 分提前结束")
                 BulletText("结算公式：赢方分 = 赢方已收 + 输方未走完玩家已收 + 输方未走完玩家手牌分")
-                BulletText("详细规则与单元测试见 docs/settlement_verification.md")
+                BulletText("完整规则与 15 个验证用例见 docs/game_rules.md / settlement_verification.md")
             }
 
             Spacer(Modifier.padding(top = 12.dp))

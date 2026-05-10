@@ -1069,7 +1069,7 @@ class GameActivity : AppCompatActivity() {
 
     /**
      * 自由出牌策略：优先出小牌，保留大牌
-     * 优先级：小单张 > 小对子 > 小三张 > 顺子 > 炸弹
+     * 优先级：小单张 > 小对子 > 小三张 > 炸弹
      * 避免出2、A、王等大牌（value >= 12）
      */
     private fun findBestFreePlay(nonBombs: List<CardGroup>, bombs: List<CardGroup>): CardGroup? {
@@ -1077,7 +1077,6 @@ class GameActivity : AppCompatActivity() {
         val singles = nonBombs.filter { it.type == CardGroupType.SINGLE }
         val pairs = nonBombs.filter { it.type == CardGroupType.PAIR }
         val triples = nonBombs.filter { it.type == CardGroupType.TRIPLE }
-        val straights = nonBombs.filter { it.type == CardGroupType.STRAIGHT }
 
         // 定义"小牌"阈值：value < 12 (即小于A的牌)
         val smallThreshold = 12
@@ -1098,11 +1097,6 @@ class GameActivity : AppCompatActivity() {
         val smallTriples = triples.filter { it.primaryRank.value < smallThreshold }
         if (smallTriples.isNotEmpty()) {
             return smallTriples.minByOrNull { it.primaryRank.value }
-        }
-
-        // 顺子可以出（一次走5张以上，有优势）
-        if (straights.isNotEmpty()) {
-            return straights.minByOrNull { it.primaryRank.value }
         }
 
         // 如果没有小牌，出最小的非炸弹牌（可能是A、2、王）
