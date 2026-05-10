@@ -22,7 +22,7 @@ DEPLOY_USER="cards"
 
 step() { echo ""; echo "==> $*"; }
 
-step "1/6 安装系统依赖（Caddy / JRE 17 / rsync）"
+step "1/7 安装系统依赖（Caddy / JRE 17 / rsync）"
 apt-get update
 apt-get install -y debian-keyring debian-archive-keyring apt-transport-https rsync curl gnupg
 
@@ -38,25 +38,45 @@ if ! command -v caddy >/dev/null 2>&1; then
 fi
 apt-get install -y openjdk-17-jre-headless
 
-step "2/6 创建部署用户与目录"
+step "2/7 创建部署用户与目录"
 id -u "$DEPLOY_USER" >/dev/null 2>&1 || \
     useradd --system --create-home --shell /bin/bash "$DEPLOY_USER"
 mkdir -p "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR"
 
-step "3/6 部署 Caddyfile"
+step "3/7 部署 Caddyfile"
 curl -fsSL "$REPO_RAW/deploy/Caddyfile" -o /etc/caddy/Caddyfile
 echo "    !!! 编辑 /etc/caddy/Caddyfile：选 A（IP 直连）或 B（域名 + HTTPS）方案，"
 echo "        删掉不需要那段，然后 systemctl reload caddy"
 
-step "4/6 部署 systemd unit"
+step "4/7 部署 systemd unit"
 curl -fsSL "$REPO_RAW/deploy/communication-card-server.service" \
     -o /etc/systemd/system/communication-card-server.service
 systemctl daemon-reload
 systemctl enable communication-card-server.service
 # 等首次部署落 server/bin/server 后再启动；现在不 start
 
-step "5/6 给 cards 用户开特定 sudo（重启 service / reload caddy）"
+step "5/7 配置 ufw 防火墙（host 层；腾讯云安全组是另一层，需在控制台单独配）"
+# 历史教训（已发生 2 次）：仅配腾讯云安全组而漏 ufw，或反之，导致公网 timeout。
+# 这一步把 ufw 配成 expected state：放 22/80/443，关掉 8080（应仅 127.0.0.1 用）。
+if ! command -v ufw >/dev/null 2>&1; then
+    apt-get install -y ufw
+fi
+# 确保 SSH 不被锁外（必须先放再 enable，否则 ssh 会断）
+ufw allow 22/tcp comment 'SSH'
+ufw allow 80/tcp comment 'HTTP (Caddy)'
+ufw allow 443/tcp comment 'HTTPS (Caddy)'
+# 8080 必须只在 loopback 用：如果之前手动允许过则删除（双 v4+v6）
+ufw delete allow 8080/tcp 2>/dev/null || true
+ufw delete allow 8080 2>/dev/null || true
+# 启用（已 active 时是 noop）
+ufw --force enable
+ufw status verbose
+echo ""
+echo "    ⚠️ ufw 仅是 host 层防火墙。云厂商安全组（腾讯云 / 阿里云 / AWS）是另一层"
+echo "       网络边界防火墙，必须 ALSO 在云控制台放行 80/443，否则公网仍 timeout。"
+
+step "6/7 给 cards 用户开特定 sudo（重启 service / reload caddy）"
 # 用 command -v 找 systemctl 真实路径：Ubuntu 22.04 实际是 /usr/bin/systemctl，
 # /bin/systemctl 是 usrmerge symlink，sudo 按字符串匹配命令路径，写错了 NOPASSWD 失效
 SYSCTL="$(command -v systemctl)"
@@ -72,7 +92,7 @@ chmod 440 "$SUDOERS_FILE"
 # 校验语法 —— 错误的 sudoers 会让整台机的 sudo 失效，必须 visudo -c
 visudo -cf "$SUDOERS_FILE"
 
-step "6/6 启 Caddy + 占位首页"
+step "7/7 启 Caddy + 占位首页"
 cat > "$WEB_DIR/index.html" <<'EOF'
 <!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><title>沟通牌</title></head>
 <body style="background:#1b5e20;color:#fff;font-family:sans-serif;text-align:center;padding-top:30vh;">
@@ -108,40 +128,59 @@ cat <<EOF
 ============================================================
 ✅ 服务器初始化完成
 
-下一步（在 GitHub repo 网页上）：
+【ufw 已经自动配好】放行 22/80/443，关闭 8080。无需再动 ufw。
 
-1) Settings → Secrets and variables → Actions → New repository secret
-   依次添加 3 个 Secret：
+【⚠️ 但 ufw 不是唯一一层！还要去云控制台配安全组（已踩过 2 次坑）】
 
-   Name:   DEPLOY_SSH_HOST
-   Value:  $PUBLIC_IP
-   （或你的域名，如 cards.example.com）
+下一步：
 
-   Name:   DEPLOY_SSH_USER
-   Value:  $DEPLOY_USER
+1) 【必做】云厂商安全组（网络边界，与 ufw 是两层独立防火墙）
+   腾讯云控制台 → 云服务器 → 实例 → "更多" → "安全组"
+   → 修改规则 → 入站规则 → 新增以下两条：
 
-   Name:   DEPLOY_SSH_KEY
-   Value:  （把下面整段私钥复制进去，含 BEGIN/END 行）
+     来源: 0.0.0.0/0   协议端口: TCP:80    策略: 允许   备注: HTTP
+     来源: 0.0.0.0/0   协议端口: TCP:443   策略: 允许   备注: HTTPS
+
+   并删除任何对外开放 8080 的旧规则（8080 应仅 127.0.0.1 用）。
+
+   阿里云 / AWS / GCP 等等同操作。如果跳过这一步：
+   - 服务器 ufw 全部放行 = 仍然公网 timeout
+   - 自检命令（在你本机笔记本跑，不是服务器内）：
+       curl -I --max-time 5 http://$PUBLIC_IP/
+     超时 = 安全组没放行；秒回 200 = 通了
+
+2) 【必做】GitHub repo → Settings → Secrets and variables → Actions
+   → New repository secret，加 3 个 Secret：
+
+     Name:   DEPLOY_SSH_HOST
+     Value:  $PUBLIC_IP
+     （或你的域名，如 cards.example.com）
+
+     Name:   DEPLOY_SSH_USER
+     Value:  $DEPLOY_USER
+
+     Name:   DEPLOY_SSH_KEY
+     Value:  （把下面整段私钥复制进去，含 BEGIN/END 行）
 ------------------------------------------------------------
 EOF
 cat "$KEY_PATH"
 cat <<EOF
 ------------------------------------------------------------
 
-2) 同一页 → Variables tab → New repository variable
-   Name:   DEPLOY_ENABLED
-   Value:  true
+3) 【必做】同一页 → Variables tab → New repository variable
+
+     Name:   DEPLOY_ENABLED
+     Value:  true
+
    （opt-in 开关；不为 true 时 deploy workflow 直接 skip。
     没设这个，下面第 5 步无论怎么按都不会跑。）
 
-3) 编辑 /etc/caddy/Caddyfile：
+4) 【必做】编辑 /etc/caddy/Caddyfile：
    - 用 IP 访问：保留 ":80" 那段，删掉域名段
    - 用域名访问：把 cards.example.com 改成你的域名，删掉 ":80" 段
    然后：sudo systemctl reload caddy
 
-4) 腾讯云安全组：放行 22 / 80 / 443，关闭 8080（只在本机 127.0.0.1 用）
-
-5) 触发首次部署：
+5) 【必做】触发首次部署：
    GitHub repo → Actions 页 → 选 "Deploy to server" workflow
    → 点 "Run workflow" 按钮（branch: main）
 
@@ -149,8 +188,24 @@ cat <<EOF
    空 commit 不命中任何路径，workflow 不会触发。workflow_dispatch
    是绕过 paths 的唯一方式。
 
-6) 验证：
-   curl -I http://$PUBLIC_IP/         # 应 200
+6) 验证（按这个顺序排查，能精确定位到哪一层挂了）：
+
+   # a) 服务器内部，绕过所有防火墙，直接打 Caddy
+   curl -I --max-time 5 http://127.0.0.1/
+   # 通 → Caddy + 服务文件 OK，问题在防火墙某层
+   # 不通 → Caddy 没启或 Caddyfile 写错，看 systemctl status caddy
+
+   # b) 服务器内部走 ufw（公网 IP 会经 NAT loop 回到自己）
+   curl -I --max-time 5 http://$PUBLIC_IP/
+   # 通 → ufw OK，剩腾讯云安全组
+   # 超时 → ufw 仍在拦；sudo ufw status verbose 看规则
+
+   # c) 你的本机笔记本（不是 SSH 进服务器）
+   curl -I --max-time 5 http://$PUBLIC_IP/
+   # 通 → 全部 OK
+   # 超时 → 腾讯云安全组没放行 80（最常见，约 80% 概率）
+
+   # d) server 进程日志
    journalctl -u communication-card-server -f
 ============================================================
 EOF
