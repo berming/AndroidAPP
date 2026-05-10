@@ -249,42 +249,19 @@
                 android:textStyle="bold"
                 tools:text="轮到你出牌" />
 
-            <!-- 记录按钮 -->
-            <Button
-                android:id="@+id/btnHistory"
-                android:layout_width="48dp"
-                android:layout_height="32dp"
-                android:layout_marginEnd="4dp"
-                android:minWidth="0dp"
-                android:padding="0dp"
-                android:background="@drawable/button_secondary"
-                android:text="记录"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+            <!-- Stage G：按钮组按附录 A 顺序重排 —
+                 出牌 (primary) / 过牌 / 提示 / AI 接管 (多人) / 更多…
+                 删除 btnHistory / btnAfk / btnAutoPlay：均移入"更多…"菜单 -->
 
-            <!-- 托管按钮 (AI代打) -->
             <Button
-                android:id="@+id/btnAutoPlay"
+                android:id="@+id/btnPlay"
                 android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
                 android:padding="0dp"
-                android:background="@drawable/button_secondary"
-                android:text="托管"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-
-            <!-- 操作按钮 -->
-            <Button
-                android:id="@+id/btnHint"
-                android:layout_width="48dp"
-                android:layout_height="32dp"
-                android:layout_marginEnd="4dp"
-                android:minWidth="0dp"
-                android:padding="0dp"
-                android:background="@drawable/button_secondary"
-                android:text="提示"
+                android:background="@drawable/button_primary"
+                android:text="出牌"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
 
@@ -301,18 +278,18 @@
                 android:textSize="12sp" />
 
             <Button
-                android:id="@+id/btnPlay"
+                android:id="@+id/btnHint"
                 android:layout_width="48dp"
                 android:layout_height="32dp"
                 android:layout_marginEnd="4dp"
                 android:minWidth="0dp"
                 android:padding="0dp"
-                android:background="@drawable/button_primary"
-                android:text="出牌"
+                android:background="@drawable/button_secondary"
+                android:text="提示"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
 
-            <!-- AI 接管 / 取消（feature_spec G34）-->
+            <!-- AI 接管 / 取消（feature_spec G34）；单机模式 visibility=gone -->
             <Button
                 android:id="@+id/btnAiTakeover"
                 android:layout_width="56dp"
@@ -325,19 +302,17 @@
                 android:textColor="@color/text_primary"
                 android:textSize="11sp" />
 
-            <!-- 暂离 / 回归（feature_spec G35，仅多人）-->
+            <!-- 更多…：触发 MoreMenuDialog（查看记录 / 昵称 / AI 速度 / 离开 / 暂离） -->
             <Button
-                android:id="@+id/btnAfk"
-                android:layout_width="48dp"
+                android:id="@+id/btnMore"
+                android:layout_width="56dp"
                 android:layout_height="32dp"
                 android:minWidth="0dp"
                 android:padding="0dp"
                 android:background="@drawable/button_secondary"
-                android:text="@string/btn_afk"
+                android:text="更多…"
                 android:textColor="@color/text_primary"
-                android:textSize="11sp"
-                android:visibility="gone"
-                tools:visibility="visible" />
+                android:textSize="12sp" />
 
         </LinearLayout>
 

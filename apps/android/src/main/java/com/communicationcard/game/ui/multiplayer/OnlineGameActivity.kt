@@ -22,6 +22,8 @@ import com.communicationcard.game.R
 import com.communicationcard.game.engine.*
 import com.communicationcard.game.model.*
 import com.communicationcard.game.network.*
+import com.communicationcard.game.ui.GamePreferences
+import com.communicationcard.game.ui.MoreMenuDialog
 import com.communicationcard.game.ui.SoundManager
 import com.communicationcard.game.util.DebugLogManager
 import kotlinx.coroutines.flow.collectLatest
@@ -61,11 +63,10 @@ class OnlineGameActivity : AppCompatActivity() {
     private lateinit var btnPass: Button
     private lateinit var btnHint: Button
     private lateinit var btnAiTakeover: Button
-    private lateinit var btnAfk: Button
     /** 玩家是否处于 AI 托管 / 暂离状态（来自服务端 RoomUpdate.players[me].isAISubstitute） */
     private var imAiSubstitute: Boolean = false
-    private lateinit var btnHistory: Button
-    private lateinit var btnAutoPlay: Button
+    // Stage G：btnMore 取代 btnHistory / btnAfk / btnAutoPlay；后三者已从 activity_game.xml 删除
+    private lateinit var btnMore: Button
     private lateinit var gameOverOverlay: FrameLayout
     private lateinit var tvGameOverTitle: TextView
     private lateinit var tvGameOverResult: TextView
@@ -119,6 +120,10 @@ class OnlineGameActivity : AppCompatActivity() {
 
     private var localSeatIndex: Int = -1
 
+    // Stage G：游戏内"更多…"菜单的"设置昵称""AI 出牌速度"复用同一份偏好持久化路径
+    // （与 SettingsActivity / MainActivity 共用 SharedPreferences）
+    private lateinit var preferences: GamePreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DebugLogManager.i(TAG, "=== OnlineGameActivity onCreate START ===")
@@ -128,6 +133,7 @@ class OnlineGameActivity : AppCompatActivity() {
             setContentView(R.layout.activity_game)
 
             soundManager = SoundManager(this)
+            preferences = GamePreferences(this)
 
             initManagers()
             initViews()
@@ -177,11 +183,7 @@ class OnlineGameActivity : AppCompatActivity() {
         btnPass = findViewById(R.id.btnPass)
         btnHint = findViewById(R.id.btnHint)
         btnAiTakeover = findViewById(R.id.btnAiTakeover)
-        btnAfk = findViewById(R.id.btnAfk)
-        // 多人模式下 AFK 按钮可见（feature_spec G35）
-        btnAfk.visibility = View.VISIBLE
-        btnHistory = findViewById(R.id.btnHistory)
-        btnAutoPlay = findViewById(R.id.btnAutoPlay)
+        btnMore = findViewById(R.id.btnMore)
         gameOverOverlay = findViewById(R.id.gameOverOverlay)
         tvGameOverTitle = findViewById(R.id.tvGameOverTitle)
         tvGameOverResult = findViewById(R.id.tvGameOverResult)
@@ -219,8 +221,7 @@ class OnlineGameActivity : AppCompatActivity() {
 
         // 多人模式下隐藏"再来一局"按钮
         btnPlayAgain.visibility = View.GONE
-        // 托管按钮改为"离开"
-        btnAutoPlay.text = "离开"
+        // Stage G：旧 btnAutoPlay 借作"离开"按钮的功能已迁移到"更多…"菜单的"离开房间"项。
     }
 
     private fun initGameFromIntent() {
@@ -294,22 +295,28 @@ class OnlineGameActivity : AppCompatActivity() {
             // UI 立即反馈；服务端 RoomUpdate 回来时会再 reconcile（一次性切换是安全的）
         }
 
-        // 暂离 / 我回来了（feature_spec G35）
-        // 暂离 = ToggleAITakeover(true)；我回来了 = ToggleAITakeover(false)
-        // 与 AI 接管按钮共享同一服务端状态，只是 UI 文本 / 含义不同
-        btnAfk.setOnClickListener {
-            val target = !imAiSubstitute
-            networkManager.send(ToggleAITakeover(enabled = target))
+        // Stage G：btnAfk / btnHistory / btnAutoPlay 已删除；
+        // 查看记录 / 暂离 / 离开均由"更多…"菜单触发
+        btnMore.setOnClickListener {
+            MoreMenuDialog.show(
+                activity = this,
+                preferences = preferences,
+                isMultiplayer = true,
+                imAiSubstitute = imAiSubstitute,
+                onShowHistory = { showHistory() },
+                onLeave = { showLeaveConfirmDialog() },
+                onToggleAfk = {
+                    val target = !imAiSubstitute
+                    networkManager.send(ToggleAITakeover(enabled = target))
+                },
+            )
         }
 
-        btnHistory.setOnClickListener { showHistory() }
         btnShowHistory.setOnClickListener { showHistory() }
         btnCloseHistory.setOnClickListener { historyOverlay.visibility = View.GONE }
         btnHistoryPrev.setOnClickListener { showHistoryPage(historyCurrentPage - 1) }
         btnHistoryNext.setOnClickListener { showHistoryPage(historyCurrentPage + 1) }
 
-        // 托管按钮改为离开
-        btnAutoPlay.setOnClickListener { showLeaveConfirmDialog() }
         btnBackMenu.setOnClickListener { showLeaveConfirmDialog() }
 
         // 点击手牌区空白处取消选中
@@ -859,17 +866,17 @@ class OnlineGameActivity : AppCompatActivity() {
     }
 
     /**
-     * 同步 AI 接管 / 暂离按钮的文本与游戏状态条提示。
+     * 同步 AI 接管按钮的文本与游戏状态条提示。
      * 由 RoomUpdate 推 → imAiSubstitute 变化时调用（feature_spec G34/G35）。
+     *
+     * Stage G：btnAfk 已删除；"暂离"语义合并到"更多…"菜单第 5 项（菜单项文字
+     * 在弹出时根据当前 imAiSubstitute 动态生成，无需 lateinit 持有 button 引用）。
      */
     private fun updateAiTakeoverButtons() {
-        if (imAiSubstitute) {
-            btnAiTakeover.text = getString(R.string.btn_ai_takeover_off)
-            btnAfk.text = getString(R.string.btn_back_from_afk)
-        } else {
-            btnAiTakeover.text = getString(R.string.btn_ai_takeover_on)
-            btnAfk.text = getString(R.string.btn_afk)
-        }
+        btnAiTakeover.text = if (imAiSubstitute)
+            getString(R.string.btn_ai_takeover_off)
+        else
+            getString(R.string.btn_ai_takeover_on)
         // 同步刷新出牌按钮 enabled 态
         updateButtonStates()
     }
