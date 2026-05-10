@@ -618,7 +618,6 @@ mutexFor(room).withLock {
 > **核心**：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑
 
 ---
-
 <!-- 结束页 -->
 
 # 谢谢
