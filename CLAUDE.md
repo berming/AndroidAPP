@@ -94,7 +94,8 @@ CI 的 `tdd-gate` job 会 mechanically 校验：上表中任一文件被改但�
 
 1. **CI 绿**（GitHub Actions：tests + detekt 全部通过）
 2. **Codex Bot review**（chatgpt-codex-connector 评论无 P1）
-3. **Claude PR review**（开新会话 `/review`，确认无 P0/P1）
+3. **Claude PR review**（`/review-pr <PR#>` 调 pr-reviewer subagent；
+   PR-H5 引入；确认无 P0/P1）
 4. **真机验证**（至少 happy path + 1 个边界场景）
 
 详见 `.github/pull_request_template.md`。
@@ -180,6 +181,8 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 - `/ship-check` — push 前 4 关本地校验
 - `/pre-commit-scan` — Haiku 4.5 批量扫 5 大约束
 - `/trace-bug` — 用户 bug 报告 → 失败测试 commit（Loop B 入口；PR-H4 引入）
+- `/review-pr <PR#>` — 调 pr-reviewer subagent 做对抗审查
+  （PR-H5 引入；替代"开新会话 /review"）
 
 **Subagents**（`.claude/agents/` 下）
 
@@ -187,6 +190,8 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
   bump（PR-H4 引入）
 - `tdd-scaffolder` — 关键路径函数 → 失败测试骨架（PR-H4 引入；
   被 `/trace-bug` 调用）
+- `pr-reviewer` — 独立 context 拉 PR diff 跑 P0/P1/P2 rubric
+  （PR-H5 引入；被 `/review-pr` 调用；模型 Opus 4.7）
 - `.claude/hooks/{SessionStart,PostToolUse,UserPromptSubmit}.sh` — 启动摘要 /
   关键路径 TDD 提醒 / push 关键词提醒
 - `.githooks/{pre-push,commit-msg}` — 自动跑 :shared:jvmTest / 校验署名两行

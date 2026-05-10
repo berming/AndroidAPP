@@ -49,34 +49,81 @@
 
 ---
 
-## 2. 半自动触发：关键路径必走 Claude `/review` 新会话
+## 2. 半自动触发：关键路径必走 `/review-pr <PR#>`
 
-CLAUDE.md 第五章 PR 4 关的第 3 关：「Claude PR review（**新会话**
-`/review`，确认无 P0/P1）」。
+CLAUDE.md 第五章 PR 4 关的第 3 关：「Claude PR review（确认无 P0/P1）」。
 
-### 为什么必须**新会话**
+### 为什么需要 context isolation
 
 提交 PR 的会话已经形成「我的方案没问题」的心理偏差。要 Claude 公正
-审查，必须从空白上下文开始。
+审查，审查者必须看不到作者的辩护、看不到作者的叙述、只看 PR 的原始
+diff。
+
+### 实现：`/review-pr` 调 pr-reviewer subagent（PR-H5 引入，2026-05）
+
+> 历史上这一关要求"开新会话跑 `/review`"。问题：会话切换成本高、
+> 上下文 / 滚动记录丢失、审查报告分散在多个会话里。
+>
+> 替换方案：`/review-pr <PR#>` slash command 调 `pr-reviewer` subagent
+> （`.claude/agents/pr-reviewer.md`）。subagent 满足"context
+> isolation"的核心要素：
+>
+> - 独立 context window，看不到主会话历史
+> - **system prompt 锁在 agent 文件里**，主会话不能临时改写
+> - 强制从 `mcp__github__pull_request_read` 拉 diff，
+>   不接受主会话叙述
+> - 模型默认 Opus 4.7（与作者同等容量，最大化抓 P0/P1 概率）
+>
+> 这就把"开新会话"的真正价值（独立上下文）保留下来，又免了开会话
+> 的体力开销。**Codex（异 vendor）和真机仍然必走** —— 见 §1、§4。
 
 ### 何时强制走
 
 **关键路径**改动时。判定标准（与 CI tdd-gate 一致）：
+
 - `shared/.../engine/CardRules.kt`
 - `shared/.../engine/SettlementCalculator.kt`
 - `shared/.../network/GameMessage.kt`（含 PROTOCOL_VERSION 升降）
 - `server/.../ServerGameManager.kt`
 - `server/.../Application.kt`（handleReconnect / handleAction 等流量入口）
 
-PR 模板里要有「关键路径改动 → 已开 Opus 4.7 新会话 `/review`」复选框。
-没勾 → reviewer 拒绝合入。
+PR 模板里要有「关键路径改动 → 已跑 `/review-pr`」复选框。没勾 →
+reviewer 拒绝合入。
 
 ### 操作
 
-1. 在 Claude Code 里 `/clear`（清空当前会话）
-2. 切到 Opus 4.7：`/model claude-opus-4-7`
-3. 跑：`/review`（如果有该 slash command）或手动喂 PR diff
-4. 审查输出 → P0/P1 → 走 Loop B；P2 → 自行判断
+```
+/review-pr <PR#>
+```
+
+主会话把这一行交给 pr-reviewer subagent；subagent 跑完返回结构化的
+P0/P1/P2 列表。主会话**只展示报告**，不替你拍板修不修。
+
+输出处理：
+- P0 / P1 → 修；走 `docs/playbooks/bug-triage.md` Loop B
+- P2 → 自行判断；不修也要在 PR 评论里留一句理由
+- nit → 顺手修或忽略
+
+### 已知限制
+
+`/review-pr` 不能完全替代「开新会话 + 真机验证」的所有价值：
+
+| 替代了 | 没替代 |
+|---|---|
+| 独立 context（看不到作者叙述） | 跨 vendor 能力（仍同是 Claude 家族） |
+| 锁定的 reviewer rubric（不可被作者诱导） | 真机/真服务端验证（subagent 跑不了 wasmJs / 服务器 curl） |
+| 每 PR 5 分钟内完成 | 「直觉式」整体感（subagent 走 rubric，可能漏 rubric 之外的问题） |
+
+所以：
+- **Codex bot 评论必读**（§1）—— 异 vendor 才能补 Claude 家族盲区
+- **真机/真服务器验证必跑**（§4）—— rubric 之外的运行时问题
+- 季度第二 vendor 深审（§3）—— 仍按季度走
+
+### Fallback：何时还是要开新会话
+
+- subagent 报告自相矛盾或明显跑偏 → 开新会话用 `/review` 复核
+- 涉及多 PR 关联（如本 PR 修了 PR-X 引入的 bug，要回看 PR-X 上下文）
+  —— 主会话上下文太大，subagent 也会被截断 → 开新会话整体梳理
 
 ---
 
