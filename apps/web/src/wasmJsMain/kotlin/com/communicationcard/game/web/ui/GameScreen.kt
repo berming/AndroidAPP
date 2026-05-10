@@ -263,14 +263,18 @@ private fun TopBar(
         ) { Text("过牌", color = Color.White, fontSize = 12.sp) }
         Spacer(Modifier.width(4.dp))
         // AI 接管 / 取消（feature_spec G34/G35），仅多人模式
-        if (imAiSubstitute != null && onToggleAITakeover != null) {
+        // 用 local val 固化非空，避免 wasmJs/Compose 智能转换 + lambda 捕获组合
+        // 触发的 psi2ir backend NPE（PR #53 第二轮 CI 失败的根因）
+        val takeoverCallback = onToggleAITakeover
+        val isSubstitute = imAiSubstitute
+        if (isSubstitute != null && takeoverCallback != null) {
             OutlinedButton(
-                onClick = onToggleAITakeover,
+                onClick = takeoverCallback,
                 modifier = Modifier.height(36.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
             ) {
                 Text(
-                    if (imAiSubstitute) "我回来了" else "AI 接管",
+                    if (isSubstitute) "我回来了" else "AI 接管",
                     color = Color.White,
                     fontSize = 11.sp,
                 )
@@ -279,7 +283,7 @@ private fun TopBar(
         }
         Button(
             onClick = onPlay,
-            enabled = canPlay && (imAiSubstitute != true),
+            enabled = canPlay && (isSubstitute != true),
             modifier = Modifier.height(36.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
             colors = ButtonDefaults.buttonColors(

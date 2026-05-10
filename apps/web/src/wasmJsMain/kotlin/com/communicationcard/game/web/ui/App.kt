@@ -84,11 +84,13 @@ fun App() {
                             onToggleSelected = vm::toggleSelectedCard,
                             onLeave = vm::leaveGame,
                             // feature_spec G34/G35：仅多人模式传非 null（GameScreen 据此显示按钮）
+                            // 用 lambda 而非 KFunction reference，避开 wasmJs/Compose
+                            // psi2ir backend NPE（PR #53 第二轮 CI 失败的根因之一）
                             imAiSubstitute = if (s.mode == Screen.Game.Mode.Multiplayer) {
                                 s.imAiSubstitute ?: false
                             } else null,
                             onToggleAITakeover = if (s.mode == Screen.Game.Mode.Multiplayer) {
-                                vm::toggleAITakeover
+                                { vm.toggleAITakeover() }
                             } else null,
                         )
                         is Screen.Settlement -> SettlementScreen(
