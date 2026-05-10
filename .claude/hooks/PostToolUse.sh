@@ -61,13 +61,18 @@ fi
 # ─────────────────────────────────────────────────────────────
 # 分支 B：git push 后 → 主动检查 Codex review 提醒
 #
-# 只匹配命令真的"以 git push 起头"（行首 / `&&` / `;` / `|` / `(` 之后）。
-# 旧版用 substring `*"git push"*` 会被 commit message 文本、grep "git push"、
-# echo 含该字符串的 JSON 等误触发（实操中确实碰到 2 次假阳性）。
-# 用 grep -E 锚定边界 + 在所有常见 shell 分隔符之后才认。
+# 只匹配命令"实际**以** `git push` 起头"（行首 / 或在常见 shell 分隔符
+# `;`/`&`/`|`/`(`/`)` 之后）。旧版用 substring 会被 commit message 文本、
+# grep "git push"、git log --grep "git push" 等误触（实操中碰到 3 次假阳性）。
+#
+# 实现：sed 把所有 shell 分隔符替换成 newline（把单个命令拆成多个候选起头），
+# 再 grep -E '^[[:space:]]*git[[:space:]]+push' 匹配行首。
+# 这样 quoted 字符串里的 "git push" 不被算作命令起头。
 # ─────────────────────────────────────────────────────────────
 if [ -n "$bash_cmd" ] \
-   && printf '%s' "$bash_cmd" | grep -qE '(^|[[:space:]]*[;&|(]+[[:space:]]*)git[[:space:]]+push([[:space:]]|$)'; then
+   && printf '%s' "$bash_cmd" \
+        | sed 's/[;&|()]\+/\n/g' \
+        | grep -qE '^[[:space:]]*git[[:space:]]+push([[:space:]]|$)'; then
     emit_context "🤖 [Push 后自动 review-check 提醒] 刚 push 完。
 
 **主会话应当主动**（不要等用户再提一次）：
