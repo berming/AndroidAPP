@@ -1,15 +1,21 @@
-# 沟通牌 - 多人游戏完整指南
+# 沟通牌 · 多人游戏完整指南
+
+> 本文覆盖三件事：本地起服务、客户端怎么连、生产部署。
+> 协议 / AI / 重连 / FAQ 等"运行时知识"在后半部分。
+>
+> 部署到自有服务器走 [`docs/playbooks/web-deploy.md`](playbooks/web-deploy.md)
+> （已脚本化：`deploy/install.sh` + `Caddyfile` + systemd unit + GitHub Actions
+> 自动 push 部署）；本节只说本地开发。
 
 ## 快速开始
 
-### 1. 启动服务器
+### 1. 本地启动服务端
 
 ```bash
-cd server
-./gradlew run
+./gradlew :server:run         # 监听 0.0.0.0:8080，提供 /game WebSocket
 ```
 
-成功启动显示：
+成功启动会输出：
 ```
 === Starting Server ===
 === WebSockets installed ===
@@ -17,107 +23,50 @@ cd server
 === Server ready on port 8080 ===
 ```
 
-### 2. 配置客户端连接地址
+> `:server` 是 root build 的子项目（PR-H3 后并入），无需 `cd server`。
 
-修改 `LobbyActivity.kt` 的 `SERVER_URL`：
+### 2. 客户端怎么连服务端
 
-```kotlin
-// apps/communication-card/src/main/java/com/communicationcard/game/ui/multiplayer/LobbyActivity.kt
-companion object {
-    // 模拟器连本机
-    private const val SERVER_URL = "ws://10.0.2.2:8080/game"
+| 客户端 | 默认连法 | 自定义 |
+|--------|---------|--------|
+| **Android (`:apps:android`)** | `ws://10.0.2.2:8080/game`（模拟器）<br>`ws://<电脑局域网IP>:8080/game`（真机） | 主菜单 → 多人游戏 → Lobby 顶栏输入框；连接前可改 |
+| **Web (`:apps:web`)** | 同源：`ws://<host>/game` 或 `wss://<host>/game`（host=空 时回退 `ws://localhost:8080/game`） | Lobby 顶栏输入框；连接前可改 |
+| **未来客户端** | 由各端的 `defaultServerUrl()` 决定，应遵循 [客户端实现指南](client_implementation_guide.md) §3 | 同上，端内提供"自定义 URL"入口 |
 
-    // 真机连同局域网电脑
-    // private const val SERVER_URL = "ws://192.168.1.100:8080/game"
+> Web 端在浏览器打开后默认走"和当前页同 host"——这意味着部署时 Caddy
+> 反代 `/game` 到 `127.0.0.1:8080` 后客户端就能直接连，不需要改源码。
+> 详见 [`apps/web/.../viewmodel/AppViewModel.kt`](../apps/web/src/wasmJsMain/kotlin/com/communicationcard/game/web/viewmodel/AppViewModel.kt)
+> 的 `defaultServerUrl()`。
 
-    // 公网部署
-    // private const val SERVER_URL = "ws://your-server.com:8080/game"
-}
-```
+### 3. 进入游戏
 
-### 3. 运行游戏
-
-1. 安装 APK
-2. 主菜单 → 多人游戏
-3. 输入昵称（首次提示）
-4. 创建房间或输入房间码加入
+1. 客户端：输入昵称（首次会提示）
+2. 创建房间 → 把房间码（4 位）发给朋友
+3. 朋友输入房间码 → 加入 → 点准备
+4. 房主点开始；服务端自动用 AI 填到 6 人
 
 ---
 
-## 服务端部署
+## 部署到生产服务器
 
-### 本地开发
+> **不要再手抄旧版"复制 systemd unit + 跑 ufw"流程**——已脚手架化。
 
-```bash
-cd server
-./gradlew run
-```
+完整流程：[`docs/playbooks/web-deploy.md`](playbooks/web-deploy.md)。
 
-- 模拟器连本机：`ws://10.0.2.2:8080/game`
-- 真机连同 WiFi 电脑：`ws://<电脑局域网IP>:8080/game`
+要点速览：
 
-### 公网部署（Ubuntu 22.04）
+- `deploy/install.sh`：Ubuntu 22.04 一次性 bootstrap（apt 装 caddy/JDK17/rsync、
+  建 cards 用户 / 各种目录、生成 ed25519 SSH key、装 sudoers 白名单）
+- `deploy/Caddyfile`：Caddy 反代 `/game` 到本机 8080；静态文件托管 web 产物；
+  含 IP 直连（A 方案）+ HTTPS 域名（B 方案）模板
+- `deploy/communication-card-server.service`：systemd unit（cards 用户 / JVM
+  调优 / 日志路径 / `ProtectSystem=strict`）
+- `.github/workflows/deploy.yml`：push to main 自动 SSH rsync + 重启服务（**opt-in**：
+  设 `vars.DEPLOY_ENABLED=true` 才跑）
 
-```bash
-# 1. 安装 JDK 17 与 Git
-apt update && apt install -y openjdk-17-jdk git
-
-# 2. 拉代码
-cd /opt
-git clone <你的仓库> AndroidAPP
-cd AndroidAPP/server
-chmod +x gradlew
-
-# 3. 构建
-./gradlew build
-
-# 4. 防火墙
-ufw allow 8080/tcp
-ufw allow 22/tcp
-ufw --force enable
-
-# 5. systemd 服务
-cat > /etc/systemd/system/communication-card.service << 'EOF'
-[Unit]
-Description=Communication Card Game Server
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/AndroidAPP/server
-ExecStart=/opt/AndroidAPP/server/gradlew run --no-daemon
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable communication-card
-systemctl start communication-card
-
-# 6. 验证
-systemctl status communication-card
-curl http://localhost:8080/        # 应返回 OK
-journalctl -u communication-card -f
-```
-
-> 云服务商记得在控制台安全组开放 8080 端口。
-
-### 升级 / 重新部署
-
-```bash
-cd /opt/AndroidAPP
-git pull
-git log -1 --oneline                  # 确认拉到了最新提交
-cd server && ./gradlew build
-systemctl restart communication-card
-journalctl -u communication-card -n 50
-```
-
-> **注意**：部署新版本会清空所有进行中的房间。需要等当前对局结束或通知玩家。
+> **协议层兼容**：升级 server 会断开所有进行中房间。建议挑非黄金时段或在
+> playbook 提示玩家退到大厅。`PROTOCOL_VERSION` bump 时老客户端会被服务端
+> 拒绝（详见 [架构总览](architecture.md) §六）。
 
 ---
 
@@ -192,33 +141,15 @@ WAITING ──(房主点开始 + 至少1名真人玩家已准备)──▶ IN_GA
 
 ---
 
-## 游戏规则要点（联网与单机一致）
+## 游戏规则
 
-### 牌型
-- 单张 / 对子 / 三张 / 顺子（5+ 连续无 2/王）/ 炸弹（4+ 同点）
+完整规则定义（玩家手册 + 开发参考）→ [`docs/game_rules.md`](game_rules.md)。
+联网与单机使用同一份规则——`:shared/engine/{CardRules,SettlementCalculator}.kt`
+是单一真相来源；服务端 `:server/.../ServerGameManager.kt` 必须与之等价
+（[CLAUDE.md §约束 1](../CLAUDE.md) 强制）。
 
-### 比较规则（`canBeat`）
-- 同类型同张数：比点数（高者胜）
-- 炸弹 vs 非炸弹：炸弹必胜
-- 炸弹 vs 炸弹：**先比张数，张数相同再比点数**（5×3 能压 4×10）
-- 上家是炸弹时，必须用炸弹才能压
-
-### 计分
-- 5 → 5 分；10 → 10 分；K → 10 分；其他牌 → 0 分
-- 4 副牌共 216 张牌，总分 400 分
-- "已收"：玩家赢得该轮所获得的所有牌的分值之和
-- 队伍累计分（实时显示）：本队所有玩家"已收"之和
-- 每回合 30 秒；超时由服务端 AI 自动接管出牌
-
-### 结算
-（与单机 `SettlementCalculator` 完全一致——见 `settlement_verification.md`）
-
-**全队走完触发**：
-- 赢方 = 赢方已收 + 输方未走完玩家(已收 + 手牌分)
-- 输方 = 输方已走完玩家已收
-
-**已收 ≥ 200 触发**：
-- 双方得分 = 各自已走完玩家已收（未走完玩家的累计分**不算**）
+> 历史上 `multiplayer_guide.md` 含一份简化规则速查；为避免与代码漂移，
+> 已统一迁移到 `game_rules.md`。本节仅留指针。
 
 ---
 
@@ -375,27 +306,30 @@ embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
 ### 连接失败
 
 ```bash
-# 1. 服务起着吗？
-systemctl status communication-card
+# 1. 服务起着吗？（生产服务器）
+systemctl status communication-card-server
 
 # 2. 端口监听了吗？
 ss -tlnp | grep 8080
 
 # 3. 防火墙开了吗？
-ufw status
+ufw status                              # 主机层
+# 云控制台还要确认安全组（参考 docs/playbooks/web-deploy.md 第二层防火墙）
 
 # 4. 客户端能连吗？
-telnet 服务器IP 8080
-curl http://服务器IP:8080/        # 期望返回 OK
+curl -I http://<服务器IP>/                  # Caddy 应返 200
+curl -I http://<服务器IP>/game              # WS 上线前 Caddy 通常返 426/400 也算正常
 ```
+
+更详尽的连不上排错路径见 [`docs/playbooks/web-deploy.md`](playbooks/web-deploy.md) §排错。
 
 ### 游戏看似卡住（服务端 AI 不出牌）
 
 **最常见原因：客户端连了一台旧版服务**。先确认服务端是最新代码：
 
 ```bash
-cd /opt/AndroidAPP && git log -1 --oneline
-journalctl -u communication-card --since "5 min ago" | grep -i "AI"
+ssh cards@<host> 'sudo systemctl status communication-card-server'
+ssh cards@<host> 'sudo journalctl -u communication-card-server --since "5 min ago" | grep -i AI'
 ```
 
 最新版本的服务端在每次 AI 失败时都会输出日志：
@@ -451,16 +385,48 @@ A: 升级到含 `8a56e14` 的版本。`NetworkManager.handleMessage` 现在会�
 
 ## 关键文件索引
 
+### 跨平台共享层（`:shared`）—— 所有客户端共用
+
 | 路径 | 角色 |
 |------|------|
-| `server/src/main/kotlin/.../Application.kt` | WebSocket 路由、消息分发 |
-| `server/src/main/kotlin/.../Messages.kt` | 协议定义（与客户端 `GameMessage.kt` 1:1 对齐） |
+| `shared/src/commonMain/.../network/GameMessage.kt` | 协议 DTO + `PROTOCOL_VERSION`，**所有客户端依赖** |
+| `shared/src/commonMain/.../engine/CardRules.kt` | 牌型识别 + `canBeat`（与服务端 `canBeat` 必须等价） |
+| `shared/src/commonMain/.../engine/SettlementCalculator.kt` | 结算公式（与服务端 `computeAllFinishedScores` 等价） |
+| `shared/src/commonMain/.../ai/AIPlayer.kt` | AI 决策；服务端、Web 单机模式都用同一份 |
+
+### 服务端（`:server`）
+
+| 路径 | 角色 |
+|------|------|
+| `server/src/main/kotlin/.../Application.kt` | WebSocket 路由、消息分发、`handleReconnect`/版本握手 |
 | `server/src/main/kotlin/.../ServerRoomManager.kt` | 房间生命周期 |
-| `server/src/main/kotlin/.../ServerGameManager.kt` | 游戏逻辑 / AI / 计时器 / Mutex |
-| `apps/.../network/NetworkManager.kt` | WebSocket 连接 / 心跳 / 重连 |
-| `apps/.../network/RoomManager.kt` | 房间状态流 |
-| `apps/.../network/GameSyncManager.kt` | 游戏状态流 + 回合计时 |
-| `apps/.../engine/MultiplayerGameEngine.kt` | 网络版引擎适配器 |
-| `apps/.../ui/multiplayer/LobbyActivity.kt` | 大厅 |
-| `apps/.../ui/multiplayer/RoomActivity.kt` | 房间 |
-| `apps/.../ui/multiplayer/OnlineGameActivity.kt` | 联网游戏 |
+| `server/src/main/kotlin/.../ServerGameManager.kt` | 游戏逻辑 / AI / 计时器 / `mutexFor(room)` |
+| `server/src/main/kotlin/.../Messages.kt` | 服务端独有的握手 / 错误消息（业务消息已用 `:shared` 的 `GameMessage`） |
+
+### Android 客户端（`:apps:android`）
+
+| 路径 | 角色 |
+|------|------|
+| `apps/android/.../network/NetworkManager.kt` | WebSocket 连接 / 心跳 / 重连 |
+| `apps/android/.../network/RoomManager.kt` | 房间状态流 |
+| `apps/android/.../network/GameSyncManager.kt` | 游戏状态流 + 回合计时 |
+| `apps/android/.../engine/MultiplayerGameEngine.kt` | 网络版引擎适配器 |
+| `apps/android/.../ui/multiplayer/LobbyActivity.kt` | 大厅 |
+| `apps/android/.../ui/multiplayer/RoomActivity.kt` | 房间 |
+| `apps/android/.../ui/multiplayer/OnlineGameActivity.kt` | 联网游戏界面 |
+
+### Web 客户端（`:apps:web`）
+
+| 路径 | 角色 |
+|------|------|
+| `apps/web/.../web/Main.kt` | `ComposeViewport(document.body)` 入口 + #loader 移除 |
+| `apps/web/.../web/viewmodel/AppViewModel.kt` | 状态机 + `defaultServerUrl()` + ws 连接 |
+| `apps/web/.../web/net/WebSocketTransport.kt` | 浏览器 WS 包装（`@JsFun` interop） |
+| `apps/web/.../web/singleplayer/SinglePlayerEngine.kt` | 单机模式（包装 `:shared` `GameEngine`） |
+| `apps/web/.../web/ui/{Home,Lobby,Room,Game,Settlement}Screen.kt` | 5 屏 Compose UI |
+
+### 新客户端（iOS / Desktop / CLI / 其他）
+
+参考 [`docs/client_implementation_guide.md`](client_implementation_guide.md) +
+[`docs/feature_spec.md`](feature_spec.md)。所有新端必须复用 `:shared` 的协议
+DTO 与 `PROTOCOL_VERSION`，否则握手失败。

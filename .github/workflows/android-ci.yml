@@ -113,7 +113,7 @@ jobs:
         # GITHUB_STEP_SUMMARY 与 PR 评论，方便沙箱/无登录环境通过 MCP 读取错误。
         run: |
           set -o pipefail
-          ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
+          ./gradlew :apps:android:assembleDebug --info --stacktrace 2>&1 \
             | tee assembleDebug.log
 
       - name: Surface assembleDebug error on failure
@@ -125,7 +125,7 @@ jobs:
           # 评论体：标题永远显示，详细 grep + tail 默认折叠（<details>）
           # —— 大部分时候只想看错误摘要，需要时再点开看详情。
           {
-            echo "## ❌ :apps:communication-card:assembleDebug 失败"
+            echo "## ❌ :apps:android:assembleDebug 失败"
             echo ""
             echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
             echo ""
@@ -210,7 +210,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: communication-card-app
-          path: apps/communication-card/build/outputs/apk/debug/*.apk
+          path: apps/android/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 7
 
@@ -220,8 +220,8 @@ jobs:
         with:
           name: reports
           path: |
-            apps/communication-card/build/reports/
-            apps/communication-card/build/test-results/
+            apps/android/build/reports/
+            apps/android/build/test-results/
             shared/build/reports/
             shared/build/test-results/
             server/build/reports/

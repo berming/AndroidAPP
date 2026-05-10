@@ -29,7 +29,7 @@ import kotlin.random.Random
  * 游戏规则：
  * - 使用四副牌（216张）
  * - 黑桃3先出
- * - 支持单张、对子、三张、炸弹、顺子
+ * - 支持单张、对子、三张、炸弹（不支持顺子，详见 docs/game_rules.md）
  * - 一队全部出完或达到200分结束
  */
 class ServerGameManager(

@@ -9,12 +9,12 @@ kotlin {
     androidTarget {
         compilations.all {
             kotlinOptions {
-                // 必须与 :apps:communication-card 一致（jvmTarget = "1.8"）；
+                // 必须与 :apps:android 一致（jvmTarget = "1.8"）；
                 // 不一致 AGP 会报 "Inconsistent JVM-target compatibility..."。
                 jvmTarget = "1.8"
             }
         }
-        // KMP 默认只发布 release 变体；Android 消费方（:apps:communication-card）
+        // KMP 默认只发布 release 变体；Android 消费方（:apps:android）
         // 同时需要 debug 变体来跑 assembleDebug。不显式声明会出现
         // "Could not find a variant of project :shared that matches the consumer
         //  attributes" 这类 AGP variant resolution 错误。
@@ -71,7 +71,7 @@ android {
     }
 
     compileOptions {
-        // 与 :apps:communication-card 对齐
+        // 与 :apps:android 对齐
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }

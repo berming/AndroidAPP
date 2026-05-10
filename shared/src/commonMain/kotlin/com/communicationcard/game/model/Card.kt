@@ -23,9 +23,6 @@ enum class CardRank(val value: Int, val displayName: String, val scoreValue: Int
 
     companion object {
         fun fromValue(value: Int): CardRank? = entries.find { it.value == value }
-
-        // 获取用于顺子的连续牌（不含大小王）
-        val straightRanks = listOf(THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN, JACK, QUEEN, KING, ACE, TWO)
     }
 }
 
@@ -86,14 +83,9 @@ data class CardGroup(
     val size: Int
         get() = cards.size
 
-    // 获取用于比较的主要点数
+    // 获取用于比较的主要点数（同点数牌组取首张点数）
     val primaryRank: CardRank
-        get() = when (type) {
-            CardGroupType.SINGLE, CardGroupType.PAIR, CardGroupType.TRIPLE, CardGroupType.BOMB ->
-                cards.first().rank
-            CardGroupType.STRAIGHT ->
-                cards.maxByOrNull { it.rank.value }?.rank ?: cards.first().rank
-        }
+        get() = cards.first().rank
 
     override fun toString(): String = cards.joinToString(" ") { it.displayName }
 }
@@ -105,6 +97,5 @@ enum class CardGroupType(val displayName: String) {
     SINGLE("单张"),
     PAIR("对子"),
     TRIPLE("三张"),
-    STRAIGHT("顺子"),
     BOMB("炸弹");
 }

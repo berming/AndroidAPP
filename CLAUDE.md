@@ -1,6 +1,6 @@
 # 沟通牌项目 — Claude Code 工作规约
 
-> 适用于：Android 客户端 (`apps/communication-card`) + Ktor 服务端 (`server/`)
+> 适用于：Android 客户端 (`apps/android`) + Ktor 服务端 (`server/`)
 > 本文是 Claude Code 在本仓库工作时必读的"工作手册"。
 
 ---
@@ -118,7 +118,7 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 ./gradlew :shared:assemble                      # 编译所有 target
 
 # Android 客户端
-./gradlew :apps:communication-card:assembleDebug
+./gradlew :apps:android:assembleDebug
 
 # Web 客户端（Compose Multiplatform / Wasm-JS，浏览器版本）
 ./gradlew :apps:web:wasmJsBrowserDevelopmentRun  # 启本地 dev 服务器（默认 8080），热重载
@@ -143,7 +143,7 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
     network/    GameMessage（+ 所有 SerializedXxx DTO）
   commonTest/   SettlementCalculatorTest（15 用例，kotlin.test）
 
-:apps:communication-card         Android 视图层（依赖 :shared）
+:apps:android         Android 视图层（依赖 :shared）
 :apps:web                        Compose Multiplatform / Wasm-JS（依赖 :shared）
 :server                          Ktor 后端（PR-H3 起依赖 :shared，约束 1/4 已编译期消除）
 ```
@@ -164,8 +164,11 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 **项目档案**
 
 - `docs/architecture.md` — 项目架构总览
+- `docs/game_rules.md` — **沟通牌玩法权威定义**（玩家手册 + 开发参考；改规则先看这）
 - `docs/multiplayer_guide.md` — 联网部署 / 协议 / 调试
-- `docs/settlement_verification.md` — 结算公式（含 15 验证用例）
+- `docs/settlement_verification.md` — 结算公式（含 15 验证用例，数学规约）
+- `docs/feature_spec.md` — 跨端功能规格（MUST/SHOULD/MAY 矩阵）
+- `docs/client_implementation_guide.md` — 实现新客户端（iOS / Desktop / CLI）参考路径
 - `docs/dev_summary.md` — 开发实践总结（多 AI 协同方案）
 
 **Harness Engineering**（PR-H1/H2 引入）

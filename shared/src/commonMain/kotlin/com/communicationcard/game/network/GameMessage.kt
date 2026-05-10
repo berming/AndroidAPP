@@ -18,7 +18,7 @@ sealed class GameMessage {
          * 升级规则（PR-H3 起）：任一兼容性破坏的协议变更（字段类型变 / 移除字段 /
          * 枚举值改名）必须 +1。仅添加字段且字段有默认值不必 +1。
          */
-        const val PROTOCOL_VERSION = 1
+        const val PROTOCOL_VERSION = 2
 
         val json = Json {
             ignoreUnknownKeys = true

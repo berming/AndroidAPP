@@ -1,19 +1,19 @@
 ---
 description: 跑 :shared:jvmTest（≤30s），失败摘要直出
-allowed-tools: Bash(./gradlew :shared:jvmTest), Bash(./gradlew :apps:communication-card:test), Read, Bash(grep*), Bash(cat *), Bash(head *), Bash(tail *)
+allowed-tools: Bash(./gradlew :shared:jvmTest), Bash(./gradlew :apps:android:test), Read, Bash(grep*), Bash(cat *), Bash(head *), Bash(tail *)
 ---
 
 # /test-fast
 
 本地极速反馈循环。优先跑 `:shared:jvmTest`（含 15 个 SettlementCalculatorTest
 用例 + PR-H2 之后的 CardRulesTest）。`:shared` 模块尚未存在时降级到
-`:apps:communication-card:test`。
+`:apps:android:test`。
 
 ## 执行步骤
 
 1. 检查 `settings.gradle.kts` 是否 `include(":shared")`：
    - 是 → 跑 `./gradlew :shared:jvmTest --console=plain`
-   - 否 → 跑 `./gradlew :apps:communication-card:test --console=plain`
+   - 否 → 跑 `./gradlew :apps:android:test --console=plain`
 2. 若失败：解析输出，把 **第一组失败的测试名 + 关键 stack 行**摘出来给我看。
 3. 若通过：一句话报「✅ N 个测试全绿，耗时 Xs」。
 4. **不要**自动尝试修复。失败时只报告，让用户决定下一步（通常是进入
@@ -40,4 +40,4 @@ allowed-tools: Bash(./gradlew :shared:jvmTest), Bash(./gradlew :apps:communicati
 
 - 不修代码（让 Loop B 走流程）
 - 不跑 detekt（那是 `/pre-commit-scan` 的职责）
-- 不跑 `:apps:communication-card:assembleDebug`（慢，留给 CI）
+- 不跑 `:apps:android:assembleDebug`（慢，留给 CI）

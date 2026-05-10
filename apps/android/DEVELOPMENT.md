@@ -15,14 +15,14 @@
 ## 项目结构
 
 ```
-apps/communication-card/
+apps/android/
 ├── src/main/java/com/communicationcard/game/
 │   ├── model/          # 数据模型
 │   │   ├── Card.kt         # 卡牌定义（花色、点数、分值）
 │   │   ├── Deck.kt         # 牌组管理
 │   │   └── Player.kt       # 玩家状态
 │   ├── engine/         # 游戏引擎
-│   │   ├── CardRules.kt           # 牌型规则（单张、对子、三张、顺子、炸弹）
+│   │   ├── CardRules.kt           # 牌型规则（单张、对子、三张、炸弹）
 │   │   ├── GameEngine.kt          # 游戏流程控制
 │   │   ├── SettlementCalculator.kt # 结算逻辑
 │   │   └── SettlementVerification.kt
@@ -48,7 +48,6 @@ apps/communication-card/
 | 单张 | 任意一张牌 |
 | 对子 | 两张相同点数 |
 | 三张 | 三张相同点数 |
-| 顺子 | 5张及以上连续点数（不含王） |
 | 炸弹 | 4张及以上相同点数 |
 
 ### 计分规则
@@ -306,13 +305,13 @@ data class ReplayStep(
 
 ```bash
 # 构建 Debug APK
-./gradlew :apps:communication-card:assembleDebug
+./gradlew :apps:android:assembleDebug
 
 # 运行测试
-./gradlew :apps:communication-card:test
+./gradlew :apps:android:test
 
 # APK 输出路径
-apps/communication-card/build/outputs/apk/debug/communication-card-debug.apk
+apps/android/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---

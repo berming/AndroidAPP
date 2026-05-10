@@ -69,7 +69,7 @@ PR-H2 之后会变成 hard gate。本地复现：
 
 报告在 `*/build/reports/detekt/detekt.html`。
 
-### Step 6: `Build Debug APK with Gradle` —— `:apps:communication-card:assembleDebug` 失败
+### Step 6: `Build Debug APK with Gradle` —— `:apps:android:assembleDebug` 失败
 
 通常是：
 
@@ -176,7 +176,7 @@ log 的关键片段贴回 PR 作为评论。评论是公开的 JSON，沙箱可�
   # 加 --info --stacktrace + tee 到日志文件
   run: |
     set -o pipefail
-    ./gradlew :apps:communication-card:assembleDebug --info --stacktrace 2>&1 \
+    ./gradlew :apps:android:assembleDebug --info --stacktrace 2>&1 \
       | tee assembleDebug.log
 
 - name: Surface assembleDebug error on failure
@@ -186,7 +186,7 @@ log 的关键片段贴回 PR 作为评论。评论是公开的 JSON，沙箱可�
     PR_NUMBER: ${{ github.event.pull_request.number }}
   run: |
     {
-      echo "## :apps:communication-card:assembleDebug 失败"
+      echo "## :apps:android:assembleDebug 失败"
       echo
       echo "### Kotlin compiler errors（grep）"
       echo '```'

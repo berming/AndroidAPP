@@ -1,6 +1,6 @@
 ---
 description: Push 前 4 关本地校验（detekt + 测试 + 签名 + 关键路径同改）
-allowed-tools: Bash(./gradlew detekt), Bash(./gradlew :shared:jvmTest), Bash(./gradlew :apps:communication-card:test), Bash(git diff*), Bash(git log*), Bash(git status*), Read, Bash(grep*)
+allowed-tools: Bash(./gradlew detekt), Bash(./gradlew :shared:jvmTest), Bash(./gradlew :apps:android:test), Bash(git diff*), Bash(git log*), Bash(git status*), Read, Bash(grep*)
 ---
 
 # /ship-check
@@ -15,7 +15,7 @@ CI 仍是最终权威——本命令只是把"反馈周期从 4 分钟缩到 30 
 ### Gate 1: detekt + 测试
 
 1. `./gradlew detekt --console=plain` —— 必须 exit 0
-2. `./gradlew :shared:jvmTest --console=plain`（或降级 `:apps:communication-card:test`）
+2. `./gradlew :shared:jvmTest --console=plain`（或降级 `:apps:android:test`）
    —— 必须全绿
 
 任一失败 → 报失败位置，**不继续**。

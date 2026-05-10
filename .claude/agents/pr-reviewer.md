@@ -96,7 +96,7 @@ Bucket each changed file into:
   `NetworkManager` — check the "first send must be in onOpen" rule
   (CLAUDE.md 约束 3)
 - **Web UI**: `apps/web/...` — Compose, JsFun interop, lifecycle
-- **Android UI**: `apps/communication-card/...`
+- **Android UI**: `apps/android/...`
 - **CI / deploy**: `.github/workflows/...`, `deploy/...`,
   `Caddyfile`, systemd units
 - **Docs / harness**: `.claude/...`, `docs/...`, README

@@ -90,15 +90,14 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun identifyCardGroup_fiveConsecutive_returnsStraight() {
+    fun identifyCardGroup_fiveConsecutive_returnsNull_straightRemoved() {
+        // 沟通牌不再支持顺子；服务端委托给 :shared/CardRules，与之等价
         val cards = listOf(card("FIVE"), card("SIX"), card("SEVEN"), card("EIGHT"), card("NINE"))
-        val g = gm.identifyCardGroup(cards)
-        assertEquals("STRAIGHT", g!!.type)
+        assertNull(gm.identifyCardGroup(cards))
     }
 
     @Test
     fun identifyCardGroup_fourConsecutive_returnsNull() {
-        // 顺子至少 5 张
         val cards = listOf(card("FIVE"), card("SIX"), card("SEVEN"), card("EIGHT"))
         assertNull(gm.identifyCardGroup(cards))
     }

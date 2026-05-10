@@ -25,17 +25,14 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AndroidApps"
+rootProject.name = "AndroidAPP"
 
-// 跨平台共享模块（协议 / 牌型规则 / 结算 / AI），Android、Web 等所有客户端共用
+// 跨平台共享模块（协议 / 牌型规则 / 结算 / AI），所有客户端共用
 include(":shared")
 
-// Communication Card Game (沟通牌)
-include(":apps:communication-card")
+// Android 客户端
+include(":apps:android")
 // Web 客户端（Compose Multiplatform / Wasm-JS，浏览器版本）
 include(":apps:web")
 // 服务端（Ktor + WebSocket）。PR-H3 起并入 root build；依赖 :shared 消除约束 1/4。
 include(":server")
-
-// Gomoku (五子棋)
-include(":apps:gomoku")
