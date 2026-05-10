@@ -11,25 +11,25 @@
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
 from pptx.oxml.ns import qn
 from lxml import etree
 
-# Colors
-# 主配色：华为红（品牌色 #C7000B）— 仅用于"重点突出"（封面 / 章节标题 / callout）
-PRIMARY = RGBColor(0xC7, 0x00, 0x0B)
-DARK = RGBColor(0x20, 0x20, 0x20)
-GRAY = RGBColor(0x60, 0x60, 0x60)
-# 浅色衬底改为低饱和红粉色（# FFF1F2），与 PRIMARY 同色系协调
-LIGHT_BG = RGBColor(0xFF, 0xF1, 0xF2)
-# 表格标题 / 非重点区分块的浅灰底（替换原来的红 / 绿底）
-LIGHT_HEADER = RGBColor(0xF5, 0xF5, 0xF5)
-LIGHT_HEADER_BORDER = RGBColor(0xD0, 0xD0, 0xD0)
-RED = RGBColor(0xE5, 0x39, 0x35)
-GREEN = RGBColor(0x2E, 0x7D, 0x32)
-ORANGE = RGBColor(0xF5, 0x7C, 0x00)
+# Colors（极简调色板：红 / 黑 / 灰，最多搭配浅灰底）
+# 原则：每页颜色控制在 3 种以内；红色仅用于强调；不使用绿、橙、蓝、亮色
+PRIMARY = RGBColor(0xC7, 0x00, 0x0B)            # 华为红：标题 / 强调 / 表格 emphasized header
+DARK = RGBColor(0x20, 0x20, 0x20)               # 主体文字
+GRAY = RGBColor(0x60, 0x60, 0x60)               # 次要文字 / 边框
+LIGHT_BG = RGBColor(0xFA, 0xFA, 0xFA)           # 大文本框浅底（接近白，不喧宾夺主）
+LIGHT_HEADER = RGBColor(0xF5, 0xF5, 0xF5)       # 表格 header 浅灰底
+BORDER_GRAY = RGBColor(0xBD, 0xBD, 0xBD)        # 表格 / 卡片细边框（深灰）
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+# 兼容性别名（指向极简调色板里的同义色，方便老代码无痛切换）
+RED = PRIMARY        # 老代码里的 RED 全部统一到 PRIMARY 红
+GREEN = DARK         # 绿色（"已实现" / "✅ 通过"）改为 DARK 黑（用 ✓ 符号本身已表达）
+ORANGE = PRIMARY     # 橙色仍归红
+LIGHT_HEADER_BORDER = BORDER_GRAY  # 兼容
 
 FONT_CN = "Microsoft YaHei"
 FONT_MONO = "Consolas"
@@ -91,12 +91,35 @@ def add_page_number(slide, num, total):
                 align=PP_ALIGN.RIGHT)
 
 
+def _set_cell_border(cell, color_rgb=BORDER_GRAY, width_pt=0.5):
+    """给单元格 4 边加细边框（深灰极细）。python-pptx 没暴露 cell.line，
+    需要直接改底层 OOXML：在 a:tcPr 下塞 a:lnL/lnR/lnT/lnB。"""
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    rgb_hex = "{0:02X}{1:02X}{2:02X}".format(color_rgb[0], color_rgb[1], color_rgb[2])
+    width_emu = int(width_pt * 12700)  # 1 pt = 12700 EMU
+    for side in ("lnL", "lnR", "lnT", "lnB"):
+        # 先移除可能已有的同名 child，避免重复
+        for old in tcPr.findall(qn(f"a:{side}")):
+            tcPr.remove(old)
+        ln = etree.SubElement(tcPr, qn(f"a:{side}"))
+        ln.set("w", str(width_emu))
+        ln.set("cap", "flat")
+        ln.set("cmpd", "sng")
+        ln.set("algn", "ctr")
+        solidFill = etree.SubElement(ln, qn("a:solidFill"))
+        srgbClr = etree.SubElement(solidFill, qn("a:srgbClr"))
+        srgbClr.set("val", rgb_hex)
+
+
 def add_table(slide, left, top, width, height, headers, rows,
-              header_color=LIGHT_HEADER, alt_color=LIGHT_BG,
+              header_color=LIGHT_HEADER, alt_color=None,
               font_size=BODY_SM, header_font_size=BODY_SM,
               col_widths=None, header_text_color=DARK):
-    """表格。默认 header 浅灰底 + 深字（用户要求："非重点突出部分用浅灰底"）；
-    重点强调的表格可显式传 header_color=PRIMARY + header_text_color=WHITE。"""
+    """表格。默认 header 浅灰底 + 深字 + 数据行白底；用户要求：不要镶边行，
+    改用极细深灰边框 + 字体上下居中。
+
+    `alt_color` 参数保留以保持调用方签名兼容；现在不再使用。"""
     n_rows = len(rows) + 1
     n_cols = len(headers)
     tbl_shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
@@ -109,6 +132,7 @@ def add_table(slide, left, top, width, height, headers, rows,
         cell = table.cell(0, i)
         cell.fill.solid()
         cell.fill.fore_color.rgb = header_color
+        cell.vertical_anchor = MSO_ANCHOR.MIDDLE  # 字体上下居中
         tf = cell.text_frame
         tf.margin_left = Emu(40000)
         tf.margin_right = Emu(40000)
@@ -123,16 +147,15 @@ def add_table(slide, left, top, width, height, headers, rows,
         run.font.size = Pt(header_font_size)
         run.font.bold = True
         run.font.color.rgb = header_text_color
+        _set_cell_border(cell)
 
     for r, row in enumerate(rows, start=1):
         for c, val in enumerate(row):
             cell = table.cell(r, c)
-            if r % 2 == 0:
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = alt_color
-            else:
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = WHITE
+            # 用户要求：不要镶边行；所有数据行统一白底
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = WHITE
+            cell.vertical_anchor = MSO_ANCHOR.MIDDLE  # 字体上下居中
             tf = cell.text_frame
             tf.margin_left = Emu(40000)
             tf.margin_right = Emu(40000)
@@ -147,6 +170,7 @@ def add_table(slide, left, top, width, height, headers, rows,
             run.font.name = FONT_CN
             run.font.size = Pt(font_size)
             run.font.color.rgb = DARK
+            _set_cell_border(cell)
     return table
 
 
@@ -286,16 +310,12 @@ def _native_text(slide, x_in, y_in, w_in, h_in, text, *,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def draw_architecture(slide, x_in, y_in, w_in):
-    """画架构图。水平占 w_in 英寸（建议 ≥ 6.4），高度自动计算约 5.6 英寸。"""
-    # 配色（与 dev_summary.html SVG 同源）
-    g_android_fill = RGBColor(0xDC, 0xFC, 0xE7)
-    g_android_border = RGBColor(0x16, 0xA3, 0x4A)
-    g_web_fill = RGBColor(0xDB, 0xEA, 0xFE)
-    g_web_border = RGBColor(0x25, 0x63, 0xEB)
-    g_shared_fill = RGBColor(0xFE, 0xF3, 0xC7)
-    g_shared_border = RGBColor(0xD9, 0x77, 0x06)
-    g_server_fill = RGBColor(0xFC, 0xE7, 0xF3)
-    g_server_border = RGBColor(0xBE, 0x18, 0x5D)
+    """画架构图。极简调色板：所有矩形用同一极浅灰底 + 同一深灰细边，标题红字。
+    不同 component 靠**位置 / 标题**区分，不靠颜色（用户要求"3 色内"）。"""
+    NEUTRAL_FILL = RGBColor(0xFA, 0xFA, 0xFA)
+    NEUTRAL_BORDER = BORDER_GRAY
+    g_android_fill = g_web_fill = g_shared_fill = g_server_fill = NEUTRAL_FILL
+    g_android_border = g_web_border = g_shared_border = g_server_border = NEUTRAL_BORDER
 
     # 上半部两列宽度
     half = (w_in - 0.15) / 2.0  # 中间留 0.15" gap
@@ -306,7 +326,7 @@ def draw_architecture(slide, x_in, y_in, w_in):
     _native_box(slide, col_l_x, y_in, half, 0.95,
                 fill_rgb=g_android_fill, border_rgb=g_android_border,
                 title=":apps:android（Android 客户端，XML 布局）",
-                title_color=g_android_border, title_size=11,
+                title_color=PRIMARY, title_size=11,
                 body_lines=[
                     "ui/ → GameActivity（单机）/ OnlineGameActivity（联网）",
                     "network/ → NetworkManager / RoomManager / GameSyncManager",
@@ -315,7 +335,7 @@ def draw_architecture(slide, x_in, y_in, w_in):
     _native_box(slide, col_r_x, y_in, half, 0.95,
                 fill_rgb=g_web_fill, border_rgb=g_web_border,
                 title=":apps:web（Compose Multiplatform / wasmJs）",
-                title_color=g_web_border, title_size=11,
+                title_color=PRIMARY, title_size=11,
                 body_lines=[
                     "AppViewModel → 统一状态机；Screen.{Home/Lobby/Room/Game/Settlement}",
                     "SinglePlayerEngine → 包装 :shared GameEngine",
@@ -329,7 +349,7 @@ def draw_architecture(slide, x_in, y_in, w_in):
     _native_box(slide, inner_x, shared_y, inner_w, 1.20,
                 fill_rgb=g_shared_fill, border_rgb=g_shared_border,
                 title=":shared（KMP：android + jvm + wasmJs）",
-                title_color=g_shared_border, title_size=11,
+                title_color=PRIMARY, title_size=11,
                 body_lines=[
                     "model/   Card · Deck · Player",
                     "engine/  CardRules · SettlementCalculator · GameEngine",
@@ -343,7 +363,7 @@ def draw_architecture(slide, x_in, y_in, w_in):
     _native_box(slide, inner_x, server_y, inner_w, 1.05,
                 fill_rgb=g_server_fill, border_rgb=g_server_border,
                 title=":server（Ktor + Netty，Gradle 子项目）",
-                title_color=g_server_border, title_size=11,
+                title_color=PRIMARY, title_size=11,
                 body_lines=[
                     "Application.kt → ServerRoomManager（房间 / AI 填充）",
                     "             └→ ServerGameManager（权威状态 / AI / 计时）",
@@ -402,29 +422,44 @@ def draw_architecture(slide, x_in, y_in, w_in):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def draw_collab_levels(slide, x_in, y_in, w_in):
-    """画协同 4 层次。高度约 3.6 英寸。"""
+    """画协同 4 层次。极简调色板：所有框统一浅灰底 + 深灰细边；标题红字。
+    L1-L4 用 left-edge 加重红色窄条作为强调级别（L3/L4 是本项目主用模式）。"""
     rows = [
+        # (title, desc, emphasized?)  emphasized = 用 PRIMARY 红做 left-edge 强调条
         ("Level 1　AI 执行人工指令",
          "传统：人主导。人写完整指令 → AI 按指令完成 → 等待下一条。AI 沦为'会编程的工具'",
-         RGBColor(0xFE, 0xE2, 0xE2), RGBColor(0xDC, 0x26, 0x26)),
+         False),
         ("Level 2　AI 提建议，人工决策",
          "审稿：人审 AI。AI 完成后输出方案 + 备选 → 人工选择 / 调整 / 驳回",
-         RGBColor(0xFE, 0xD7, 0xAA), RGBColor(0xEA, 0x58, 0x0C)),
+         False),
         ("Level 3　人工反馈现象，AI 自主排查 ← 本项目大量使用",
          "人工：截图 + '还卡住' / '分数错了'  AI：看代码 + 推理 + 多轮自查 + 修复",
-         RGBColor(0xBB, 0xF7, 0xD0), RGBColor(0x16, 0xA3, 0x4A)),
+         True),
         ("Level 4　AI 主动审查，人工验证 ← 最高效模式",
          "人工：开放性指令（'自查自纠所有问题'）  AI：全量扫描 + 输出清单 + 修复  人工：真机验证",
-         RGBColor(0xBF, 0xDB, 0xFE), RGBColor(0x25, 0x63, 0xEB)),
+         True),
     ]
+    NEUTRAL_FILL = RGBColor(0xFA, 0xFA, 0xFA)
     h_box = 0.78
     gap = 0.08
-    for i, (title, desc, fill, border) in enumerate(rows):
+    for i, (title, desc, emph) in enumerate(rows):
         y = y_in + i * (h_box + gap)
         _native_box(slide, x_in, y, w_in, h_box,
-                    fill_rgb=fill, border_rgb=border,
-                    title=title, title_color=border, title_size=12,
-                    body_lines=[desc], body_size=10)
+                    fill_rgb=NEUTRAL_FILL, border_rgb=BORDER_GRAY,
+                    title=title,
+                    title_color=PRIMARY if emph else DARK,
+                    title_bold=True, title_size=12,
+                    body_lines=[desc], body_size=10, body_color=DARK)
+        if emph:
+            # 红色左边强调条（5% 宽度），仅给 L3/L4 用
+            bar = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                Inches(x_in), Inches(y),
+                Inches(0.08), Inches(h_box),
+            )
+            bar.fill.solid()
+            bar.fill.fore_color.rgb = PRIMARY
+            bar.line.fill.background()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -432,37 +467,34 @@ def draw_collab_levels(slide, x_in, y_in, w_in):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def draw_harness_l0_l4(slide, x_in, y_in, w_in):
-    """画 L0-L4 五层。高度约 4.4 英寸。"""
+    """画 L0-L4 五层。极简调色板：所有层统一浅灰底 + 深灰细边；标题红字。
+    L0-L4 编号本身（"L0/L1/L2/L3/L4"）已经是清晰的视觉标尺，不再依赖颜色区分。"""
     layers = [
         ("L0  记忆层",
          ["CLAUDE.md（主索引）+ docs/regressions.md（Bug 冷藏库）",
-          "+ docs/playbooks/{feature-development, bug-triage, ci-failure-triage}.md"],
-         RGBColor(0xFE, 0xE2, 0xE2), RGBColor(0xDC, 0x26, 0x26)),
+          "+ docs/playbooks/{feature-development, bug-triage, ci-failure-triage}.md"]),
         ("L1  权限 & 钩子层",
          [".claude/settings.json + .claude/hooks/{SessionStart,PostToolUse,UserPromptSubmit}.sh",
-          "+ .githooks/{pre-push, commit-msg}"],
-         RGBColor(0xFE, 0xD7, 0xAA), RGBColor(0xEA, 0x58, 0x0C)),
+          "+ .githooks/{pre-push, commit-msg}"]),
         ("L2  命令 & 子代理",
          [".claude/commands/{test-fast, ship-check, pre-commit-scan, trace-bug, review-pr}.md",
-          "+ .claude/agents/{protocol-syncer, tdd-scaffolder, pr-reviewer}.md"],
-         RGBColor(0xFE, 0xF3, 0xC7), RGBColor(0xA1, 0x62, 0x07)),
+          "+ .claude/agents/{protocol-syncer, tdd-scaffolder, pr-reviewer}.md"]),
         ("L3  TDD 强制层",
          ["CardRulesTest（~30）+ ServerGameManagerTest（~25）",
-          "+ GameMessageSerializationTest（协议 round-trip）+ CI tdd-gate job"],
-         RGBColor(0xBB, 0xF7, 0xD0), RGBColor(0x16, 0xA3, 0x4A)),
+          "+ GameMessageSerializationTest（协议 round-trip）+ CI tdd-gate job"]),
         ("L4  跨 vendor 审查",
          ["Codex bot（自动每 PR）+ pr-reviewer subagent（Opus 4.7 独立 context）",
-          "+ 季度第二 vendor + 真机最后一关；4 关 PR 流程"],
-         RGBColor(0xBF, 0xDB, 0xFE), RGBColor(0x25, 0x63, 0xEB)),
+          "+ 季度第二 vendor + 真机最后一关；4 关 PR 流程"]),
     ]
+    NEUTRAL_FILL = RGBColor(0xFA, 0xFA, 0xFA)
     h_box = 0.78
     gap = 0.08
-    for i, (title, body, fill, border) in enumerate(layers):
+    for i, (title, body) in enumerate(layers):
         y = y_in + i * (h_box + gap)
         _native_box(slide, x_in, y, w_in, h_box,
-                    fill_rgb=fill, border_rgb=border,
-                    title=title, title_color=border, title_size=12,
-                    body_lines=body, body_size=9)
+                    fill_rgb=NEUTRAL_FILL, border_rgb=BORDER_GRAY,
+                    title=title, title_color=PRIMARY, title_size=12,
+                    body_lines=body, body_size=9, body_color=DARK)
 
 
 def add_callout(slide, left, top, width, height, text, *,
@@ -615,8 +647,8 @@ add_table(s, Inches(7.0), Inches(4.95), Inches(6.0), Inches(1.5),
 
 add_callout(s, Inches(0.5), Inches(6.6), Inches(12.5), Inches(0.55),
             "核心原则：服务端权威  ·  客户端乐观响应  ·  全量状态 + version 同步",
-            bg=PRIMARY, border=PRIMARY,
-            font_size=BODY_MD, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=BODY_MD, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
 # Slide 4: 三、问题发现：人工 + AI（合并旧 slides 4+5+6）
@@ -624,30 +656,32 @@ add_callout(s, Inches(0.5), Inches(6.6), Inches(12.5), Inches(0.55),
 s = add_slide()
 add_header(s, "三、问题发现：人工 + AI（~128 个，4 视角不重叠）")
 
-# Top: 4 metric cards (compact 高度从 2.6 → 1.5)
+# Top: 4 metric cards — 浅灰底 + 红色数字强调 + 深字标题（极简调色板）
 y = 1.05
 cards = [
-    ("🔴 人工测试 / 反馈", "~35", "27%", "UI · 部署 · 真机崩溃", RED),
-    ("🔵 Claude Code 主会话", "~55", "43%", "全量扫描 · 跨文件 · 并发", PRIMARY),
-    ("🟢 Claude pr-reviewer", "~15", "12%", "独立 context · 跨文件契约", GREEN),
-    ("🟡 ChatGPT Codex Bot", "~13", "10%", "语句级边界 · entropy · 文案", ORANGE),
+    ("🔴 人工测试 / 反馈", "~35", "27%", "UI · 部署 · 真机崩溃"),
+    ("🔵 Claude Code 主会话", "~55", "43%", "全量扫描 · 跨文件 · 并发"),
+    ("🟢 Claude pr-reviewer", "~15", "12%", "独立 context · 跨文件契约"),
+    ("🟡 ChatGPT Codex Bot", "~13", "10%", "语句级边界 · entropy · 文案"),
 ]
 x_positions = [0.5, 3.7, 6.9, 10.1]
-for (title, num, pct, desc, color), x in zip(cards, x_positions):
+NEUTRAL_FILL = RGBColor(0xFA, 0xFA, 0xFA)
+for (title, num, pct, desc), x in zip(cards, x_positions):
     box = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
                                 Inches(x), Inches(y),
                                 Inches(3.0), Inches(1.55))
     box.fill.solid()
-    box.fill.fore_color.rgb = color
-    box.line.fill.background()
+    box.fill.fore_color.rgb = NEUTRAL_FILL
+    box.line.color.rgb = BORDER_GRAY
+    box.line.width = Pt(0.5)
     add_textbox(s, Inches(x), Inches(y + 0.05), Inches(3.0), Inches(0.32),
-                title, font_size=11, bold=True, color=WHITE,
+                title, font_size=11, bold=True, color=DARK,
                 align=PP_ALIGN.CENTER)
     add_textbox(s, Inches(x), Inches(y + 0.38), Inches(3.0), Inches(0.55),
-                f"{num}  ({pct})", font_size=22, bold=True, color=WHITE,
+                f"{num}  ({pct})", font_size=22, bold=True, color=PRIMARY,
                 align=PP_ALIGN.CENTER)
     add_textbox(s, Inches(x), Inches(y + 1.02), Inches(3.0), Inches(0.4),
-                desc, font_size=10, color=WHITE, align=PP_ALIGN.CENTER)
+                desc, font_size=10, color=GRAY, align=PP_ALIGN.CENTER)
 
 # Middle: Left = 人工 (3 阶段); Right = AI (Claude 4 轮 + Codex 3 个)
 add_textbox(s, Inches(0.5), Inches(2.75), Inches(6.2), Inches(0.35),
@@ -987,8 +1021,8 @@ draw_harness_l0_l4(s, x_in=7.2, y_in=1.4, w_in=5.9)
 
 add_callout(s, Inches(0.4), Inches(5.15), Inches(12.5), Inches(0.5),
             "💎 核心：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑",
-            bg=PRIMARY, border=PRIMARY,
-            font_size=BODY_MD, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
+            bg=LIGHT_BG, border=PRIMARY,
+            font_size=BODY_MD, color=PRIMARY, bold=True, align=PP_ALIGN.CENTER)
 
 # =================================================================
 total = len(prs.slides)
