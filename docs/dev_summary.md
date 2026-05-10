@@ -226,26 +226,80 @@
 
 ---
 
-### AI（Claude 主会话）自主发现的问题（~55 个）
+### AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）
 
-> **工作模式**：Level 3-4 — 截图 / 症状 → Claude 自主推理根因；
-> 或开放性指令"自查自纠"全量扫描
+> **AI 来源**：Claude Code Agent（claude-opus-4-7 / claude-sonnet-4-6）
+> **工作模式**：Level 3-4 — 截图 / 症状 → AI 自主推理；或开放性指令"自查自纠"全量扫描
+> **核心规律**：每轮"在问不同的问题"，症状被消除后下一层根因才暴露 ⇒ 单轮无法到底
 
-#### PR #1–34 阶段（~35 个，见 ch.4 旧版统计）
+#### PR #1–34 阶段（~35 个，4 轮统一明细）
 
-- 协议/序列化（4）、会话/重连（3）、房间状态机（4）、UI/状态同步（6）、版本控制（1）
-- `handleRoundEnd` 赢家未设为下轮首出玩家、`CopyOnWriteArrayList` 缺失
-- WebSocket CONNECTING 时 send() 静默丢弃（根本原因）
-- `playerScores` 字段整体缺失、结算公式漏算、AI 无回退链
-
-#### PR #35–54 阶段（~20 个，新增）
+**第 1 轮：综合审查（~20 个）**
 
 | 类别 | 数量 | 主要问题 |
 |------|------|---------|
-| wasmJs 工具链兼容性 | 8 | assertNull 导入 / coroutines 版本 / jvmTarget / smart-cast / kotlinx-browser K2 要求 / serialization-json 版本 / compose.components.resources / repositoriesMode（逐层剥，详见 §9.9.3）|
-| 部署链路 | 5 | Caddy 配置缺 WebSocket 代理头 / systemd service 文件路径 / ufw 自动配置 / GitHub Actions 权限 / 健康检查 |
-| Web 功能完整性 | 5 | stuck loading overlay（flow collector 未取消）/ web lastPlayerId 初始化 / serialization plugin 未引用 / GreenTableColors 缺失 / 出牌后未清空 selection |
-| AI 托管/速度 | 2 | processAITurn delay 后未重检 isAISubstitute（race）; AI 炸弹决策阈值偏移（1-based shift）|
+| 协议 / 序列化 | 4 | sealed class 缺 `classDiscriminator`；枚举值客户端 / 服务端不对齐；JSON 反序列化抛 SerializationException；老消息字段无默认值 |
+| 会话 / 重连 | 3 | sessionToken 创建房间后未设置；leaveRoom 未清空 token；同一玩家被映射到两个房间 |
+| 房间状态机 | 4 | `handleStartGame` 未检查 WAITING；玩家退出不补 AI；重复加入同一房间；STARTING → IN_GAME 缺保护 |
+| UI / 状态同步 | 6 | seatIndex%2 误算队伍；初始化后未刷新按钮；onDestroy 未 guard lateinit；ChatAdapter 引用不存在 View ID；玩家槽错位；状态广播粒度过粗 |
+| 版本控制 | 1 | `applyState` 版本比较方向反了（接受了旧状态）|
+| 其他 | 2 | senderId 用不稳定 session.id；`generateRoomCode` 碰撞无重试 |
+
+**第 2-3 轮：深层审查（~8 个）**
+
+| # | 问题 | 类型 |
+|---|------|------|
+| 1 | `handleRoundEnd` 赢家未设为下轮 `currentPlayerIndex`（回合错位）| 状态机契约违反 |
+| 2 | `ArrayList` → `CopyOnWriteArrayList`（玩家列表并发修改异常）| 并发安全 |
+| 3 | AI 回退链完全缺失（首选失败 → 游戏永久挂起）| 兜底逻辑缺失 |
+| 4 | `getStateForPlayer` 中 `collectedScore` 硬编码为 0 | 占位符未实装 |
+| 5 | `handleDisconnect` 对 FINISHED 房间处理不当 | 状态机边界 |
+| 6 | 多处空指针风险（`seats` 为 null 时无保护）| null safety |
+| 7 | `kickPlayer` 后未广播房间更新 | 事件遗漏 |
+| 8 | `addAI` 在 IN_GAME 状态下被允许 | 状态机契约 |
+
+**第 4 轮：专项根因审查（~7 个）**
+
+| # | 问题 | 根因层级 |
+|---|------|---------|
+| 1 | WebSocket `send()` 在 CONNECTING 状态静默丢弃（重连失效根本原因）| 异步 API 时序陷阱 |
+| 2 | 多协程无锁并发写 `state.hands`（卡死的并发根因）| 共享可变状态 |
+| 3 | AI 失败无最终兜底（`broadcastForceAdvance` 缺失）| 兜底链路缺口 |
+| 4 | `playerScores` 字段整体缺失 → `collectedScore` 永远为 0 | 数据模型缺字段 |
+| 5 | 结算公式漏算"输方未走完玩家已收分"（金额错算）| 公式遗漏分支 |
+| 6 | `computeAllFinishedScores` 两端逻辑不一致（约束 1 违反）| 双份代码漂移 |
+| 7 | `checkGameEnd` 提前结算条件判断有误（200 分阈值边界）| 边界条件错 |
+
+#### PR #35–54 阶段（~20 个，新增明细）
+
+| # | 问题 | 类别 | 修复 |
+|---|------|------|------|
+| 1 | `assertNull` 未导入 → 测试编译失败 | wasmJs 工具链 | commit 3bd979a |
+| 2 | `kotlinx-coroutines-core:1.7.3` 没 wasmJs variant | wasmJs 工具链 | commit fe1aa60（升 1.8.1）|
+| 3 | androidTarget jvmTarget 与 consumer 不齐 → AGP 报错 | wasmJs 工具链 | commit ae00dfc |
+| 4 | 跨模块对 `var message.state` smart-cast 失败 | wasmJs 工具链 | commit 16782d9（local val 快照）|
+| 5 | `kotlinx-browser:0.1` 要求 Kotlin 2.0+ | wasmJs 工具链 | commit 2eff0ca（@JsFun interop）|
+| 6 | `kotlinx-serialization-json:1.6.0` 没 wasmJs | wasmJs 工具链 | commit b332375（升 1.6.3）|
+| 7 | `compose.components.resources` 要求 K2.0+ | wasmJs 工具链 | commit b332375（移除）|
+| 8 | `RepositoriesMode.FAIL_ON_PROJECT_REPOS` 阻断 KGP NodeJsSetupTask | wasmJs 工具链 | commit a6cc8dd |
+| 9 | Caddy reverse_proxy 缺 WebSocket upgrade 头 | 部署 | PR #41 self-review P0 |
+| 10 | systemd service 缺 `Restart=always` + `WorkingDirectory` | 部署 | PR #41 self-review P1 |
+| 11 | install.sh 未自动配 ufw（用户得手动）| 部署 | commit f26a66d |
+| 12 | GitHub Actions deploy workflow 缺 secret 授权 | 部署 | PR #42 dogfood P1 |
+| 13 | 健康检查端点暴露内部状态 | 部署 | PR #42 dogfood P1 |
+| 14 | Web stuck "loading" overlay（flow collector 未取消）| Web 功能 | commit 400917e |
+| 15 | Web SinglePlayer `lastPlayerId` 初始化错（首轮显示空）| Web 功能 | commit d484dbc |
+| 16 | Web `kotlinx-serialization` plugin 未 apply → DTO 序列化抛 | Web 功能 | commit 7f83753 |
+| 17 | Web `GreenTableColors.teamA/teamB` 缺 → 编译失败 | Web 功能 | commit 8dcba8e |
+| 18 | Web 出牌后 selection 未清空（下一手仍高亮）| Web 功能 | commit 7f83753 |
+| 19 | `processAITurn` `delay()` 后只重检 currentPlayerIndex，漏检 isAISubstitute | AI 托管 race | commit c9988fd（Codex P2 触发）|
+| 20 | AI 炸弹决策阈值用 `rank.value`（1-based），比较值偏移 | AI 托管 | commit 49ded62（Codex P2 触发）|
+
+> **跨会话观察**：第 1 轮发现的多是"代码长得不对"（语法 / 命名 / 类型）；
+> 越往后越是"行为长得不对"（时序 / 并发 / 跨文件契约）；
+> PR #35 后的 wasmJs 8 层是工具链兼容性，**完全不在前 4 轮模式覆盖范围内**——
+> 这印证了 §8.3："训练相关性盲区"不会被多轮自审消除，只能靠真实环境暴露。
+
 
 ---
 
@@ -360,6 +414,42 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 | 只用一个 AI 工具 | Claude + Codex + pr-reviewer 三层才完整 |
 | CI 红不读报错只猜 | 沙箱看不到 CI 日志，应走 exfil channel（§9.9.5）|
 
+### 高效协同最佳实践
+
+> 6 条经验自原 PR #1-34 阶段沉淀；PR #35-54 阶段加入 4 条 harness-era 补充。
+
+**原始 6 条（症状-修复回路）**
+
+1. **症状描述要具体**："等待电脑 54 出牌不动了"比"卡了"信息量大 10 倍。
+   屏幕里看到的具体牌点 / 玩家 ID / 时机，AI 可以直接 grep 锁定代码路径
+2. **截图优于文字**：UI / 现象类问题，截图让 AI 直接获得视觉上下文，省去
+   "你的意思是…吗" 的来回；本项目 #27/#28/#29 三个截图各自直接定位到根因
+3. **允许多轮迭代**：第 1 轮修表象，第 2 轮挖根因，第 3 轮加防护；
+   "卡死"经历 4 轮才彻底，**强行要求一次到位反而出更多 Bug**
+4. **关键决策人工拍板**：架构、协议、依赖选择，AI 提方案、人工选；
+   AI 不应擅自决定"用哪个序列化库"或"是否引入新模块"
+5. **人工把守发布闸门**：commit / push 前人工最终 review；CLAUDE.md 第八章
+   commit 署名规范确保责任归属
+6. **开放性指令激发全量审查**："全部自查自纠"比"修这个 bug"更有效——
+   前者触发系统性扫描，后者只修指定行；本项目 4 轮根因审查全部由开放
+   指令激发
+
+**Harness-era 新增 4 条（结构-自动化）**
+
+7. **优先用基础设施替代自律**：每条"约束"都问"能不能让机器自动检查"——
+   能就写 hook / CI gate / lint 规则，不能再写文档；
+   本项目 5 大约束（CLAUDE.md 第二章）3 条已机器化（tdd-gate / commit-msg
+   hook / detekt baseline），剩 2 条仍靠 review
+8. **多 AI 互补而非替代**：Codex（语句级）+ Claude 主会话（全局根因）+
+   pr-reviewer（功能完整 / 文档漂移）+ Haiku 静态扫描，**4 套都跑**比
+   "找最强的一套" 更可靠；本项目 13 条 Codex 意见中 7 条 Claude 自查没发现
+9. **CI red 走 exfil channel，不要猜**：沙箱里读不到 GitHub Actions 日志，
+   `.github/workflows/android-ci.yml` 把 gradle stderr 自动 post 成 PR
+   comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）
+10. **每条 Bug 入 regressions.md**：修完不仅 push 代码，**还要写 8 字段
+    Bug 卡片**（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 13 条入库
+
 ### 协同效率数据
 
 | 指标 | 数值 |
@@ -369,6 +459,8 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 | **提速比** | **约 10 倍** |
 | 代码提交（非 merge）| 约 170 次 |
 | 从"单机 Android"到"双端 + 服务端 + Harness"| 约 4 个月 |
+| 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
+| → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
 ---
 
@@ -567,21 +659,34 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 
 ### 8.3 多 Claude 协同的天花板
 
-多 Claude 实例共享训练语料 + 目标 + 架构 → **相关性盲区**同时存在。
+要诚实说：**多 Claude 协同有用，但有结构性上限。**
 
-本项目 **~13 个 Codex 意见**中，大量是多个 Claude 自查也找不出来的：
-- `UUID.take(8)`：所有 LLM 训练语料里到处是，视为"常用模式"
+因为它们共享：
+
+1. **同一训练语料** → 共享"常见模式"假设
+2. **同一训练目标** → 共享"什么是好代码"的偏好
+3. **同一架构** → 共享类似的注意力分布
+
+→ **相关性盲区**会同时存在于所有 Claude 模型里。
+
+本项目 **~13 个 Codex 意见**中，大量是多个 Claude 自查也大概率找不出来的：
+
+- `UUID.take(8)`：训练语料里到处是，所有 LLM 都视为"常用模式"
+- "房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项
+- Loading 遮罩边界：UI 状态机 + 用户视角
 - AI 炸弹阈值偏移（1-based vs 0-based）：Codex 逐行数，Claude 偏全局
-- 语句级 race condition（delay 后漏检 isAISubstitute）：Codex 偏逐行问
+- 语句级 race condition（delay 后漏检 isAISubstitute）：Codex 偏逐行问"这里的边界在哪？"
 
-**真正补盲区的是"换 vendor + 静态工具 + 真机"：**
+#### 真正补盲区的是"换 vendor + 加静态工具 + 人工真机"
 
-| 组合 | 互补程度 |
-|------|--------|
-| 多 Claude 实例 | 中等（视角多，但训练相关）|
-| Claude + Codex（OpenAI）| **较高**（训练目标不同）|
-| + pr-reviewer（Opus 独立 context）| **更高**（功能完整 / 文档漂移）|
-| + 真机验证 | **必要**（环境问题 AI 看不见）|
+| 组合 | 找到的问题类型 | 互补程度 |
+|------|------------|--------|
+| 多个 Claude 实例 | 全局架构 + 逻辑链路（多个角度）| 中等 |
+| Claude + Codex（OpenAI）| 增加细粒度风险点 | **较高** |
+| + Claude pr-reviewer（Opus 独立 context）| 功能完整 / 文档漂移 / 跨文件契约 | **更高** |
+| Claude + Codex + Gemini | 不同训练目标，覆盖最广 | **最高**（季度手动）|
+| Claude + 静态分析（Detekt / SpotBugs / kover）| 规则化盲区 | **必要** |
+| + 人工真机验证 | 部署 / 字体 / cleartext 等环境问题 | **必要** |
 
 ### 8.4 本项目的实际实施结果
 
@@ -609,6 +714,33 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 - Codex P1 数：3 → 10（绝对值增加，但 PR 数也多了；都在当 PR 修）
 - 因 "缺测试导致回归" 的 Bug：0（PR-H2 后无一例）
 - `docs/regressions.md` 追踪的"修了又坏"事件：0（PR #35 后）
+- 卡死类 P0：0（PR #34 之后未复发；force-advance + Mutex 兜底有效）
+- 协议双端漂移：编译期消除（PR-H3 之后任一 GameMessage 改动两端同步）
+
+预计前面"修了又坏"的 4 轮压到 1-2 轮的目标已**基本达成**：
+PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因为
+1 次 wasmJs psi2ir bug CI 红 2 轮，但属于 wasmJs 后端本身的编译器 bug
+（外部依赖问题），不是逻辑回归。
+
+### 8.5 核心洞察
+
+> - 单一 Claude 多轮，本质是**用时间换覆盖率**
+> - 多个 Claude 协同，是**用视角换覆盖率**
+> - 多 vendor + 静态工具 + 真机验证，是**用异构换覆盖率**
+
+**异构换覆盖率的边际收益最大**，应作为关键代码的标配。
+
+本项目实证：
+
+| 维度 | 投入 | 产出 |
+|------|------|------|
+| 时间换覆盖率（单 Claude 多轮）| 4 轮自审 | ~35 个 Bug |
+| 视角换覆盖率（多 Claude 协同）| Opus + Sonnet + Haiku | +20 个 Bug（post-#34 阶段）|
+| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | +13 个 Codex + 5 个真机；**90% 是前两者找不到的** |
+
+异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
+否则三种来源会大量重叠，边际收益迅速递减。本项目 13 个 Codex 与 ~55 个
+Claude 发现几乎不重叠，正是异构有效的实证。
 
 ---
 
@@ -632,8 +764,11 @@ Web / 测试，跨 ~700 行。
 - Phase split 让 Codex / pr-reviewer 的反馈精确到单层
 - 协议先行：Phase 1 落地后，Phase 2/3 即便未完成，server 已能跑
 
-**反例**：Phase 3 一次塞下 SP UI + Room speed picker + Web wiring + 12 个测试
-~320 行，wasmJs psi2ir 隐藏 bug 把 CI 红了 2 轮（详见 9.3）。
+**反例**：本次 Phase 3 一次塞下 SP UI + Room speed picker + Web wiring +
+12 个测试 ~320 行，结果 wasmJs 一个 psi2ir 隐藏 bug 把 CI 红了 2 轮（详见
+9.3）。**教训**：Phase 内部还能再切，按"编译单元"切（Android / Web 拆成两个
+commit）能更早发现编译错误——本来 Phase 3 应该至少拆为 "3a Web wiring
++ 测试" 和 "3b SP UI + Room speed picker"，前者过 CI 之后再叠后者。
 
 ### 9.2 同 commit `*Test.kt` 配对（tdd-gate 实战）
 
