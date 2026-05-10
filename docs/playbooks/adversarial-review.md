@@ -119,6 +119,26 @@ P0/P1/P2 列表。主会话**只展示报告**，不替你拍板修不修。
 - **真机/真服务器验证必跑**（§4）—— rubric 之外的运行时问题
 - 季度第二 vendor 深审（§3）—— 仍按季度走
 
+### Codex 与 /review-pr 的实际盲区互补（PR #53 实证）
+
+PR #53 引入 `feature_spec G34-G38`（5 特性，~700 行）。两个 reviewer 都
+跑了，结果：
+
+| Reviewer | 找到的问题 | 漏掉的问题 |
+|---|---|---|
+| **Claude `/review-pr`**（Opus 4.7 subagent） | P1 #1 docs/game_rules.md 误写"随机起手"、引用了不存在的 `randomFirstPlayer` 函数（**功能性 / 跨文件契约**） | P2 `processAITurn` 在 `delay()` 后没重检 `isAISubstitute` 的 race（语句级边界） |
+| **Codex bot** | P2-A 上面那条 race；P2-B `btnAiTakeover` 单机未接（已修，时间戳错位） | P1 #1（功能性 / 文档与代码的语义对齐）—— Codex 偏向句法 / 边界，对"文档自称权威 vs 实际实现"的语义不一致不敏感 |
+
+**核心洞察**：两个 reviewer 的盲区**不重叠**——这是用 Codex + Claude
+互补的核心价值。如果只跑一个，**至少漏一类问题**。
+
+实战 checklist：
+- Codex P2 出现"在 X 之后没重检 Y"类评论时不要先反驳——race condition
+  类报告极少误报，先看代码再回应
+- Claude `/review-pr` 的 P1 通常是"跨文件 / 跨服务的契约不一致"——
+  尤其是涉及"权威定义文档 vs 实际代码"的漂移
+- 两个都跑完都没 P0/P1 才算"双重过关"
+
 ### Fallback：何时还是要开新会话
 
 - subagent 报告自相矛盾或明显跑偏 → 开新会话用 `/review` 复核

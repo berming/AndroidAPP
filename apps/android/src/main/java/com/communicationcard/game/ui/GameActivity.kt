@@ -214,7 +214,11 @@ class GameActivity : AppCompatActivity() {
         handCardsArea = findViewById(R.id.handCardsArea)
 
         // Auto-play button
+        // 单机模式下 btnAutoPlay 与 btnAiTakeover 功能重复（feature_spec G34 引入后者
+        // 作为统一的 v3 spec 按钮）；隐藏旧按钮避免 UI 上两个"托管"重复。
+        // OnlineGameActivity 仍然把同一个 btnAutoPlay 复用为"离开"按钮（不受影响）。
         btnAutoPlay = findViewById(R.id.btnAutoPlay)
+        btnAutoPlay.visibility = View.GONE
 
         // Replay overlay
         replayOverlay = findViewById(R.id.replayOverlay)
