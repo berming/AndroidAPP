@@ -263,7 +263,7 @@ class AppViewModel {
                 val mySeat = s.localSeatIndex.value
                 trackPerPlayerLastPlay(state, perPlayerLastPlay)
                 // 从 currentRoom 取本玩家的 isAISubstitute（feature_spec G34/G35）
-                val me = r.currentRoom.value?.players?.find { it.id == r.localPlayerId }
+                val me = r.currentRoom.value?.players?.find { it.id == r.localPlayerId.value }
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = mySeat,
@@ -287,7 +287,7 @@ class AppViewModel {
         sessionScope.launch {
             r.currentRoom.collect { cr ->
                 val current = _screen.value as? Screen.Game ?: return@collect
-                val me = cr?.players?.find { it.id == r.localPlayerId }
+                val me = cr?.players?.find { it.id == r.localPlayerId.value }
                 val newVal = me?.isAISubstitute == true
                 if (newVal != current.imAiSubstitute) {
                     _screen.value = current.copy(imAiSubstitute = newVal)
