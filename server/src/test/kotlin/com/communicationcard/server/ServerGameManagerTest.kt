@@ -377,4 +377,53 @@ class ServerGameManagerTest {
         version = 1,
         playerScores = playerScores.toMutableMap(),
     )
+
+    // ============================================================
+    //  AI 速度配置（feature_spec G37 / G38）
+    //  测试 ServerRoom / ServerPlayer 上的字段可以被读写并被 toRoomInfo 序列化；
+    //  effectiveAiDelayMs() 是 private，本组测试通过黑盒断言其等价行为
+    // ============================================================
+
+    @Test
+    fun room_serverAiDelayMs_defaultsToProtocolConstant() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS,
+            room.serverAiDelayMs,
+            "默认应为 AI_DELAY_DEFAULT_MS（400ms），feature_spec G37"
+        )
+    }
+
+    @Test
+    fun room_serverAiDelayMs_persistsToRoomInfo() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 100
+        assertEquals(100, room.toRoomInfo().serverAiDelayMs)
+    }
+
+    @Test
+    fun player_takeoverAiDelayMs_defaultsToProtocolConstant() {
+        val player = ServerPlayer(
+            id = "p1", name = "Alice", session = null, isReady = false,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS,
+            player.takeoverAiDelayMs,
+            "默认应为 AI_DELAY_DEFAULT_MS（400ms），feature_spec G38"
+        )
+    }
+
+    @Test
+    fun player_takeoverFields_persistToRoomPlayer() {
+        val player = ServerPlayer(
+            id = "p1", name = "Alice", session = null, isReady = false,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        player.takeoverAiDelayMs = 1000
+        player.isAISubstitute = true
+        val rp = player.toRoomPlayer()
+        assertEquals(1000, rp.takeoverAiDelayMs)
+        assertTrue(rp.isAISubstitute, "isAISubstitute 必须随 RoomUpdate 广播给客户端")
+    }
 }

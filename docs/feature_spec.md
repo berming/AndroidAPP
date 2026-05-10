@@ -95,6 +95,26 @@
 | G32 | MAY | 深色模式（沟通牌天然是绿桌深色，所以多数端等价） |
 | G33 | MAY | 国际化（当前仅 zh-CN；新端可只支持中文） |
 
+### 2.6 AI 托管 / 速度配置（PROTOCOL_VERSION 3 引入）
+
+| ID | 档位 | 功能 |
+|----|------|------|
+| G34 | SHOULD | **手动 AI 托管按钮**（双模式）—— 单机：点击后 AI 完全代打你的座位，按钮文本变"取消托管"；多人：发 `player.toggle_ai_takeover { enabled=true }` → 服务端 `isAISubstitute=true`；再点取消 |
+| G35 | SHOULD | **暂离 / 回归按钮**（仅多人）—— "暂离" = 立即托管 + 不等 30s 超时（服务端 `isAISubstitute=true` + UI 标记"已暂离"）；"我回来了" = 取消托管 |
+| G36 | SHOULD | **单机 AI 出牌速度**（3 档预设：50ms / 400ms 默认 / 1000ms） —— 设置面板 radio；存本地偏好；下一回合生效 |
+| G37 | SHOULD | **多人房主：服务端 AI 速度**（3 档预设：100ms / 400ms 默认 / 1000ms）—— 仅房主可见；发 `room.set_ai_speed`；服务端校验 `clientId == hostId` 否则 403；同 PR 房间所有 AI 座位（补位 AI + 玩家托管 AI）即时生效 |
+| G38 | SHOULD | **多人玩家：自己的托管 AI 速度**（3 档预设：100ms / 400ms 默认 / 1000ms）—— 每个玩家独立设置；发 `player.set_takeover_speed`；服务端 `playerTakeoverDelayMs[seatIndex]`；该玩家被 AI 接管时用此值 |
+
+> **协议契约（MUST）**：本组特性把 `PROTOCOL_VERSION` 从 2 升到 3。
+> 老客户端（v2）连新服务端会被握手层拒（`ERR_PROTOCOL_VERSION_MISMATCH`）；
+> 新客户端连老服务端发的 `room.set_ai_speed` / `player.set_takeover_speed` /
+> `player.toggle_ai_takeover` 会被忽略（老服无对应 handler）——客户端不应假设
+> 这些消息一定生效，UI 应在协议握手后能查询服务端实际的 AI 速度并显示。
+>
+> **速度档位为什么是 50/100/400/1000**：单机最低 50ms 不影响连接质量；多人最低
+> 100ms 是为了避免在网络抖动时 AI 出牌雪崩压垮慢客户端的 UI 渲染；400ms 是
+> 综合"看清楚 + 不无聊"的甜点（与 Android 旧默认 1000ms 对比缩短 60%）。
+
 ---
 
 ## 3. 客户端非功能（MUST/SHOULD/MAY）
@@ -168,6 +188,11 @@
 | 提示按钮 G23 | ✅ | ✅ | — | — |
 | 横屏 / 大屏 G31 | ❌ | ✅（Compact/Medium/Expanded 三档） | — | — |
 | 深色模式 G32 | ✅（绿桌天然深色） | ✅（同上） | — | — |
+| 手动 AI 托管 G34 | 🚧 PR-AI-1 实现中 | ⏳ 跟进 | — | — |
+| 暂离 / 回归 G35 | 🚧 PR-AI-1 实现中 | ⏳ 跟进 | — | — |
+| 单机 AI 速度 G36 | 🚧 PR-AI-1（已有 prefs，加 3 档预设 UI） | ⏳ 跟进 | — | — |
+| 房主：服务端 AI 速度 G37 | 🚧 PR-AI-1 | ⏳ 跟进 | — | — |
+| 玩家：自己托管速度 G38 | 🚧 PR-AI-1 | ⏳ 跟进 | — | — |
 | 调试日志 N6 | ✅ | ❌ | — | — |
 
 > "—" = 端未实现；"✅" = 已上线；"❌" = 未做但已计入 backlog。

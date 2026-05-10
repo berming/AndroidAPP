@@ -100,6 +100,9 @@ private suspend fun handleMessage(
         is StartGameRequest -> handleStartGame(session, roomManager, gameManager)
         is KickPlayer -> handleKickPlayer(session, message, roomManager)
         is AddAI -> handleAddAI(session, roomManager)
+        is SetRoomAISpeed -> handleSetRoomAISpeed(session, message, roomManager)
+        is SetMyTakeoverSpeed -> handleSetMyTakeoverSpeed(session, message, roomManager)
+        is ToggleAITakeover -> handleToggleAITakeover(session, message, roomManager, gameManager)
         is ListRooms -> handleListRooms(session, roomManager)
         is GameAction -> handleGameAction(session, message, gameManager)
         is TextChatMessage -> handleTextChat(session, message, roomManager)
@@ -284,6 +287,93 @@ private suspend fun handleAddAI(
             session.send(ErrorMessage(400, error.message ?: "添加AI失败"))
         }
     )
+}
+
+/**
+ * 房主修改房间级 AI 出牌速度（feature_spec G37）。
+ * 立即生效，下一次 AI 决策（processAITurn）读 room.serverAiDelayMs。
+ * 校验：session.id == hostId；clamp [100, 1000]ms；广播 RoomUpdate。
+ */
+private suspend fun handleSetRoomAISpeed(
+    session: GameSession,
+    message: SetRoomAISpeed,
+    roomManager: ServerRoomManager
+) {
+    val room = roomManager.getRoom(session.roomId ?: "") ?: run {
+        session.send(ErrorMessage(404, "房间不存在"))
+        return
+    }
+    if (room.hostId != session.id) {
+        session.send(ErrorMessage(403, "仅房主可修改服务端 AI 速度"))
+        return
+    }
+    room.serverAiDelayMs = message.delayMs.coerceIn(
+        GameMessage.AI_DELAY_MIN_MULTIPLAYER_MS,
+        GameMessage.AI_DELAY_MAX_MS
+    )
+    broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+}
+
+/**
+ * 玩家修改自己被 AI 接管时的出牌速度（feature_spec G38）。
+ * 仅本玩家可改自己的；clamp [100, 1000]ms；广播 RoomUpdate（让房间内所有人看到）。
+ */
+private suspend fun handleSetMyTakeoverSpeed(
+    session: GameSession,
+    message: SetMyTakeoverSpeed,
+    roomManager: ServerRoomManager
+) {
+    val room = roomManager.getRoom(session.roomId ?: "") ?: run {
+        session.send(ErrorMessage(404, "房间不存在"))
+        return
+    }
+    val player = room.players.find { it.id == session.id } ?: run {
+        session.send(ErrorMessage(404, "玩家不在房间中"))
+        return
+    }
+    player.takeoverAiDelayMs = message.delayMs.coerceIn(
+        GameMessage.AI_DELAY_MIN_MULTIPLAYER_MS,
+        GameMessage.AI_DELAY_MAX_MS
+    )
+    broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+}
+
+/**
+ * 玩家手动暂离 / 收回控制权（feature_spec G34, G35）。
+ * - enabled=true：立刻 isAISubstitute=true，AI 接管该玩家座位（不等 30s 超时）。
+ *   若是该玩家的回合，立即触发 AI 出牌。
+ * - enabled=false：isAISubstitute=false，玩家收回手动控制；下一次自己的回合
+ *   不再被 AI 接管。
+ * 校验：session.id 必须匹配玩家 id（不允许替别人按）；房间必须 IN_GAME。
+ */
+private suspend fun handleToggleAITakeover(
+    session: GameSession,
+    message: ToggleAITakeover,
+    roomManager: ServerRoomManager,
+    gameManager: ServerGameManager
+) {
+    val room = roomManager.getRoom(session.roomId ?: "") ?: run {
+        session.send(ErrorMessage(404, "房间不存在"))
+        return
+    }
+    if (room.status != RoomStatus.IN_GAME) {
+        session.send(ErrorMessage(400, "仅游戏中可切换 AI 接管"))
+        return
+    }
+    val player = room.players.find { it.id == session.id } ?: run {
+        session.send(ErrorMessage(404, "玩家不在房间中"))
+        return
+    }
+    if (player.isAI) {
+        session.send(ErrorMessage(400, "AI 玩家无需切换接管"))
+        return
+    }
+    player.isAISubstitute = message.enabled
+    broadcastToRoom(room, RoomUpdate(room.toRoomInfo()))
+    // 若刚开启托管且正轮到该玩家 → 立即 kick 一次 AI 决策
+    if (message.enabled) {
+        gameManager.checkAndProcessAITurn(room)
+    }
 }
 
 private suspend fun handleListRooms(

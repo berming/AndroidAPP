@@ -18,7 +18,14 @@ sealed class GameMessage {
          * 升级规则（PR-H3 起）：任一兼容性破坏的协议变更（字段类型变 / 移除字段 /
          * 枚举值改名）必须 +1。仅添加字段且字段有默认值不必 +1。
          */
-        const val PROTOCOL_VERSION = 2
+        const val PROTOCOL_VERSION = 3
+
+        // AI 速度档位（feature_spec.md G36-G38）
+        // 单机：50/400/1000；多人：100/400/1000；默认 400ms
+        const val AI_DELAY_DEFAULT_MS = 400
+        const val AI_DELAY_MIN_MULTIPLAYER_MS = 100
+        const val AI_DELAY_MIN_SINGLEPLAYER_MS = 50
+        const val AI_DELAY_MAX_MS = 1000
 
         val json = Json {
             ignoreUnknownKeys = true
@@ -98,6 +105,27 @@ data class KickPlayer(
 @SerialName("room.add_ai")
 data class AddAI(
     val roomId: String
+) : GameMessage()
+
+@Serializable
+@SerialName("room.set_ai_speed")
+data class SetRoomAISpeed(
+    /** 房间内所有 AI 座位（补位 AI + 玩家被托管时的 AI）的出牌延迟，毫秒 */
+    val delayMs: Int
+) : GameMessage()
+
+@Serializable
+@SerialName("player.set_takeover_speed")
+data class SetMyTakeoverSpeed(
+    /** 仅当本玩家被 AI 接管时使用的出牌延迟，毫秒 */
+    val delayMs: Int
+) : GameMessage()
+
+@Serializable
+@SerialName("player.toggle_ai_takeover")
+data class ToggleAITakeover(
+    /** true = 暂离 / 让 AI 代打；false = 我回来了 / 收回控制权 */
+    val enabled: Boolean
 ) : GameMessage()
 
 @Serializable
@@ -231,7 +259,12 @@ data class RoomInfo(
     val hostId: String,
     val players: List<RoomPlayer>,
     val maxPlayers: Int,
-    val status: RoomStatus
+    val status: RoomStatus,
+    /**
+     * 房间级 AI 出牌延迟（毫秒）。仅房主可修改（SetRoomAISpeed）。
+     * v3 新增；老服务端不发此字段时反序列化为 AI_DELAY_DEFAULT_MS。
+     */
+    val serverAiDelayMs: Int = GameMessage.AI_DELAY_DEFAULT_MS
 )
 
 @Serializable
@@ -242,7 +275,17 @@ data class RoomPlayer(
     val isConnected: Boolean,
     val isAI: Boolean,
     val team: String? = null,  // "TEAM_A" or "TEAM_B"
-    val seatIndex: Int
+    val seatIndex: Int,
+    /**
+     * 该玩家被 AI 接管时的出牌延迟（毫秒）。仅本人可修改（SetMyTakeoverSpeed）。
+     * v3 新增；老服务端不发此字段时反序列化为 AI_DELAY_DEFAULT_MS。
+     */
+    val takeoverAiDelayMs: Int = GameMessage.AI_DELAY_DEFAULT_MS,
+    /**
+     * 玩家是否被 AI 接管中（暂离 / 超时 / 断线导致）。
+     * v3 新增；老服务端不发此字段时反序列化为 false。
+     */
+    val isAISubstitute: Boolean = false
 )
 
 @Serializable
