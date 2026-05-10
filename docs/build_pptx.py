@@ -23,7 +23,7 @@ DARK = RGBColor(0x20, 0x20, 0x20)               # 主体文字
 GRAY = RGBColor(0x60, 0x60, 0x60)               # 次要文字 / 边框
 LIGHT_BG = RGBColor(0xFA, 0xFA, 0xFA)           # 大文本框浅底（接近白，不喧宾夺主）
 LIGHT_HEADER = RGBColor(0xF5, 0xF5, 0xF5)       # 表格 header 浅灰底
-BORDER_GRAY = RGBColor(0xBD, 0xBD, 0xBD)        # 表格 / 卡片细边框（深灰）
+BORDER_GRAY = RGBColor(0x80, 0x80, 0x80)        # 表格 0.5pt 边框：黑白居中的 50% 深灰
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 # 兼容性别名（指向极简调色板里的同义色，方便老代码无痛切换）
 RED = PRIMARY        # 老代码里的 RED 全部统一到 PRIMARY 红
