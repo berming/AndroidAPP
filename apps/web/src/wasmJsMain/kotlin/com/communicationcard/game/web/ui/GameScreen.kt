@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,13 +30,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.communicationcard.game.network.SerializedCard
 import com.communicationcard.game.network.SerializedCardGroup
+import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.network.SerializedPlayer
 import com.communicationcard.game.web.viewmodel.Screen
 
+/**
+ * 游戏中屏幕（Stage 2 改为响应式）。
+ *
+ * 三档布局（[LayoutMode]）：
+ *
+ * - **Compact** (< 600 dp，手机竖屏)
+ *   - 顶栏：图标 + 紧凑分数；当前玩家文字省略
+ *   - 玩家区：2 列 × N 行 grid（5 玩家 = 3 行 / 7 = 4 行）
+ *   - 上一手：放玩家区下方
+ *   - 手牌：LazyRow 单行 + 横向滚动；卡片 44×62 dp
+ *   - 操作按钮：2 行（提示+过牌 / 出牌单独宽按钮）
+ *
+ * - **Medium** (600-1200 dp，iPad / 笔记本)
+ *   - 顶栏完整
+ *   - 玩家区：3 列横排（5+ 玩家自动 wrap 到第二行）
+ *   - 上一手：玩家区下方居中
+ *   - 手牌：LazyRow 单行；卡片 56×80 dp
+ *   - 操作按钮：1 行（当前布局）
+ *
+ * - **Expanded** (>= 1200 dp，宽屏 / 4K)
+ *   - 顶栏完整
+ *   - 玩家区：1 行 5 列均分，最大化卡片显示
+ *   - 上一手：居中放大
+ *   - 手牌：LazyRow 单行；卡片 64×90 dp（更大更舒适）
+ *   - 操作按钮：1 行 + 更大字号
+ */
 @Composable
 fun GameScreen(
     state: Screen.Game,
@@ -45,123 +74,134 @@ fun GameScreen(
     onToggleSelected: (String) -> Unit,
     onLeave: () -> Unit,
 ) {
-    val me = state.state.players.find { it.id == state.localSeatIndex }
-    val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
-    val selected = state.selectedCardIds
-    val hinted = state.hintedCardIds
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
+        val mode = classify(maxWidth)
+        val me = state.state.players.find { it.id == state.localSeatIndex }
+        val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
+        val cardSize = cardSizeFor(mode)
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
-        // 顶栏：分数 + 当前轮 + 离开
-        TopBar(state = state.state, onLeave = onLeave)
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopBar(state = state.state, onLeave = onLeave, mode = mode)
 
-        // 桌面区：其它玩家头像 + 上一手
-        Box(modifier = Modifier.fillMaxWidth().weight(1f).padding(8.dp)) {
-            TableArea(state = state.state, localSeatIndex = state.localSeatIndex)
-        }
-
-        // 我的手牌
-        Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF0E3812)).padding(8.dp)) {
-            HandRow(
-                me = me,
-                selected = selected,
-                hinted = hinted,
-                onToggle = onToggleSelected,
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // 操作按钮
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            // 桌面区
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(8.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                OutlinedButton(
-                    onClick = onHint,
-                    enabled = isMyTurn,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                ) { Text("提示", color = Color.White) }
-                OutlinedButton(
-                    onClick = onPass,
-                    enabled = isMyTurn && state.state.lastPlayedGroup != null,
-                    modifier = Modifier.weight(1f).height(48.dp),
-                ) { Text("过牌", color = Color.White) }
-                Button(
-                    onClick = {
-                        if (selected.isEmpty() || me == null) return@Button
-                        val toPlay = me.hand.filter { keyOf(it) in selected }
+                TableArea(state = state.state, localSeatIndex = state.localSeatIndex, mode = mode)
+            }
+
+            // 手牌 + 操作
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF0E3812))
+                    .padding(horizontal = 8.dp, vertical = if (mode.isCompact) 4.dp else 8.dp),
+            ) {
+                HandRow(
+                    me = me,
+                    selected = state.selectedCardIds,
+                    hinted = state.hintedCardIds,
+                    cardWidth = cardSize.first,
+                    cardHeight = cardSize.second,
+                    onToggle = onToggleSelected,
+                )
+
+                Spacer(Modifier.height(if (mode.isCompact) 6.dp else 8.dp))
+
+                ActionButtons(
+                    mode = mode,
+                    isMyTurn = isMyTurn,
+                    canPass = isMyTurn && state.state.lastPlayedGroup != null,
+                    canPlay = isMyTurn && state.selectedCardIds.isNotEmpty(),
+                    onHint = onHint,
+                    onPass = onPass,
+                    onPlay = {
+                        if (state.selectedCardIds.isEmpty() || me == null) return@ActionButtons
+                        val toPlay = me.hand.filter { keyOf(it) in state.selectedCardIds }
                         onPlayCards(toPlay)
                     },
-                    enabled = isMyTurn && selected.isNotEmpty(),
-                    modifier = Modifier.weight(1.4f).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFFC107),
-                        contentColor = Color.Black,
-                    ),
-                ) { Text("出牌", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                )
             }
         }
     }
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/*  顶栏                                                            */
+/* ────────────────────────────────────────────────────────────── */
+
 @Composable
-private fun TopBar(
-    state: com.communicationcard.game.network.SerializedGameState,
-    onLeave: () -> Unit,
-) {
+private fun TopBar(state: SerializedGameState, onLeave: () -> Unit, mode: LayoutMode) {
     Row(
         modifier = Modifier.fillMaxWidth().background(Color(0xFF0E3812)).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OutlinedButton(onClick = onLeave) { Text("离开", color = Color.White) }
-        Spacer(Modifier.width(12.dp))
-        ScoreChip(label = "A 队", score = state.teamAScore, color = Color(0xFFEF5350))
-        Spacer(Modifier.width(12.dp))
-        ScoreChip(label = "B 队", score = state.teamBScore, color = Color(0xFF42A5F5))
+        OutlinedButton(onClick = onLeave) {
+            Text(if (mode.isCompact) "←" else "离开", color = Color.White)
+        }
+        Spacer(Modifier.width(if (mode.isCompact) 6.dp else 12.dp))
+        ScoreChip(label = "A", score = state.teamAScore, color = Color(0xFFEF5350), mode = mode)
+        Spacer(Modifier.width(if (mode.isCompact) 6.dp else 12.dp))
+        ScoreChip(label = "B", score = state.teamBScore, color = Color(0xFF42A5F5), mode = mode)
         Spacer(Modifier.fillMaxWidth().weight(1f))
-        val current = state.players.find { it.id == state.currentPlayerIndex }
-        Text(
-            text = current?.let { "当前: ${it.name}" } ?: "—",
-            color = Color.White,
-            fontSize = 14.sp,
-        )
+        if (!mode.isCompact) {
+            val current = state.players.find { it.id == state.currentPlayerIndex }
+            Text(
+                text = current?.let { "当前: ${it.name}" } ?: "—",
+                color = Color.White,
+                fontSize = 14.sp,
+            )
+        } else {
+            // Compact 用单字符圆点指示当前是谁
+            val current = state.players.find { it.id == state.currentPlayerIndex }
+            Text(
+                text = current?.let { "▶ ${it.name.take(4)}" } ?: "—",
+                color = Color(0xFFFFC107),
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 
 @Composable
-private fun ScoreChip(label: String, score: Int, color: Color) {
+private fun ScoreChip(label: String, score: Int, color: Color, mode: LayoutMode) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(12.dp)
+                .size(if (mode.isCompact) 8.dp else 12.dp)
                 .background(color, shape = RoundedCornerShape(6.dp)),
         )
         Spacer(Modifier.width(4.dp))
-        Text("$label: $score", color = Color.White, fontWeight = FontWeight.Bold)
+        Text(
+            "$label: $score",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = if (mode.isCompact) 12.sp else 14.sp,
+        )
     }
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/*  桌面区（玩家头像 + 上一手）—— 三档布局                          */
+/* ────────────────────────────────────────────────────────────── */
+
 @Composable
-private fun TableArea(
-    state: com.communicationcard.game.network.SerializedGameState,
-    localSeatIndex: Int,
-) {
+private fun TableArea(state: SerializedGameState, localSeatIndex: Int, mode: LayoutMode) {
+    val others = state.players.filter { it.id != localSeatIndex }
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(if (mode.isCompact) 6.dp else 12.dp),
     ) {
-        // 其他玩家
-        val others = state.players.filter { it.id != localSeatIndex }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            others.forEach { p -> OtherPlayerCell(player = p, isCurrent = p.id == state.currentPlayerIndex) }
+        when (mode) {
+            LayoutMode.Compact -> CompactPlayersGrid(others, state.currentPlayerIndex)
+            LayoutMode.Medium -> MediumPlayersWrap(others, state.currentPlayerIndex)
+            LayoutMode.Expanded -> ExpandedPlayersRow(others, state.currentPlayerIndex)
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
 
-        // 上一手出牌
         val last = state.lastPlayedGroup
         if (last != null) {
             Box(
@@ -170,38 +210,112 @@ private fun TableArea(
                     .background(Color(0xFF2E7D32), RoundedCornerShape(8.dp))
                     .padding(8.dp),
             ) {
-                LastPlayedRow(group = last, owner = state.players.find { it.id == state.lastPlayerId })
+                LastPlayedRow(
+                    group = last,
+                    owner = state.players.find { it.id == state.lastPlayerId },
+                    cardSize = cardSizeFor(mode),
+                )
             }
         } else {
             Text(
                 text = if (state.consecutivePasses > 0) "等待新一轮 …" else "请出牌",
                 color = Color(0xFFE8F5E9),
+                fontSize = if (mode.isCompact) 13.sp else 14.sp,
+            )
+        }
+    }
+}
+
+/** Compact: 2 列网格，5 玩家 = 3 行（最后 1 行只占左格） */
+@Composable
+private fun CompactPlayersGrid(others: List<SerializedPlayer>, currentSeat: Int) {
+    val rows = others.chunked(2)
+    rows.forEach { row ->
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            row.forEach { p ->
+                Box(modifier = Modifier.weight(1f)) {
+                    OtherPlayerCell(player = p, isCurrent = p.id == currentSeat, compact = true)
+                }
+            }
+            // 凑齐 2 列宽度（最后一行可能只有 1 个）
+            if (row.size == 1) Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+/** Medium: 5 玩家 1 行 width 不够时自动 wrap 到第二行（最多 3 列） */
+@Composable
+private fun MediumPlayersWrap(others: List<SerializedPlayer>, currentSeat: Int) {
+    val rows = others.chunked(3)
+    rows.forEach { row ->
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            row.forEach { p ->
+                OtherPlayerCell(player = p, isCurrent = p.id == currentSeat, compact = false)
+            }
+        }
+    }
+}
+
+/** Expanded: 一字排开，sp 大字号 */
+@Composable
+private fun ExpandedPlayersRow(others: List<SerializedPlayer>, currentSeat: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        others.forEach { p -> OtherPlayerCell(player = p, isCurrent = p.id == currentSeat, compact = false) }
+    }
+}
+
+@Composable
+private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean, compact: Boolean) {
+    val borderColor = if (isCurrent) Color(0xFFFFC107) else Color.Transparent
+    val padding = if (compact) 6.dp else 10.dp
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (player.team == "TEAM_A") Color(0xFF5D2A2A) else Color(0xFF22416A),
+        ),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .padding(if (compact) 2.dp else 4.dp)
+            .border(2.dp, borderColor, RoundedCornerShape(8.dp)),
+    ) {
+        Column(
+            modifier = Modifier.padding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                player.name,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = if (compact) 12.sp else 14.sp,
+            )
+            Text(
+                "剩 ${player.handSize}",
+                color = Color(0xFFE8F5E9),
+                fontSize = if (compact) 10.sp else 12.sp,
+            )
+            Text(
+                "已收 ${player.collectedScore}",
+                color = Color(0xFFFFC107),
+                fontSize = if (compact) 10.sp else 12.sp,
             )
         }
     }
 }
 
 @Composable
-private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean) {
-    val borderColor = if (isCurrent) Color(0xFFFFC107) else Color.Transparent
-    Card(
-        colors = CardDefaults.cardColors(containerColor = if (player.team == "TEAM_A") Color(0xFF5D2A2A) else Color(0xFF22416A)),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.padding(4.dp).border(2.dp, borderColor, RoundedCornerShape(8.dp)),
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(player.name, color = Color.White, fontWeight = FontWeight.Bold)
-            Text("剩 ${player.handSize} 张", color = Color(0xFFE8F5E9), fontSize = 12.sp)
-            Text("已收 ${player.collectedScore}", color = Color(0xFFFFC107), fontSize = 12.sp)
-        }
-    }
-}
-
-@Composable
-private fun LastPlayedRow(group: SerializedCardGroup, owner: SerializedPlayer?) {
+private fun LastPlayedRow(
+    group: SerializedCardGroup,
+    owner: SerializedPlayer?,
+    cardSize: Pair<Dp, Dp>,
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = owner?.let { "${it.name} 出: " } ?: "",
@@ -210,16 +324,28 @@ private fun LastPlayedRow(group: SerializedCardGroup, owner: SerializedPlayer?) 
         )
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            group.cards.forEach { c -> CardView(card = c, selected = false, modifier = Modifier.size(48.dp, 64.dp)) }
+            group.cards.forEach { c ->
+                CardView(
+                    card = c,
+                    selected = false,
+                    modifier = Modifier.size(cardSize.first, cardSize.second),
+                )
+            }
         }
     }
 }
+
+/* ────────────────────────────────────────────────────────────── */
+/*  手牌区 + 操作按钮                                               */
+/* ────────────────────────────────────────────────────────────── */
 
 @Composable
 private fun HandRow(
     me: SerializedPlayer?,
     selected: Set<String>,
     hinted: Set<String>,
+    cardWidth: Dp,
+    cardHeight: Dp,
     onToggle: (String) -> Unit,
 ) {
     if (me == null) {
@@ -237,12 +363,79 @@ private fun HandRow(
                 selected = key in selected,
                 hinted = key in hinted,
                 modifier = Modifier
-                    .size(56.dp, 80.dp)
+                    .size(cardWidth, cardHeight)
                     .clickable { onToggle(key) },
             )
         }
     }
 }
+
+@Composable
+private fun ActionButtons(
+    mode: LayoutMode,
+    isMyTurn: Boolean,
+    canPass: Boolean,
+    canPlay: Boolean,
+    onHint: () -> Unit,
+    onPass: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    val btnHeight = if (mode.isCompact) 44.dp else 48.dp
+    val playFontSize = if (mode.isExpanded) 20.sp else 18.sp
+
+    if (mode.isCompact) {
+        // 2 行：提示 + 过牌 一行 / 出牌 单独一行（最重要的操作占整宽）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            OutlinedButton(
+                onClick = onHint, enabled = isMyTurn,
+                modifier = Modifier.weight(1f).height(btnHeight),
+            ) { Text("提示", color = Color.White, fontSize = 14.sp) }
+            OutlinedButton(
+                onClick = onPass, enabled = canPass,
+                modifier = Modifier.weight(1f).height(btnHeight),
+            ) { Text("过牌", color = Color.White, fontSize = 14.sp) }
+        }
+        Spacer(Modifier.height(6.dp))
+        Button(
+            onClick = onPlay, enabled = canPlay,
+            modifier = Modifier.fillMaxWidth().height(btnHeight),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFFFC107),
+                contentColor = Color.Black,
+            ),
+        ) { Text("出牌", fontSize = playFontSize, fontWeight = FontWeight.Bold) }
+    } else {
+        // Medium / Expanded: 1 行
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = onHint, enabled = isMyTurn,
+                modifier = Modifier.weight(1f).height(btnHeight),
+            ) { Text("提示", color = Color.White) }
+            OutlinedButton(
+                onClick = onPass, enabled = canPass,
+                modifier = Modifier.weight(1f).height(btnHeight),
+            ) { Text("过牌", color = Color.White) }
+            Button(
+                onClick = onPlay, enabled = canPlay,
+                modifier = Modifier.weight(1.4f).height(btnHeight),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFC107),
+                    contentColor = Color.Black,
+                ),
+            ) { Text("出牌", fontSize = playFontSize, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/*  CardView + 工具                                                 */
+/* ────────────────────────────────────────────────────────────── */
 
 @Composable
 private fun CardView(
@@ -255,7 +448,6 @@ private fun CardView(
         (card.suit == "JOKER" && card.rank == "BIG_JOKER")
     val textColor = if (isRed) Color(0xFFE53935) else Color.Black
     val offset = if (selected) -16.dp else 0.dp
-    // 选中：金黄高亮 / 仅提示：绿色微光提示 / 未选：默认深灰
     val borderColor = when {
         selected -> Color(0xFFFFC107)
         hinted -> Color(0xFF66BB6A)
@@ -276,6 +468,13 @@ private fun CardView(
             Text(suitSymbol(card.suit, card.rank), color = textColor, fontSize = 14.sp)
         }
     }
+}
+
+/** 三档 LayoutMode 对应的卡片宽×高（dp）。 */
+private fun cardSizeFor(mode: LayoutMode): Pair<Dp, Dp> = when (mode) {
+    LayoutMode.Compact -> 44.dp to 62.dp
+    LayoutMode.Medium -> 56.dp to 80.dp
+    LayoutMode.Expanded -> 64.dp to 90.dp
 }
 
 private fun keyOf(c: SerializedCard) = "${c.suit}|${c.rank}|${c.deckIndex}"
