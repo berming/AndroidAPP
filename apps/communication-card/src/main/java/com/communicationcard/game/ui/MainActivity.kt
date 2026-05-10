@@ -40,7 +40,9 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val SERVER_URL = "ws://175.178.158.35:8080/game"
+        // PR #41 起服务器拓扑改为 Caddy(80/443) → 反代 → :server(127.0.0.1:8080)。
+        // 8080 仅本机回环，外网走 Caddy 同源路径 /game。Tencent 安全组只开 22/80/443。
+        private const val SERVER_URL = "ws://175.178.158.35/game"
         private const val MAX_NAME_LENGTH = 12
     }
 

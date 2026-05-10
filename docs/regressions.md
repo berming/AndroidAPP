@@ -137,6 +137,18 @@
 
 ---
 
+## #10  Android 客户端硬编码 :8080 → PR #41 拓扑改造后联网失败
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | 用户拉最新 main 后，Android 客户端连接服务器超时；Web 客户端正常。腾讯云服务器侧 systemd `:server` 服务跑着、Caddy 跑着、80 端口可达。 |
+| 根因 | PR #41 把服务器拓扑改成「Caddy 80/443 反代 → 127.0.0.1:8080」，**8080 不再对外暴露**（Tencent 安全组只开 22/80/443）。同 PR 把 Web 客户端改成同源相对路径 `/game`（走 80），但 **Android 端 `MainActivity.kt:43` 和 `LobbyActivity.kt:34` 的 `SERVER_URL` 仍是 `ws://175.178.158.35:8080/game`**——硬编码端口绕开 Caddy，直接打外网不可达的 8080，必然 timeout。 |
+| 修复 | 本 PR：把两处 `SERVER_URL` 从 `ws://175.178.158.35:8080/game` 改为 `ws://175.178.158.35/game`（去 :8080，走默认 80 经 Caddy 反代）。两个 `SERVER_URL` 上各自加注释指明 PR #41 拓扑契约。 |
+| 教训 | **大改部署拓扑必须扫一遍所有客户端**——不光 Web；移动端、桌面端、未来的 iOS 都要查一遍 URL 硬编码。PR #41 的 PR 描述只提了 Web 客户端的 URL 变化，没提到 Android 同样需要改。**结构性根因**：服务器地址是配置项不是常量，不应该 `private const val` 硬编码两份；应该集中到一个地方（资源文件 / `BuildConfig` / 远程配置）。修这次的 bug 是治标，治本要后续 PR 把 Android 的 URL 配置抽出来。 |
+| 防回归测试 | 缺失（URL 是字符串常量，不易写单元测试）。流程层面：(1) `docs/playbooks/feature-development.md` Loop A Step 2 加一条「改部署拓扑前先 grep 所有 client 的 URL 硬编码」；(2) PR 模板「服务端状态修改？」段落补一条「拓扑变更时 Android + Web + 任何未来端的 SERVER_URL 是否同步更新」复选框（PR-H6 文档 follow-up） |
+
+---
+
 ## 防回归策略（PR-H2 起逐步落地）
 
 | 类别 | 落地点 |

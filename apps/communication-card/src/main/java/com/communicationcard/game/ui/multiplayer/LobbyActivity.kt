@@ -30,8 +30,10 @@ class LobbyActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "LobbyActivity"
-        // 游戏服务器地址 - 腾讯云服务器
-        private const val SERVER_URL = "ws://175.178.158.35:8080/game"
+        // 游戏服务器地址 - 腾讯云服务器（PR #41 起走 Caddy 反代）
+        // PR #41 拓扑：Caddy 80/443 → 127.0.0.1:8080；8080 不直接对外暴露。
+        // 安全组：22/80/443 开放，8080 仅本机。详见 deploy/ 文档。
+        private const val SERVER_URL = "ws://175.178.158.35/game"
         private const val MAX_NAME_LENGTH = 12
     }
 
