@@ -122,10 +122,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # 评论体：标题永远显示，详细 grep + tail 默认折叠（<details>）
+          # —— 大部分时候只想看错误摘要，需要时再点开看详情。
           {
-            echo "## :apps:communication-card:assembleDebug 失败"
+            echo "## ❌ :apps:communication-card:assembleDebug 失败"
             echo ""
-            echo "### Kotlin compiler errors（grep 'e:' / 'error:'）"
+            echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
             echo ""
             echo '```'
             grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED" assembleDebug.log \
@@ -133,11 +135,15 @@ jobs:
               || echo "(no Kotlin error lines found)"
             echo '```'
             echo ""
-            echo "### 末 300 行 gradle 输出"
+            echo "</details>"
+            echo ""
+            echo "<details><summary>末 300 行 gradle 输出 — 点击展开</summary>"
             echo ""
             echo '```'
             tail -300 assembleDebug.log
             echo '```'
+            echo ""
+            echo "</details>"
           } | tee -a "$GITHUB_STEP_SUMMARY" > comment-assembleDebug.md
           if [ -n "$PR_NUMBER" ]; then
             gh pr comment "$PR_NUMBER" --body-file comment-assembleDebug.md \
@@ -156,10 +162,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # 评论体：标题永远显示，3 个详情段都默认折叠（<details>）。
+          # 用户大部分情况只看错误摘要；需要时再展开看头/末/grep 片段。
           {
-            echo "## :apps:web:wasmJsBrowserDistribution 失败"
+            echo "## ❌ :apps:web:wasmJsBrowserDistribution 失败"
             echo ""
-            echo "### 关键错误片段（grep）"
+            echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
             echo ""
             echo '```'
             grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED|What went wrong|Could not resolve|Could not find|Cannot find|not found|Plugin .* was not found|^Caused by:" wasmJsBrowserDistribution.log \
@@ -167,17 +175,23 @@ jobs:
               || echo "(no error markers found)"
             echo '```'
             echo ""
-            echo "### 头 100 行（gradle config 阶段错误通常在这里）"
+            echo "</details>"
+            echo ""
+            echo "<details><summary>头 100 行（gradle config 阶段错误通常在这里）— 点击展开</summary>"
             echo ""
             echo '```'
             head -100 wasmJsBrowserDistribution.log
             echo '```'
             echo ""
-            echo "### 末 200 行"
+            echo "</details>"
+            echo ""
+            echo "<details><summary>末 200 行 — 点击展开</summary>"
             echo ""
             echo '```'
             tail -200 wasmJsBrowserDistribution.log
             echo '```'
+            echo ""
+            echo "</details>"
           } | tee -a "$GITHUB_STEP_SUMMARY" > comment-wasmJs.md
           if [ -n "$PR_NUMBER" ]; then
             gh pr comment "$PR_NUMBER" --body-file comment-wasmJs.md \
