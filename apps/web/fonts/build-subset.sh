@@ -36,21 +36,28 @@ if [[ ! -f "$SOURCE_FONT" ]] || [[ $(stat -f%z "$SOURCE_FONT" 2>/dev/null || sta
 fi
 
 # 2. 准备 codepoint 列表（按 mode）
+#
+# 项目通用符号（不在 GB2312 / ASCII，但 UI 实际用到 —— Codex P2 on PR #45 抓的）：
+#   U+00B7 · / U+2014 — / U+2660-2667 ♠♡♢♣♤♥♦♧（扑克花色全集，含备用空心版）
+#   U+00A0-00FF Latin-1 Supplement（防御性覆盖西文字符）
+PROJECT_EXTRA_RANGES="U+00A0-00FF,U+2014,U+2660-2667"
+
 case "$SUBSET_MODE" in
     project)
-        echo "==> mode=project：扫源码提取实际用到的 CJK 字符"
+        echo "==> mode=project：扫源码提取实际用到的 CJK 字符 + 通用符号"
         grep -roP '[\x{4e00}-\x{9fff}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]' \
             "$REPO_ROOT/apps/web/src/wasmJsMain/kotlin" \
             | grep -oP '[\x{4e00}-\x{9fff}\x{3000}-\x{303f}\x{ff00}-\x{ffef}]' \
             | sort -u | tr -d '\n' > "$FONTS_DIR/chars-project.txt"
         echo "    项目用到 $(wc -m < "$FONTS_DIR/chars-project.txt") 个 CJK 字符"
         SUBSET_ARGS=("--text-file=$FONTS_DIR/chars-project.txt"
-                     "--unicodes=U+0020-007E,U+00A0-00FF,U+2000-206F")
+                     "--unicodes=U+0020-007E,$PROJECT_EXTRA_RANGES,U+2000-206F")
         ;;
     gb2312)
-        echo "==> mode=gb2312：GB2312 全集（7540 字符 + ASCII）"
+        echo "==> mode=gb2312：GB2312 全集（7540 字符 + ASCII + 项目用符号）"
         python3 -c "
 codepoints = set()
+# GB2312 全集
 for hi in range(0xA1, 0xFF):
     for lo in range(0xA1, 0xFF):
         try:
@@ -58,7 +65,14 @@ for hi in range(0xA1, 0xFF):
             codepoints.add(ord(ch))
         except UnicodeDecodeError:
             pass
+# ASCII Basic Latin
 for cp in range(0x0020, 0x007F):
+    codepoints.add(cp)
+# Latin-1 Supplement（含 U+00B7 · MIDDLE DOT）+ 项目用符号
+for cp in range(0x00A0, 0x0100):
+    codepoints.add(cp)
+codepoints.add(0x2014)  # — EM DASH
+for cp in range(0x2660, 0x2668):  # ♠♡♢♣♤♥♦♧
     codepoints.add(cp)
 with open('$FONTS_DIR/chars-gb2312.txt', 'w') as f:
     for cp in sorted(codepoints):
