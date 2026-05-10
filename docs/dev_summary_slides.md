@@ -452,6 +452,97 @@ override fun onOpen(ws: WebSocket, response: Response) {
 
 ---
 
+## 八、harness 跨会话经验（PR-H + AI 托管特性实战）
+
+> 来自 PR #52 / #53 / #54 的实战教训。每条都是"AI 与人协作出 bug → 复盘 → 沉淀回 harness"的闭环。
+
+### 1. 大特性的 Phase 分段提交
+
+跨协议 + 服务端 + 双客户端 + 测试的特性（>200 行 / >5 文件）必须拆 Phase：
+
+| Phase | 内容 | 价值 |
+|-------|------|------|
+| **Phase 1** | 协议层 + 服务端 + 单测 | **底层稳了再动客户端**；server 即使没 UI 也能跑 |
+| **Phase 2** | 主客户端（Android） | 一份吃通，验证 server 正常 work |
+| **Phase 3** | 次客户端（Web）+ 跨端 roundtrip 测 | 最后补齐 |
+
+每 Phase 内还按"编译单元"切（Android / Web 拆 commit），更早抓平台特定编译错误。
+
+### 2. wasmJs 的"jvmTest 过 ≠ wasmJs 过"
+
+PR #53 Phase 3 在 jvmTest 全过、Android 编译过的前提下 wasmJs 报：
+```
+Backend Internal error: Exception during psi2ir
+Caused by: java.lang.NullPointerException
+```
+
+根因：Compose 可空 lambda + smart-cast / `vm::method` KFunction reference 自动转 `(() -> Unit)?` —— wasmJs 后端已知 NPE。
+
+**修法**：可空 lambda → `local val` 固化非空；函数引用宁可写 `{ vm.foo() }` 显式 lambda。
+
+> 沙箱拉不到 wasmJs 编译器，**写完 Web UI 必须 push 跑 CI 才算**。
+
+---
+
+## 八、harness 跨会话经验（续）
+
+### 3. Codex bot 与 Claude /review-pr 盲区互补（PR #53 实证）
+
+| Reviewer | 找到 | 漏掉 |
+|----------|------|------|
+| **Claude `/review-pr`** | game_rules.md 误写"随机起手"+ 引用了不存在的函数（**功能性 / 跨文件契约**） | `processAITurn` 在 `delay()` 后没重检 `isAISubstitute` 的 race |
+| **Codex bot** | 上面那条 race（**语句级边界**） | 文档与代码语义对齐问题 |
+
+> **盲区不重叠**——这是 Codex + Claude 互补的核心价值。
+> 单独跑一个**至少漏一类问题**。
+
+### 4. `delay()` 后状态过期反请
+
+任何"先 sleep / delay 再做事"的代码块都要重检"延迟期间状态变化"。
+最近一例（regressions #11）：
+
+```kotlin
+delay(effectiveAiDelayMs(...))     // 玩家在这一秒里取消了托管
+mutexFor(room).withLock {
+    if (state.currentPlayerIndex != playerIndex) return  // 只重检了这一项
+    decideAIAction(...)             // isAISubstitute 已变 → AI 不该再代打
+}
+```
+
+**审查清单**：醒来后必须重检"延迟前所有依赖项"，不只检查最显眼的那个。
+
+---
+
+## 八、harness 跨会话经验（终）
+
+### 5. 同 commit `*Test.kt` 配对 vs tdd-gate
+
+PR #53 共 6 commit，每改 `CardRules.kt` / `ServerGameManager.kt` / `SettlementCalculator.kt` 都**同 commit** 附测。CI tdd-gate 一次没误报、一次没漏。
+
+> hook 弹"⚠️ TDD 提醒"时**不要立刻另开 commit 写测试**——只要保证最终
+> 单 commit 同时含两份就行。
+
+### 6. PR 流转的"分支 vs PR"错位
+
+PR #52 合并后**本会话又在同分支 push 了 5 个 commit**——但 PR #52 已 closed，
+push 不会自动出 PR。直到用户问"PR 呢？"才意识到需要新分支 + PR #53。
+
+> **一个分支 = 一个 PR**。PR merge 后下一组改动**开新分支**。
+
+### 7. 文档单一真相 + 自动同步
+
+`pr-reviewer` 抓到 game_rules.md 误写"随机起手"+ `randomFirstPlayer` 不存在。
+
+**沉淀**：新文档自称"权威"前必须 grep 验证所有 anchor 函数名实际存在。
+
+### 8. AI 接管速度档位的设计取舍
+
+最初考虑 slider（任意 50-2000ms）；最终选 3 档预设。
+**当一个特性"看似 slider 更灵活"时，先问"用户真需要连续值么？"**——
+多数情况 3 档够用，且压缩了边界情况测试矩阵。
+
+---
+
 <!-- 结束页 -->
 
 # 谢谢
