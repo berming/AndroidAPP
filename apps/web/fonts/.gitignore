@@ -1,0 +1,3 @@
+# build-subset.sh 跑时生成的中间文件，不入版本控制
+chars-project.txt
+chars-gb2312.txt
