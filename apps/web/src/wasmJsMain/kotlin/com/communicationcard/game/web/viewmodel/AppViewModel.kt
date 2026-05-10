@@ -5,6 +5,7 @@ import com.communicationcard.game.model.Card
 import com.communicationcard.game.model.CardRank
 import com.communicationcard.game.model.CardSuit
 import com.communicationcard.game.network.SerializedCard
+import com.communicationcard.game.network.SerializedCardGroup
 import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.web.net.GameSyncManager
 import com.communicationcard.game.web.net.NetworkClient
@@ -86,14 +87,18 @@ class AppViewModel {
             aiDelayMs = prefs.gameSpeed.aiDelayMs,
         ).also { single = it }
         engine.start()
+        // Stage 4：维护 per-player 最近出牌缩图（client-only；协议无此字段）
+        val perPlayerLastPlay = mutableMapOf<Int, SerializedCardGroup>()
         sessionScope.launch {
             engine.state.collect { state ->
                 if (state == null) return@collect
+                trackPerPlayerLastPlay(state, perPlayerLastPlay)
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = engine.humanSeatIndex,
                     mode = Screen.Game.Mode.SinglePlayer,
                     selectedCardIds = currentSelectionFor(state, engine.humanSeatIndex),
+                    perPlayerLastPlay = perPlayerLastPlay.toMap(),
                 )
             }
         }
@@ -250,15 +255,19 @@ class AppViewModel {
                     }
                 }
         }
+        // Stage 4：维护 per-player 最近出牌缩图
+        val perPlayerLastPlay = mutableMapOf<Int, SerializedCardGroup>()
         sessionScope.launch {
             s.gameState.collect { state ->
                 if (state == null) return@collect
                 val mySeat = s.localSeatIndex.value
+                trackPerPlayerLastPlay(state, perPlayerLastPlay)
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = mySeat,
                     mode = Screen.Game.Mode.Multiplayer,
                     selectedCardIds = currentSelectionFor(state, mySeat),
+                    perPlayerLastPlay = perPlayerLastPlay.toMap(),
                 )
             }
         }
@@ -413,6 +422,24 @@ class AppViewModel {
     private inline fun updateLobby(transform: (Screen.Lobby) -> Screen.Lobby) {
         val current = _screen.value as? Screen.Lobby ?: return
         _screen.value = transform(current)
+    }
+
+    /**
+     * Stage 4 helper：根据 state 的 lastPlayedGroup + lastPlayerId，把"最新一手"
+     * 记到对应玩家的槽里。state.consecutivePasses == 0 且 lastPlayerId != null 时
+     * 表明 lastPlayedGroup 是这位玩家最近出的（没人后续出过）；记录之。
+     *
+     * Server 协议没有 per-player.lastPlayedGroup 字段，所以 client 在本地推断。
+     * 一旦新一轮开始（lastPlayedGroup=null）现有缩图保留——直到该玩家下一次出牌。
+     */
+    private fun trackPerPlayerLastPlay(
+        state: SerializedGameState,
+        store: MutableMap<Int, SerializedCardGroup>,
+    ) {
+        val group = state.lastPlayedGroup ?: return
+        val pid = state.lastPlayerId ?: return
+        // 仅在与已记录的不同时更新（避免重复 set 触发不必要的 recompose）
+        if (store[pid] != group) store[pid] = group
     }
 
     /** 与 GameScreen.kt 的 keyOf 保持一致：suit|rank|deckIndex 唯一标识一张实例。 */

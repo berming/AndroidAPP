@@ -59,6 +59,13 @@ class SinglePlayerEngine(
 
     private var version = 1L
     private var consecutivePassCount = 0
+    /**
+     * 上一手出牌玩家的 seat id（PR #50 引入）。GameEngine 内部有 lastPlayerId 但
+     * private；本地观察 CardsPlayed event 推断。RoundWon 时清零（新一轮开始）。
+     * 没有此字段的话 Web 端的 perPlayerLastPlay 推断永远拿不到值，单机模式
+     * 就看不到任何玩家最近的出牌缩图（Codex P2 on PR #50）。
+     */
+    private var lastPlayerSeatId: Int? = null
 
     init {
         engine.addEventListener { event ->
@@ -74,12 +81,21 @@ class SinglePlayerEngine(
                     )
                     scope.launch { _gameEnd.emit(serialized) }
                 }
+                is GameEvent.CardsPlayed -> {
+                    lastPlayerSeatId = event.player.id
+                    consecutivePassCount = 0
+                    publishState()
+                    scope.launch { driveAiIfNeeded() }
+                }
                 is GameEvent.PlayerPassed -> {
                     consecutivePassCount++
                     publishState()
                     scope.launch { driveAiIfNeeded() }
                 }
                 is GameEvent.RoundWon -> {
+                    // 新一轮开始：清空 lastPlayer 跟踪，但 perPlayerLastPlay 在 vm 侧
+                    // 保留至各玩家下次出牌（这是有意为之，对应 Android 行为）。
+                    lastPlayerSeatId = null
                     consecutivePassCount = 0
                     publishState()
                     scope.launch { driveAiIfNeeded() }
@@ -140,7 +156,7 @@ class SinglePlayerEngine(
             currentPlayerIndex = current,
             players = players,
             lastPlayedGroup = last,
-            lastPlayerId = null,
+            lastPlayerId = lastPlayerSeatId,  // PR #50 修：单机模式也填，否则 perPlayerLastPlay 永远空
             roundWinnerId = null,
             consecutivePasses = consecutivePassCount,
             currentRoundScore = 0,

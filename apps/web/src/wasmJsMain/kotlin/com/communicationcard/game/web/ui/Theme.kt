@@ -45,6 +45,8 @@ object GreenTableColors {
     val brandSecondary = Color(0xFF66BB6A)    // 副操作绿（hint border / 已走完）
     val onBrandSecondary = Color.Black
 
+    val teamA = Color(0xFFEF5350)             // A 队前景红（标题/小圆点/文字）
+    val teamB = Color(0xFF42A5F5)             // B 队前景蓝（标题/小圆点/文字）
     val teamABg = Color(0xFF5D2A2A)           // A 队卡片底
     val teamBBg = Color(0xFF22416A)           // B 队卡片底
 

@@ -1,6 +1,7 @@
 package com.communicationcard.game.web.viewmodel
 
 import com.communicationcard.game.network.RoomInfo
+import com.communicationcard.game.network.SerializedCardGroup
 import com.communicationcard.game.network.SerializedGameResult
 import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.web.net.WebSocketTransport
@@ -52,6 +53,12 @@ sealed class Screen {
         val selectedCardIds: Set<String> = emptySet(),
         /** 提示按钮高亮的卡 IDs（与 selectedCardIds 共存：提示后用户可微调选择）。 */
         val hintedCardIds: Set<String> = emptySet(),
+        /**
+         * Stage 4：每个玩家最近打出的一手（Android 客户端有此特性，Web 之前缺失）。
+         * Server 协议没有 per-player.lastPlayedGroup 字段，所以 vm 在 client 侧观察
+         * `state.lastPlayedGroup` + `lastPlayerId` 的变化推断维护。
+         */
+        val perPlayerLastPlay: Map<Int, SerializedCardGroup> = emptyMap(),
         val message: String? = null,
     ) : Screen() {
         enum class Mode { SinglePlayer, Multiplayer }
