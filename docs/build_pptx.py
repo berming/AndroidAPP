@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
-"""Generate dev_summary.pptx — compact 16-slide version with SVG-rendered diagrams."""
-import io
-import sys
-from pathlib import Path
+"""Generate dev_summary.pptx — compact 16-slide version.
 
+架构 / 协同 4 层 / L0-L4 三个图按 native PPTX 形状画（圆角矩形 + 文本 + 连接线
++ 箭头），不再嵌入 PNG。这样：
+  - 中文用 PPT 自身字体（Microsoft YaHei），无 cairosvg 字体缺失问题
+  - 形状可编辑（用户能在 PowerPoint 里直接拖、改文本、改色）
+  - 矢量缩放无锯齿
+形状的视觉布局参考 docs/dev_summary.html 里的 SVG 图（保持视觉一致性）。
+"""
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
-from pptx.enum.shapes import MSO_SHAPE
-
-import cairosvg
-
-# 复用 build_html.py 里手工调好的 SVG 图（架构 / 协同四层次 / L0-L4 / 卡死防御 等）
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_html import (  # noqa: E402
-    svg_architecture,
-    svg_collab_levels,
-    svg_4layer_defense,
-    svg_harness_l0_l4,
-    svg_implementation_results,
-)
+from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
+from pptx.oxml.ns import qn
+from lxml import etree
 
 # Colors
 # 主配色：华为红（品牌色 #C7000B）— 仅用于"重点突出"（封面 / 章节标题 / callout）
@@ -178,14 +172,297 @@ def add_code_block(slide, left, top, width, height, code, *, font_size=BODY_SM):
         run.font.color.rgb = DARK
 
 
-def embed_svg(slide, svg_str, left, top, width, *, render_width_px=2000):
-    """把 SVG 字符串渲染成 PNG 后插入幻灯片。复用 build_html.py 的 SVG 函数，
-    保证 PPT 与 HTML 渲染版的视觉一致。"""
-    png_bytes = cairosvg.svg2png(
-        bytestring=svg_str.encode("utf-8"),
-        output_width=render_width_px,
+# ─────────────────────────────────────────────────────────────────────────────
+# Native PPT shape helpers — 替代 cairosvg PNG 嵌入（用户要求）
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _native_box(slide, x_in, y_in, w_in, h_in, *,
+                fill_rgb, border_rgb, border_pt=1.5,
+                title=None, title_color=None, title_size=14, title_bold=True,
+                body_lines=None, body_size=11, body_color=None, body_bold=False,
+                shape_type=MSO_SHAPE.ROUNDED_RECTANGLE):
+    """画一个圆角矩形 + 顶部加粗标题 + 多行正文。模仿 SVG 里的 <rect/> + <text/>。"""
+    shape = slide.shapes.add_shape(
+        shape_type,
+        Inches(x_in), Inches(y_in), Inches(w_in), Inches(h_in),
     )
-    return slide.shapes.add_picture(io.BytesIO(png_bytes), left, top, width=width)
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = fill_rgb
+    shape.line.color.rgb = border_rgb
+    shape.line.width = Pt(border_pt)
+    # 把圆角调小一点（默认太圆）
+    if shape_type == MSO_SHAPE.ROUNDED_RECTANGLE:
+        try:
+            shape.adjustments[0] = 0.06
+        except Exception:
+            pass
+
+    tf = shape.text_frame
+    tf.word_wrap = True
+    tf.margin_left = Emu(110000)
+    tf.margin_right = Emu(110000)
+    tf.margin_top = Emu(70000)
+    tf.margin_bottom = Emu(70000)
+
+    is_first = True
+    if title is not None:
+        p = tf.paragraphs[0]
+        p.text = ""
+        p.alignment = PP_ALIGN.LEFT
+        run = p.add_run()
+        run.text = title
+        run.font.name = FONT_CN
+        run.font.size = Pt(title_size)
+        run.font.bold = title_bold
+        run.font.color.rgb = title_color if title_color else DARK
+        is_first = False
+
+    if body_lines:
+        for line in body_lines:
+            p = tf.paragraphs[0] if is_first else tf.add_paragraph()
+            is_first = False
+            p.text = ""
+            p.alignment = PP_ALIGN.LEFT
+            run = p.add_run()
+            run.text = line
+            run.font.name = FONT_CN
+            run.font.size = Pt(body_size)
+            run.font.bold = body_bold
+            run.font.color.rgb = body_color if body_color else DARK
+
+    return shape
+
+
+def _native_arrow(slide, x1_in, y1_in, x2_in, y2_in, *,
+                  color=GRAY, width_pt=1.5):
+    """从 (x1,y1) 画一条直线到 (x2,y2)，末端带箭头。"""
+    connector = slide.shapes.add_connector(
+        MSO_CONNECTOR.STRAIGHT,
+        Inches(x1_in), Inches(y1_in),
+        Inches(x2_in), Inches(y2_in),
+    )
+    line = connector.line
+    line.color.rgb = color
+    line.width = Pt(width_pt)
+    # python-pptx 的 connector 默认无箭头；在 a:ln 下显式加 a:tailEnd
+    ln = line._get_or_add_ln()
+    # 移除已有的 tailEnd 避免重复
+    for tail in ln.findall(qn("a:tailEnd")):
+        ln.remove(tail)
+    tail_end = etree.SubElement(ln, qn("a:tailEnd"))
+    tail_end.set("type", "triangle")
+    tail_end.set("w", "med")
+    tail_end.set("len", "med")
+    return connector
+
+
+def _native_text(slide, x_in, y_in, w_in, h_in, text, *,
+                 font_size=10, color=GRAY, bold=False, align=PP_ALIGN.LEFT):
+    """无背景的纯文字（用于箭头旁的小标签等）。"""
+    tb = slide.shapes.add_textbox(
+        Inches(x_in), Inches(y_in), Inches(w_in), Inches(h_in),
+    )
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.margin_left = Emu(0)
+    tf.margin_right = Emu(0)
+    tf.margin_top = Emu(0)
+    tf.margin_bottom = Emu(0)
+    p = tf.paragraphs[0]
+    p.alignment = align
+    p.text = ""
+    run = p.add_run()
+    run.text = text
+    run.font.name = FONT_CN
+    run.font.size = Pt(font_size)
+    run.font.bold = bold
+    run.font.color.rgb = color
+    return tb
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagram 1：整体架构（多端共享 + 服务端权威）
+# 4 个客户端/服务端层 + Caddy 反代，箭头表示依赖 / 通信
+# ─────────────────────────────────────────────────────────────────────────────
+
+def draw_architecture(slide, x_in, y_in, w_in):
+    """画架构图。水平占 w_in 英寸（建议 ≥ 6.4），高度自动计算约 5.6 英寸。"""
+    # 配色（与 dev_summary.html SVG 同源）
+    g_android_fill = RGBColor(0xDC, 0xFC, 0xE7)
+    g_android_border = RGBColor(0x16, 0xA3, 0x4A)
+    g_web_fill = RGBColor(0xDB, 0xEA, 0xFE)
+    g_web_border = RGBColor(0x25, 0x63, 0xEB)
+    g_shared_fill = RGBColor(0xFE, 0xF3, 0xC7)
+    g_shared_border = RGBColor(0xD9, 0x77, 0x06)
+    g_server_fill = RGBColor(0xFC, 0xE7, 0xF3)
+    g_server_border = RGBColor(0xBE, 0x18, 0x5D)
+
+    # 上半部两列宽度
+    half = (w_in - 0.15) / 2.0  # 中间留 0.15" gap
+    col_l_x = x_in
+    col_r_x = x_in + half + 0.15
+
+    # 层 1：Android（左）/ Web（右）
+    _native_box(slide, col_l_x, y_in, half, 0.95,
+                fill_rgb=g_android_fill, border_rgb=g_android_border,
+                title=":apps:android（Android 客户端，XML 布局）",
+                title_color=g_android_border, title_size=11,
+                body_lines=[
+                    "ui/ → GameActivity（单机）/ OnlineGameActivity（联网）",
+                    "network/ → NetworkManager / RoomManager / GameSyncManager",
+                    "engine/ → MultiplayerGameEngine（桥接 :shared GameEngine）",
+                ], body_size=9)
+    _native_box(slide, col_r_x, y_in, half, 0.95,
+                fill_rgb=g_web_fill, border_rgb=g_web_border,
+                title=":apps:web（Compose Multiplatform / wasmJs）",
+                title_color=g_web_border, title_size=11,
+                body_lines=[
+                    "AppViewModel → 统一状态机；Screen.{Home/Lobby/Room/Game/Settlement}",
+                    "SinglePlayerEngine → 包装 :shared GameEngine",
+                    "net/ → 浏览器原生 WebSocket（@JsFun）；NetworkClient 与 Android 同职",
+                ], body_size=9)
+
+    # 层 2：:shared（全宽）
+    inner_x = x_in + 0.45
+    inner_w = w_in - 0.9
+    shared_y = y_in + 1.10
+    _native_box(slide, inner_x, shared_y, inner_w, 1.20,
+                fill_rgb=g_shared_fill, border_rgb=g_shared_border,
+                title=":shared（KMP：android + jvm + wasmJs）",
+                title_color=g_shared_border, title_size=11,
+                body_lines=[
+                    "model/   Card · Deck · Player",
+                    "engine/  CardRules · SettlementCalculator · GameEngine",
+                    "ai/      AIPlayer",
+                    "network/ GameMessage（所有 sealed class + SerializedXxx DTO）",
+                    "commonTest/ CardRulesTest · SettlementCalculatorTest · GameMessageSerializationTest",
+                ], body_size=9)
+
+    # 层 3：:server（全宽）
+    server_y = shared_y + 1.40
+    _native_box(slide, inner_x, server_y, inner_w, 1.05,
+                fill_rgb=g_server_fill, border_rgb=g_server_border,
+                title=":server（Ktor + Netty，Gradle 子项目）",
+                title_color=g_server_border, title_size=11,
+                body_lines=[
+                    "Application.kt → ServerRoomManager（房间 / AI 填充）",
+                    "             └→ ServerGameManager（权威状态 / AI / 计时）",
+                    "• 每房间一把 Mutex 串行化所有状态修改",
+                    "• force-advance 兜底 + 三级 AI 回退 + 30s 超时",
+                ], body_size=9)
+
+    # 层 4：Caddy（半宽，居中）
+    caddy_w = w_in * 0.55
+    caddy_x = x_in + (w_in - caddy_w) / 2.0
+    caddy_y = server_y + 1.25
+    _native_box(slide, caddy_x, caddy_y, caddy_w, 0.55,
+                fill_rgb=WHITE, border_rgb=GRAY, border_pt=1.0,
+                title="Caddy（80 / 443 TLS）→ 反代 127.0.0.1:8080",
+                title_color=DARK, title_size=10, title_bold=True,
+                body_lines=["公网 ws:// 或 wss:// /game"], body_size=9,
+                body_color=GRAY)
+
+    # 箭头：Android → :shared, Web → :shared, :shared → :server, :server → Caddy
+    arr_color = RGBColor(0x4B, 0x55, 0x63)
+    # Android (中下) → :shared (左上)
+    _native_arrow(slide,
+                  col_l_x + half * 0.55, y_in + 0.95,
+                  inner_x + inner_w * 0.30, shared_y,
+                  color=arr_color)
+    # Web (中下) → :shared (右上)
+    _native_arrow(slide,
+                  col_r_x + half * 0.45, y_in + 0.95,
+                  inner_x + inner_w * 0.70, shared_y,
+                  color=arr_color)
+    # :shared → :server
+    mid_x = inner_x + inner_w / 2.0
+    _native_arrow(slide,
+                  mid_x, shared_y + 1.20,
+                  mid_x, server_y,
+                  color=arr_color)
+    # :server → Caddy
+    _native_arrow(slide,
+                  mid_x, server_y + 1.05,
+                  mid_x, caddy_y,
+                  color=arr_color)
+    # 标签
+    _native_text(slide, x_in + 0.05, shared_y + 0.50, 0.7, 0.18,
+                 "依赖 :shared", font_size=8, color=GRAY)
+    _native_text(slide, x_in + w_in - 0.85, shared_y + 0.50, 0.85, 0.18,
+                 "依赖 :shared", font_size=8, color=GRAY)
+    _native_text(slide, mid_x + 0.05, shared_y + 1.22, 0.85, 0.18,
+                 "依赖 :shared", font_size=8, color=GRAY)
+    _native_text(slide, mid_x + 0.05, server_y + 1.07, 1.4, 0.18,
+                 "WebSocket /game", font_size=8, color=GRAY)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagram 2：协同的 4 个层次
+# 4 个垂直堆叠的彩色边框框，标题 + 描述
+# ─────────────────────────────────────────────────────────────────────────────
+
+def draw_collab_levels(slide, x_in, y_in, w_in):
+    """画协同 4 层次。高度约 3.6 英寸。"""
+    rows = [
+        ("Level 1　AI 执行人工指令",
+         "传统：人主导。人写完整指令 → AI 按指令完成 → 等待下一条。AI 沦为'会编程的工具'",
+         RGBColor(0xFE, 0xE2, 0xE2), RGBColor(0xDC, 0x26, 0x26)),
+        ("Level 2　AI 提建议，人工决策",
+         "审稿：人审 AI。AI 完成后输出方案 + 备选 → 人工选择 / 调整 / 驳回",
+         RGBColor(0xFE, 0xD7, 0xAA), RGBColor(0xEA, 0x58, 0x0C)),
+        ("Level 3　人工反馈现象，AI 自主排查 ← 本项目大量使用",
+         "人工：截图 + '还卡住' / '分数错了'  AI：看代码 + 推理 + 多轮自查 + 修复",
+         RGBColor(0xBB, 0xF7, 0xD0), RGBColor(0x16, 0xA3, 0x4A)),
+        ("Level 4　AI 主动审查，人工验证 ← 最高效模式",
+         "人工：开放性指令（'自查自纠所有问题'）  AI：全量扫描 + 输出清单 + 修复  人工：真机验证",
+         RGBColor(0xBF, 0xDB, 0xFE), RGBColor(0x25, 0x63, 0xEB)),
+    ]
+    h_box = 0.78
+    gap = 0.08
+    for i, (title, desc, fill, border) in enumerate(rows):
+        y = y_in + i * (h_box + gap)
+        _native_box(slide, x_in, y, w_in, h_box,
+                    fill_rgb=fill, border_rgb=border,
+                    title=title, title_color=border, title_size=12,
+                    body_lines=[desc], body_size=10)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagram 3：Harness L0-L4 五层架构
+# ─────────────────────────────────────────────────────────────────────────────
+
+def draw_harness_l0_l4(slide, x_in, y_in, w_in):
+    """画 L0-L4 五层。高度约 4.4 英寸。"""
+    layers = [
+        ("L0  记忆层",
+         ["CLAUDE.md（主索引）+ docs/regressions.md（Bug 冷藏库）",
+          "+ docs/playbooks/{feature-development, bug-triage, ci-failure-triage}.md"],
+         RGBColor(0xFE, 0xE2, 0xE2), RGBColor(0xDC, 0x26, 0x26)),
+        ("L1  权限 & 钩子层",
+         [".claude/settings.json + .claude/hooks/{SessionStart,PostToolUse,UserPromptSubmit}.sh",
+          "+ .githooks/{pre-push, commit-msg}"],
+         RGBColor(0xFE, 0xD7, 0xAA), RGBColor(0xEA, 0x58, 0x0C)),
+        ("L2  命令 & 子代理",
+         [".claude/commands/{test-fast, ship-check, pre-commit-scan, trace-bug, review-pr}.md",
+          "+ .claude/agents/{protocol-syncer, tdd-scaffolder, pr-reviewer}.md"],
+         RGBColor(0xFE, 0xF3, 0xC7), RGBColor(0xA1, 0x62, 0x07)),
+        ("L3  TDD 强制层",
+         ["CardRulesTest（~30）+ ServerGameManagerTest（~25）",
+          "+ GameMessageSerializationTest（协议 round-trip）+ CI tdd-gate job"],
+         RGBColor(0xBB, 0xF7, 0xD0), RGBColor(0x16, 0xA3, 0x4A)),
+        ("L4  跨 vendor 审查",
+         ["Codex bot（自动每 PR）+ pr-reviewer subagent（Opus 4.7 独立 context）",
+          "+ 季度第二 vendor + 真机最后一关；4 关 PR 流程"],
+         RGBColor(0xBF, 0xDB, 0xFE), RGBColor(0x25, 0x63, 0xEB)),
+    ]
+    h_box = 0.78
+    gap = 0.08
+    for i, (title, body, fill, border) in enumerate(layers):
+        y = y_in + i * (h_box + gap)
+        _native_box(slide, x_in, y, w_in, h_box,
+                    fill_rgb=fill, border_rgb=border,
+                    title=title, title_color=border, title_size=12,
+                    body_lines=body, body_size=9)
 
 
 def add_callout(slide, left, top, width, height, text, *,
@@ -305,8 +582,8 @@ add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
 s = add_slide()
 add_header(s, "二、架构设计：多端共享 + 服务端权威")
 
-# 用 build_html.py 中的整体架构 SVG 替代 ASCII（视觉与 dev_summary.html 一致）
-embed_svg(s, svg_architecture(), Inches(0.4), Inches(1.0), width=Inches(6.5))
+# 架构图：native PPTX 形状（圆角矩形 + 箭头），中文用 PPT 自身字体
+draw_architecture(s, x_in=0.3, y_in=1.05, w_in=6.6)
 
 add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
             "关键架构决策", font_size=BODY_LG, bold=True, color=PRIMARY)
@@ -500,8 +777,8 @@ add_header(s, "五、人机协同：4 层次 + 实际分工")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.5), Inches(0.4),
             "协同的 4 个层次", font_size=BODY_LG, bold=True, color=PRIMARY)
-# 复用 build_html.py 的 SVG（与渲染版 HTML 视觉一致）
-embed_svg(s, svg_collab_levels(), Inches(0.4), Inches(1.5), width=Inches(6.6))
+# native PPTX 形状（4 个堆叠彩色框），中文用 FONT_CN 渲染
+draw_collab_levels(s, x_in=0.4, y_in=1.55, w_in=6.6)
 
 add_textbox(s, Inches(7.2), Inches(1.05), Inches(6.0), Inches(0.4),
             "实际任务分工矩阵", font_size=BODY_LG, bold=True, color=PRIMARY)
@@ -959,9 +1236,9 @@ add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
             "🏗️  Harness 5 层防御体系（PR-H1..H5 + #35 web 重构 实战搭建）",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 
-# 复用 build_html.py 的 L0-L4 SVG（与渲染版 HTML 视觉一致）
-# 左半边 SVG，右半边经验表 — 2 栏布局避免上下挤压
-embed_svg(s, svg_harness_l0_l4(), Inches(0.4), Inches(1.5), width=Inches(6.6))
+# native PPTX 形状（5 层堆叠框），中文用 FONT_CN 渲染
+# 左半边 5 层框，右半边经验表 — 2 栏布局避免上下挤压
+draw_harness_l0_l4(s, x_in=0.4, y_in=1.55, w_in=6.6)
 
 add_textbox(s, Inches(7.2), Inches(1.05), Inches(6.0), Inches(0.4),
             "🎯 跨会话经验的核心原则",
