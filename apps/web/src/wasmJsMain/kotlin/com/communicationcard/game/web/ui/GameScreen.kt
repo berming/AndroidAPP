@@ -8,7 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -17,13 +16,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -81,12 +83,14 @@ fun GameScreen(
     onToggleSelected: (String) -> Unit,
     onLeave: () -> Unit,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
-        val mode = classify(maxWidth)
-        val me = state.state.players.find { it.id == state.localSeatIndex }
-        val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
-        val cardSize = cardSizeFor(mode)
+    // Stage 3 nit#2: 读 LocalLayoutMode（Theme.kt 提供）而非自己开 BoxWithConstraints。
+    // 整个 App 已经在 App.kt 一处统一 classify 过；这里保持单一真相来源。
+    val mode = LocalLayoutMode.current
+    val me = state.state.players.find { it.id == state.localSeatIndex }
+    val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
+    val cardSize = cardSizeFor(mode)
 
+    Box(modifier = Modifier.fillMaxSize().background(GreenTableColors.tableGreen)) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopBar(state = state.state, onLeave = onLeave, mode = mode)
 
@@ -99,21 +103,37 @@ fun GameScreen(
             }
 
             // 手牌 + 操作
+            //
+            // P2#1 修复：Compact + 6 玩家时 36 张牌 FlowRow 多行可能占 >450dp，
+            // 加上 chrome 总高超过 640dp 视口 → 出牌按钮被裁掉。
+            // 方案：手牌区域 heightIn(max) 限制 + verticalScroll 兜底，
+            // 让 ActionButtons 永远可见。Medium/Expanded 单行 hand 没此问题。
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0E3812))
+                    .background(GreenTableColors.tableGreenDeep)
                     .padding(horizontal = 8.dp, vertical = if (mode.isCompact) 4.dp else 8.dp),
             ) {
-                HandRow(
-                    me = me,
-                    selected = state.selectedCardIds,
-                    hinted = state.hintedCardIds,
-                    cardWidth = cardSize.first,
-                    cardHeight = cardSize.second,
-                    mode = mode,
-                    onToggle = onToggleSelected,
-                )
+                Box(
+                    modifier = if (mode.isCompact) {
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = HAND_MAX_HEIGHT_COMPACT)
+                            .verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
+                ) {
+                    HandRow(
+                        me = me,
+                        selected = state.selectedCardIds,
+                        hinted = state.hintedCardIds,
+                        cardWidth = cardSize.first,
+                        cardHeight = cardSize.second,
+                        mode = mode,
+                        onToggle = onToggleSelected,
+                    )
+                }
 
                 Spacer(Modifier.height(if (mode.isCompact) 6.dp else 8.dp))
 
@@ -384,10 +404,12 @@ private fun HandRow(
 
     if (mode.isCompact) {
         // 手机：多行 wrap，避免 30+ 张牌横向滚动
+        // nit#3: 避免每次重组分配 (selected + hinted) Set —— 用 || 短路布尔
+        val hasHighlight = selected.isNotEmpty() || hinted.isNotEmpty()
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(if ((selected + hinted).isNotEmpty()) 18.dp else 4.dp),
+            verticalArrangement = Arrangement.spacedBy(if (hasHighlight) 18.dp else 4.dp),
         ) {
             me.hand.forEach { card ->
                 val key = keyOf(card)
@@ -547,6 +569,16 @@ private fun cardSizeFor(mode: LayoutMode): Pair<Dp, Dp> = when (mode) {
     LayoutMode.Medium -> 56.dp to 80.dp
     LayoutMode.Expanded -> 64.dp to 90.dp
 }
+
+/**
+ * Compact 模式下手牌区域最大高度。≈ 3 行牌 (62dp) + 选中态行间距 (18dp×2)
+ * = 222dp，向下取整到 220dp 留点弹性。超过此高度由 verticalScroll 兜底。
+ *
+ * 之所以是 220 而不是更大：手机视口高常 640dp，扣 TopBar (52) + TableArea
+ * 最小 (~120) + 按钮区 (~110) + padding (~20) = 302dp 占用 → 留给 hand
+ * 最多 ~338dp。220dp 留出 100+ dp 空间给 TableArea 收缩弹性。
+ */
+private val HAND_MAX_HEIGHT_COMPACT: Dp = 220.dp
 
 private fun keyOf(c: SerializedCard) = "${c.suit}|${c.rank}|${c.deckIndex}"
 

@@ -4,45 +4,52 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 
 /**
  * 沟通牌 · Web 客户端全局 Theme（Stage 3 抽离）。
  *
- * - [GreenTableColors]：绿色赌桌配色，与 Android 端 res/values/colors.xml 对齐
- *   （A/B 队红/蓝，主操作金黄，次要白）
- * - [cjkTypography]：把 Material3 全部 textStyle 的 fontFamily 设成中文 family；
- *   未加载完字体时（family=null）回退默认 Typography。同时按 LayoutMode 缩放字号。
+ * - [GreenTableColors]：绿色赌桌配色 token。仅本 module 内消费；如要与
+ *   Android 端 res/values/colors.xml 对齐请人工同步（**没有自动校验**）。
+ * - [cjkTypography]：纯函数（非 @Composable）—— 必须由调用方用
+ *   `remember(family, mode)` 包裹，否则每次重组都会重建 15 个 TextStyle 实例
+ *   触发整树 invalidate。详见 pr-reviewer P1 on PR #49。
+ * - [LocalLayoutMode]：CompositionLocal，让子树拿到当前 LayoutMode，避免
+ *   每个屏自己再开 BoxWithConstraints。
  *
- * 使用：在 App.kt 顶层 `CommunicationCardTheme(cjkFamily, mode) { ... }` 包裹整个 UI。
+ * 使用：
+ *   ```kotlin
+ *   BoxWithConstraints {
+ *       val mode = classify(maxWidth)
+ *       CommunicationCardTheme(cjkFont, mode) { /* content */ }
+ *   }
+ *   ```
  */
 
 object GreenTableColors {
     val tableGreen = Color(0xFF1B5E20)        // 主桌面背景
-    val tableGreenDeep = Color(0xFF0E3812)    // 次要面板背景
+    val tableGreenDeep = Color(0xFF0E3812)    // 次要面板背景（顶栏 / 手牌区）
     val tableGreenLight = Color(0xFF2E7D32)   // 卡片表面
     val tableGreenAccent = Color(0xFF388E3C)  // 列表项
-    val tableGreenSelected = Color(0xFF43A047) // 选中态背景
 
     val brandPrimary = Color(0xFFFFC107)      // 金黄主操作
     val onBrandPrimary = Color.Black
 
-    val brandSecondary = Color(0xFF66BB6A)    // 副操作绿
+    val brandSecondary = Color(0xFF66BB6A)    // 副操作绿（hint border / 已走完）
     val onBrandSecondary = Color.Black
 
-    val teamA = Color(0xFFEF5350)             // A 队红
-    val teamB = Color(0xFF42A5F5)             // B 队蓝
     val teamABg = Color(0xFF5D2A2A)           // A 队卡片底
     val teamBBg = Color(0xFF22416A)           // B 队卡片底
 
     val textOnDark = Color.White
     val textMuted = Color(0xFFE8F5E9)
-    val textSubtle = Color(0xFFB2DFDB)
-    val textDisabled = Color(0xFFB0BEC5)
 
     val warning = Color(0xFFE53935)
     val cardWhite = Color.White
@@ -64,14 +71,13 @@ private fun greenTableScheme() = darkColorScheme(
 )
 
 /**
- * 把 Material3 的 15 个 textStyle 的 fontFamily 都设为 [cjkFamily]，并按
- * [mode] 适当缩放字号（Compact 比 Expanded 小 2 sp 左右）。
+ * Material3 Typography with all 15 textStyles tweaked: fontFamily=cjkFamily and
+ * fontSize *= scale (Compact 0.92 / Medium 1.0 / Expanded 1.08).
  *
- * cjkFamily=null 时（首屏字体未加载完）回退 Material3 默认 Typography（Latin
- * 字符正常显示，中文豆腐 < 1s）。
+ * **纯函数。调用方负责 `remember(family, mode)` 包裹**——否则每次 viewport
+ * 重组都会触发 15 次 TextStyle.copy + 整树 invalidate（pr-reviewer P1 on #49）。
  */
-@Composable
-fun cjkTypography(cjkFamily: FontFamily?, mode: LayoutMode = LayoutMode.Medium): Typography {
+fun cjkTypography(cjkFamily: FontFamily?, mode: LayoutMode): Typography {
     val base = Typography()
     val scale = when (mode) {
         LayoutMode.Compact -> 0.92f
@@ -101,15 +107,23 @@ fun cjkTypography(cjkFamily: FontFamily?, mode: LayoutMode = LayoutMode.Medium):
     )
 }
 
+/** CompositionLocal 让子树读取当前 LayoutMode，无需自己再开 BoxWithConstraints。 */
+val LocalLayoutMode = compositionLocalOf { LayoutMode.Medium }
+
 @Composable
 fun CommunicationCardTheme(
     cjkFamily: FontFamily?,
-    mode: LayoutMode = LayoutMode.Medium,
+    mode: LayoutMode,
     content: @Composable () -> Unit,
 ) {
-    MaterialTheme(
-        colorScheme = greenTableScheme(),
-        typography = cjkTypography(cjkFamily, mode),
-        content = content,
-    )
+    // remember(family, mode)：family 或 mode 不变时 Typography 实例稳定，
+    // 整树不会因 viewport 抖动而 invalidate。
+    val typography = remember(cjkFamily, mode) { cjkTypography(cjkFamily, mode) }
+    CompositionLocalProvider(LocalLayoutMode provides mode) {
+        MaterialTheme(
+            colorScheme = greenTableScheme(),
+            typography = typography,
+            content = content,
+        )
+    }
 }
