@@ -308,8 +308,10 @@ def svg_harness_l0_l4() -> str:
     """Harness L0-L4 五层架构（叠堆）。"""
     layers = [
         ("L0", "记忆层", "CLAUDE.md（主索引）+ docs/regressions.md（Bug 冷藏库）+ docs/playbooks/{feature-development, bug-triage, ci-failure-triage, adversarial-review}.md", "#fee2e2", "#dc2626"),
-        ("L1", "权限 & 钩子层", ".claude/settings.json（readonly bash 自动放行）+ .claude/hooks/{SessionStart, PostToolUse, UserPromptSubmit}.sh + .githooks/{pre-push, commit-msg}", "#fed7aa", "#ea580c"),
-        ("L2", "命令 & 子代理", ".claude/commands/{test-fast, ship-check, pre-commit-scan, trace-bug, review-pr}.md + .claude/agents/{protocol-syncer, tdd-scaffolder, pr-reviewer}.md", "#fef3c7", "#a16207"),
+        # 注意：SVG 是 XML，& 必须转义成 &amp;（HTML 浏览器会自动还原成 &）。
+        # cairosvg 的 XML 严格解析器不容忍裸 & — 这条踩过坑（PR #59）。
+        ("L1", "权限 &amp; 钩子层", ".claude/settings.json（readonly bash 自动放行）+ .claude/hooks/{SessionStart, PostToolUse, UserPromptSubmit}.sh + .githooks/{pre-push, commit-msg}", "#fed7aa", "#ea580c"),
+        ("L2", "命令 &amp; 子代理", ".claude/commands/{test-fast, ship-check, pre-commit-scan, trace-bug, review-pr}.md + .claude/agents/{protocol-syncer, tdd-scaffolder, pr-reviewer}.md", "#fef3c7", "#a16207"),
         ("L3", "TDD 强制层", "CardRulesTest（~30）+ ServerGameManagerTest（~25）+ GameMessageSerializationTest（协议 round-trip）+ CI tdd-gate job", "#bbf7d0", "#16a34a"),
         ("L4", "跨 vendor 审查", "Codex bot（自动每 PR）+ pr-reviewer subagent（Opus 4.7 独立 context）+ 季度第二 vendor + 真机最后一关；4 关 PR 流程", "#bfdbfe", "#2563eb"),
     ]

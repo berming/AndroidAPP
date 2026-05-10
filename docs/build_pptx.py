@@ -1,18 +1,37 @@
 #!/usr/bin/env python3
-"""Generate dev_summary.pptx — compact 10-slide version."""
+"""Generate dev_summary.pptx — compact 16-slide version with SVG-rendered diagrams."""
+import io
+import sys
+from pathlib import Path
+
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 
+import cairosvg
+
+# 复用 build_html.py 里手工调好的 SVG 图（架构 / 协同四层次 / L0-L4 / 卡死防御 等）
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_html import (  # noqa: E402
+    svg_architecture,
+    svg_collab_levels,
+    svg_4layer_defense,
+    svg_harness_l0_l4,
+    svg_implementation_results,
+)
+
 # Colors
-# 主配色：华为红（品牌色 #C7000B）— 取代之前的 Google 蓝
+# 主配色：华为红（品牌色 #C7000B）— 仅用于"重点突出"（封面 / 章节标题 / callout）
 PRIMARY = RGBColor(0xC7, 0x00, 0x0B)
 DARK = RGBColor(0x20, 0x20, 0x20)
 GRAY = RGBColor(0x60, 0x60, 0x60)
 # 浅色衬底改为低饱和红粉色（# FFF1F2），与 PRIMARY 同色系协调
 LIGHT_BG = RGBColor(0xFF, 0xF1, 0xF2)
+# 表格标题 / 非重点区分块的浅灰底（替换原来的红 / 绿底）
+LIGHT_HEADER = RGBColor(0xF5, 0xF5, 0xF5)
+LIGHT_HEADER_BORDER = RGBColor(0xD0, 0xD0, 0xD0)
 RED = RGBColor(0xE5, 0x39, 0x35)
 GREEN = RGBColor(0x2E, 0x7D, 0x32)
 ORANGE = RGBColor(0xF5, 0x7C, 0x00)
@@ -79,9 +98,11 @@ def add_page_number(slide, num, total):
 
 
 def add_table(slide, left, top, width, height, headers, rows,
-              header_color=PRIMARY, alt_color=LIGHT_BG,
+              header_color=LIGHT_HEADER, alt_color=LIGHT_BG,
               font_size=BODY_SM, header_font_size=BODY_SM,
-              col_widths=None):
+              col_widths=None, header_text_color=DARK):
+    """表格。默认 header 浅灰底 + 深字（用户要求："非重点突出部分用浅灰底"）；
+    重点强调的表格可显式传 header_color=PRIMARY + header_text_color=WHITE。"""
     n_rows = len(rows) + 1
     n_cols = len(headers)
     tbl_shape = slide.shapes.add_table(n_rows, n_cols, left, top, width, height)
@@ -107,7 +128,7 @@ def add_table(slide, left, top, width, height, headers, rows,
         run.font.name = FONT_CN
         run.font.size = Pt(header_font_size)
         run.font.bold = True
-        run.font.color.rgb = WHITE
+        run.font.color.rgb = header_text_color
 
     for r, row in enumerate(rows, start=1):
         for c, val in enumerate(row):
@@ -155,6 +176,16 @@ def add_code_block(slide, left, top, width, height, code, *, font_size=BODY_SM):
         run.font.name = FONT_MONO
         run.font.size = Pt(font_size)
         run.font.color.rgb = DARK
+
+
+def embed_svg(slide, svg_str, left, top, width, *, render_width_px=2000):
+    """把 SVG 字符串渲染成 PNG 后插入幻灯片。复用 build_html.py 的 SVG 函数，
+    保证 PPT 与 HTML 渲染版的视觉一致。"""
+    png_bytes = cairosvg.svg2png(
+        bytestring=svg_str.encode("utf-8"),
+        output_width=render_width_px,
+    )
+    return slide.shapes.add_picture(io.BytesIO(png_bytes), left, top, width=width)
 
 
 def add_callout(slide, left, top, width, height, text, *,
@@ -274,36 +305,8 @@ add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
 s = add_slide()
 add_header(s, "二、架构设计：多端共享 + 服务端权威")
 
-arch_code = """┌────────────────────────┐  ┌─────────────────┐
-│ :apps:android (XML)    │  │ :apps:web (Wasm)│
-│ GameActivity / Online- │  │ Compose MP UI   │
-│ MultiplayerGameEngine  │  │ AppViewModel    │
-└──────────┬─────────────┘  └────────┬────────┘
-           │ depends on              │
-           ▼                         ▼
-        ┌──────────────────────────────┐
-        │  :shared (KMP commonMain)    │
-        │  Card · Deck · Player        │
-        │  CardRules · Settlement      │
-        │  GameEngine · AIPlayer       │
-        │  GameMessage (DTO + sealed)  │
-        │  + commonTest (40+ 用例)     │
-        └────────────┬─────────────────┘
-                     │
-                     ▼
-        ┌──────────────────────────────┐
-        │  :server (Ktor + Netty)      │
-        │  ServerRoomManager           │
-        │  ServerGameManager           │
-        │   · 每房间 Mutex             │
-        │   · 三级 AI 回退 + 兜底推进  │
-        │   · 30s 回合超时             │
-        └────────────┬─────────────────┘
-                     │ WebSocket /game (JSON + classDiscriminator)
-                     ▼
-        Caddy 80/443 → 127.0.0.1:8080"""
-add_code_block(s, Inches(0.5), Inches(1.05), Inches(6.3), Inches(5.4),
-                arch_code, font_size=10)
+# 用 build_html.py 中的整体架构 SVG 替代 ASCII（视觉与 dev_summary.html 一致）
+embed_svg(s, svg_architecture(), Inches(0.4), Inches(1.0), width=Inches(6.5))
 
 add_textbox(s, Inches(7.0), Inches(1.05), Inches(6.0), Inches(0.4),
             "关键架构决策", font_size=BODY_LG, bold=True, color=PRIMARY)
@@ -326,9 +329,10 @@ evolution = [
     ["协议版本号", "✅ PR-H3：PROTOCOL_VERSION + 握手"],
     ["事件溯源", "⚪ 未规划，全量同步够用"],
 ]
+# 表格 header 用浅灰底（与全局规则一致；不再用 GREEN 填底）
 add_table(s, Inches(7.0), Inches(4.95), Inches(6.0), Inches(1.5),
             ["遗憾", "状态"], evolution, font_size=BODY_SM,
-            header_color=GREEN, col_widths=[Inches(2.0), Inches(4.0)])
+            col_widths=[Inches(2.0), Inches(4.0)])
 
 add_callout(s, Inches(0.5), Inches(6.6), Inches(12.5), Inches(0.55),
             "核心原则：服务端权威  ·  客户端乐观响应  ·  全量状态 + version 同步",
@@ -478,7 +482,6 @@ codex_findings = [
 ]
 add_table(s, Inches(0.5), Inches(4.95), Inches(12.3), Inches(1.6),
             ["PR", "优先级", "位置", "意见", "处置"], codex_findings,
-            header_color=ORANGE,
             font_size=BODY_SM,
             col_widths=[Inches(0.8), Inches(0.9), Inches(2.4),
                         Inches(5.5), Inches(2.7)])
@@ -497,21 +500,8 @@ add_header(s, "五、人机协同：4 层次 + 实际分工")
 
 add_textbox(s, Inches(0.5), Inches(1.05), Inches(6.5), Inches(0.4),
             "协同的 4 个层次", font_size=BODY_LG, bold=True, color=PRIMARY)
-levels = [
-    ("L1", "AI 执行人工指令", "传统：人主导，瓶颈", GRAY),
-    ("L2", "AI 提建议，人工决策", "审稿模式", DARK),
-    ("L3", "人工反馈现象，AI 自主排查", "本项目大量使用 ★", PRIMARY),
-    ("L4", "AI 主动审查，人工验证", "本项目最高效模式 ★★", PRIMARY),
-]
-y = 1.55
-for lvl, title, tag, color in levels:
-    add_textbox(s, Inches(0.5), Inches(y), Inches(0.5), Inches(0.4),
-                lvl, font_size=BODY_MD, bold=True, color=color)
-    add_textbox(s, Inches(1.1), Inches(y), Inches(5.5), Inches(0.4),
-                title, font_size=BODY_MD, bold=True, color=DARK)
-    add_textbox(s, Inches(1.1), Inches(y + 0.4), Inches(5.5), Inches(0.4),
-                tag, font_size=BODY_SM, color=color)
-    y += 0.95
+# 复用 build_html.py 的 SVG（与渲染版 HTML 视觉一致）
+embed_svg(s, svg_collab_levels(), Inches(0.4), Inches(1.5), width=Inches(6.6))
 
 add_textbox(s, Inches(7.2), Inches(1.05), Inches(6.0), Inches(0.4),
             "实际任务分工矩阵", font_size=BODY_LG, bold=True, color=PRIMARY)
@@ -579,7 +569,7 @@ anti = [
 ]
 add_table(s, Inches(0.5), Inches(3.5), Inches(7.5), Inches(2.4),
             ["反模式", "后果"], anti, font_size=BODY_SM,
-            header_color=RED, col_widths=[Inches(2.0), Inches(5.5)])
+            col_widths=[Inches(2.0), Inches(5.5)])
 
 add_textbox(s, Inches(8.3), Inches(3.0), Inches(4.7), Inches(0.4),
             "📊 效率数据",
@@ -632,7 +622,6 @@ multi_reasons = [
 ]
 add_table(s, Inches(0.5), Inches(4.6), Inches(12.3), Inches(2.0),
             ["#", "原因", "本项目体现"], multi_reasons, font_size=BODY_SM,
-            header_color=ORANGE,
             col_widths=[Inches(0.5), Inches(4.5), Inches(7.3)])
 
 add_callout(s, Inches(0.5), Inches(6.75), Inches(12.4), Inches(0.55),
@@ -970,18 +959,11 @@ add_textbox(s, Inches(0.5), Inches(1.05), Inches(12.3), Inches(0.4),
             "🏗️  Harness 5 层防御体系（PR-H1..H5 + #35 web 重构 实战搭建）",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 
-l_rows = [
-    ["L0", "Settings / hooks", "PostToolUse 注入「关键路径 TDD 提醒」+ push 后自动 review-check"],
-    ["L1", "Slash commands", "/test-fast · /pre-commit-scan · /ship-check · /review-pr"],
-    ["L2", "Subagents", "pr-reviewer (Opus) · protocol-syncer · tdd-scaffolder"],
-    ["L3", "CI gates", "tdd-gate（关键路径必同改 *Test.kt）+ build + detekt"],
-    ["L4", "Documentation", "playbook（feature/bug/CI 失败/对抗审查）+ regressions DB"],
-]
-add_table(s, Inches(0.5), Inches(1.5), Inches(12.3), Inches(2.6),
-            ["层", "工具", "说明"], l_rows, font_size=BODY_SM,
-            col_widths=[Inches(0.7), Inches(2.5), Inches(9.1)])
+# 复用 build_html.py 的 L0-L4 SVG（与渲染版 HTML 视觉一致）
+# 左半边 SVG，右半边经验表 — 2 栏布局避免上下挤压
+embed_svg(s, svg_harness_l0_l4(), Inches(0.4), Inches(1.5), width=Inches(6.6))
 
-add_textbox(s, Inches(0.5), Inches(4.3), Inches(12.3), Inches(0.4),
+add_textbox(s, Inches(7.2), Inches(1.05), Inches(6.0), Inches(0.4),
             "🎯 跨会话经验的核心原则",
             font_size=BODY_LG, bold=True, color=GREEN)
 
@@ -991,9 +973,9 @@ other_lessons = [
     ["文档单一真相 grep 验证", "新 doc 自称\"权威\"前必 grep 验证 anchor 函数名实际存在"],
     ["速度档位用 3 档预设", "slider 看似灵活；实际多数场景 3 档够用 + 测试矩阵更小"],
 ]
-add_table(s, Inches(0.5), Inches(4.7), Inches(12.3), Inches(2.0),
+add_table(s, Inches(7.2), Inches(1.5), Inches(5.9), Inches(4.6),
             ["经验", "说明"], other_lessons, font_size=BODY_SM,
-            col_widths=[Inches(3.0), Inches(9.3)])
+            col_widths=[Inches(2.0), Inches(3.9)])
 
 add_callout(s, Inches(0.5), Inches(6.85), Inches(12.3), Inches(0.55),
             "💎 核心：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑",
