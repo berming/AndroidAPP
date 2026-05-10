@@ -1,24 +1,31 @@
 package com.communicationcard.game.web.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -26,8 +33,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -74,12 +83,14 @@ fun GameScreen(
     onToggleSelected: (String) -> Unit,
     onLeave: () -> Unit,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
-        val mode = classify(maxWidth)
-        val me = state.state.players.find { it.id == state.localSeatIndex }
-        val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
-        val cardSize = cardSizeFor(mode)
+    // Stage 3 nit#2: 读 LocalLayoutMode（Theme.kt 提供）而非自己开 BoxWithConstraints。
+    // 整个 App 已经在 App.kt 一处统一 classify 过；这里保持单一真相来源。
+    val mode = LocalLayoutMode.current
+    val me = state.state.players.find { it.id == state.localSeatIndex }
+    val isMyTurn = state.state.currentPlayerIndex == state.localSeatIndex
+    val cardSize = cardSizeFor(mode)
 
+    Box(modifier = Modifier.fillMaxSize().background(GreenTableColors.tableGreen)) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopBar(state = state.state, onLeave = onLeave, mode = mode)
 
@@ -92,20 +103,37 @@ fun GameScreen(
             }
 
             // 手牌 + 操作
+            //
+            // P2#1 修复：Compact + 6 玩家时 36 张牌 FlowRow 多行可能占 >450dp，
+            // 加上 chrome 总高超过 640dp 视口 → 出牌按钮被裁掉。
+            // 方案：手牌区域 heightIn(max) 限制 + verticalScroll 兜底，
+            // 让 ActionButtons 永远可见。Medium/Expanded 单行 hand 没此问题。
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0E3812))
+                    .background(GreenTableColors.tableGreenDeep)
                     .padding(horizontal = 8.dp, vertical = if (mode.isCompact) 4.dp else 8.dp),
             ) {
-                HandRow(
-                    me = me,
-                    selected = state.selectedCardIds,
-                    hinted = state.hintedCardIds,
-                    cardWidth = cardSize.first,
-                    cardHeight = cardSize.second,
-                    onToggle = onToggleSelected,
-                )
+                Box(
+                    modifier = if (mode.isCompact) {
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = HAND_MAX_HEIGHT_COMPACT)
+                            .verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
+                ) {
+                    HandRow(
+                        me = me,
+                        selected = state.selectedCardIds,
+                        hinted = state.hintedCardIds,
+                        cardWidth = cardSize.first,
+                        cardHeight = cardSize.second,
+                        mode = mode,
+                        onToggle = onToggleSelected,
+                    )
+                }
 
                 Spacer(Modifier.height(if (mode.isCompact) 6.dp else 8.dp))
 
@@ -273,18 +301,29 @@ private fun ExpandedPlayersRow(others: List<SerializedPlayer>, currentSeat: Int)
     }
 }
 
+/**
+ * 其他玩家卡片（Stage 3 升级）：
+ * - 当前玩家边框色 animateColorAsState 平滑过渡（不再瞬切金黄）
+ * - 阴影 elevation：当前玩家 6dp / 普通 1dp（突出当前玩家）
+ * - 已走完玩家半透明 + "已走完" 标签
+ */
 @Composable
 private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean, compact: Boolean) {
-    val borderColor = if (isCurrent) Color(0xFFFFC107) else Color.Transparent
+    val targetBorder = if (isCurrent) GreenTableColors.selectedBorder else Color.Transparent
+    val borderColor by animateColorAsState(targetBorder, label = "playerBorder")
+    val targetElev = if (isCurrent) 6.dp else 1.dp
+    val elev by animateDpAsState(targetElev, label = "playerElev")
     val padding = if (compact) 6.dp else 10.dp
+    val shape = RoundedCornerShape(10.dp)
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (player.team == "TEAM_A") Color(0xFF5D2A2A) else Color(0xFF22416A),
+            containerColor = if (player.team == "TEAM_A") GreenTableColors.teamABg else GreenTableColors.teamBBg,
         ),
-        shape = RoundedCornerShape(8.dp),
+        shape = shape,
         modifier = Modifier
             .padding(if (compact) 2.dp else 4.dp)
-            .border(2.dp, borderColor, RoundedCornerShape(8.dp)),
+            .shadow(elevation = elev, shape = shape, clip = false)
+            .border(2.dp, borderColor, shape),
     ) {
         Column(
             modifier = Modifier.padding(padding),
@@ -297,13 +336,13 @@ private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean, compac
                 fontSize = if (compact) 12.sp else 14.sp,
             )
             Text(
-                "剩 ${player.handSize}",
-                color = Color(0xFFE8F5E9),
+                if (player.hasFinished) "已走完" else "剩 ${player.handSize}",
+                color = if (player.hasFinished) GreenTableColors.brandSecondary else GreenTableColors.textMuted,
                 fontSize = if (compact) 10.sp else 12.sp,
             )
             Text(
                 "已收 ${player.collectedScore}",
-                color = Color(0xFFFFC107),
+                color = GreenTableColors.brandPrimary,
                 fontSize = if (compact) 10.sp else 12.sp,
             )
         }
@@ -339,6 +378,15 @@ private fun LastPlayedRow(
 /*  手牌区 + 操作按钮                                               */
 /* ────────────────────────────────────────────────────────────── */
 
+/**
+ * 手牌区（Stage 3 升级）：
+ * - **Compact 模式用 FlowRow 多行 wrap**，手机上无需横向滚动
+ * - Medium / Expanded 仍用 LazyRow（横滚），大屏单行更优雅
+ *
+ * FlowRow 是 androidx.compose.foundation.layout 的 ExperimentalLayoutApi。
+ * CMP 1.6 已经稳定可用，加 @OptIn 抑制警告。
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HandRow(
     me: SerializedPlayer?,
@@ -346,26 +394,52 @@ private fun HandRow(
     hinted: Set<String>,
     cardWidth: Dp,
     cardHeight: Dp,
+    mode: LayoutMode,
     onToggle: (String) -> Unit,
 ) {
     if (me == null) {
         Text("等待发牌 …", color = Color.White)
         return
     }
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        items(me.hand) { card ->
-            val key = keyOf(card)
-            CardView(
-                card = card,
-                selected = key in selected,
-                hinted = key in hinted,
-                modifier = Modifier
-                    .size(cardWidth, cardHeight)
-                    .clickable { onToggle(key) },
-            )
+
+    if (mode.isCompact) {
+        // 手机：多行 wrap，避免 30+ 张牌横向滚动
+        // nit#3: 避免每次重组分配 (selected + hinted) Set —— 用 || 短路布尔
+        val hasHighlight = selected.isNotEmpty() || hinted.isNotEmpty()
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(if (hasHighlight) 18.dp else 4.dp),
+        ) {
+            me.hand.forEach { card ->
+                val key = keyOf(card)
+                CardView(
+                    card = card,
+                    selected = key in selected,
+                    hinted = key in hinted,
+                    modifier = Modifier
+                        .size(cardWidth, cardHeight)
+                        .clickable { onToggle(key) },
+                )
+            }
+        }
+    } else {
+        // 平板 / 桌面：单行横滚（屏幕宽足够，单行更优雅）
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(me.hand) { card ->
+                val key = keyOf(card)
+                CardView(
+                    card = card,
+                    selected = key in selected,
+                    hinted = key in hinted,
+                    modifier = Modifier
+                        .size(cardWidth, cardHeight)
+                        .clickable { onToggle(key) },
+                )
+            }
         }
     }
 }
@@ -437,6 +511,13 @@ private fun ActionButtons(
 /*  CardView + 工具                                                 */
 /* ────────────────────────────────────────────────────────────── */
 
+/**
+ * 卡牌视觉（Stage 3 升级）：
+ * - 阴影 elevation：未选 2dp / hint 4dp / 选中 8dp（spring 动画过渡）
+ * - 选中上抬 -16dp，平滑 spring 动画（不再瞬切）
+ * - 边框颜色 animateColorAsState 平滑过渡（默认灰 → hint 绿 → 选中金）
+ * - 圆角放大到 8dp（更现代）
+ */
 @Composable
 private fun CardView(
     card: SerializedCard,
@@ -447,17 +528,29 @@ private fun CardView(
     val isRed = card.suit == "HEART" || card.suit == "DIAMOND" ||
         (card.suit == "JOKER" && card.rank == "BIG_JOKER")
     val textColor = if (isRed) Color(0xFFE53935) else Color.Black
-    val offset = if (selected) -16.dp else 0.dp
-    val borderColor = when {
-        selected -> Color(0xFFFFC107)
-        hinted -> Color(0xFF66BB6A)
-        else -> Color(0xFF424242)
+
+    val shape = RoundedCornerShape(8.dp)
+    val targetBorder = when {
+        selected -> GreenTableColors.selectedBorder
+        hinted -> GreenTableColors.hintBorder
+        else -> GreenTableColors.cardOutline
     }
+    val borderColor by animateColorAsState(targetBorder, label = "cardBorder")
+    val targetLift = if (selected) (-16).dp else 0.dp
+    val lift by animateDpAsState(targetLift, animationSpec = spring(), label = "cardLift")
+    val targetElev = when {
+        selected -> 8.dp
+        hinted -> 4.dp
+        else -> 2.dp
+    }
+    val elev by animateDpAsState(targetElev, label = "cardElev")
+
     Box(
         modifier = modifier
-            .offset(y = offset)
-            .background(Color.White, RoundedCornerShape(6.dp))
-            .border(if (hinted || selected) 3.dp else 2.dp, borderColor, RoundedCornerShape(6.dp)),
+            .offset(y = lift)
+            .shadow(elevation = elev, shape = shape, clip = false)
+            .background(GreenTableColors.cardWhite, shape)
+            .border(if (hinted || selected) 3.dp else 1.5.dp, borderColor, shape),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -476,6 +569,16 @@ private fun cardSizeFor(mode: LayoutMode): Pair<Dp, Dp> = when (mode) {
     LayoutMode.Medium -> 56.dp to 80.dp
     LayoutMode.Expanded -> 64.dp to 90.dp
 }
+
+/**
+ * Compact 模式下手牌区域最大高度。≈ 3 行牌 (62dp) + 选中态行间距 (18dp×2)
+ * = 222dp，向下取整到 220dp 留点弹性。超过此高度由 verticalScroll 兜底。
+ *
+ * 之所以是 220 而不是更大：手机视口高常 640dp，扣 TopBar (52) + TableArea
+ * 最小 (~120) + 按钮区 (~110) + padding (~20) = 302dp 占用 → 留给 hand
+ * 最多 ~338dp。220dp 留出 100+ dp 空间给 TableArea 收缩弹性。
+ */
+private val HAND_MAX_HEIGHT_COMPACT: Dp = 220.dp
 
 private fun keyOf(c: SerializedCard) = "${c.suit}|${c.rank}|${c.deckIndex}"
 
