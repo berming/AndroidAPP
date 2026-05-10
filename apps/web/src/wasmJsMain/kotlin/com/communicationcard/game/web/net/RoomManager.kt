@@ -56,10 +56,13 @@ class RoomManager(private val net: NetworkClient) {
             is RoomCreated -> {
                 _currentRoom.value = message.room
                 _localPlayerId.value = message.room.hostId
+                // 让 NetworkClient 在自动重连时恢复会话（Codex P1 on PR #59）
+                net.setSessionToken(message.room.hostId)
             }
             is RoomJoined -> {
                 _currentRoom.value = message.room
                 _localPlayerId.value = message.playerId
+                net.setSessionToken(message.playerId)
             }
             is RoomUpdate -> {
                 _currentRoom.value = message.room
@@ -98,6 +101,8 @@ class RoomManager(private val net: NetworkClient) {
         if (ok) {
             _currentRoom.value = null
             _localPlayerId.value = null
+            // 已离开房间，后续重连不再带 token；服务端按全新会话处理
+            net.setSessionToken(null)
         }
         return ok
     }
