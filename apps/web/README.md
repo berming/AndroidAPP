@@ -58,10 +58,39 @@ npx http-server -c-1                  # 推荐：MIME 完整 + 禁缓存
 |---|---|
 | `src/wasmJsMain/kotlin/.../web/Main.kt` | `ComposeViewport` 入口 + 移除 loader |
 | `src/wasmJsMain/kotlin/.../web/ui/` | Home / Lobby / Room / Game / Settlement 五个屏幕 |
+| `src/wasmJsMain/kotlin/.../web/ui/Fonts.kt` | 中文字体加载（fetch + base64 + Skia interop） |
 | `src/wasmJsMain/kotlin/.../web/viewmodel/` | `AppViewModel` 状态机 + sessionJob 生命周期 |
 | `src/wasmJsMain/kotlin/.../web/net/` | `WebSocketTransport`（@JsFun 直 interop） + Network/Room/GameSync |
 | `src/wasmJsMain/kotlin/.../web/singleplayer/` | 单机模式：包装 `:shared` 的 `GameEngine` |
 | `src/wasmJsMain/resources/index.html` | 加载页 + loader（`#loader` 由 wasm 启动后 fade-out 移除） |
+| `src/wasmJsMain/resources/fonts/NotoSansSC-Subset.ttf` | 中文子集字体（GB2312 7540 字，~3 MB） |
+| `fonts/build-subset.sh` | 字体子集重生成脚本（默认 GB2312；`SUBSET_MODE=project` 切到 ~200 KB 仅项目用字版） |
 
 依赖 Kotlin 1.9.24 + CMP 1.6.10；不引入 `kotlinx-browser:0.1`（要求 Kotlin 2.0+），
 DOM API 通过 `@JsFun` 直接 interop。
+
+---
+
+## 关于中文字体
+
+**为什么要打包字体**：CMP wasmJs 在 `<canvas>` 里用 Skia 渲染文本。Skia 在浏览器
+wasm 沙箱内**拿不到操作系统字体**（沙箱安全），CMP 默认只打 Latin。中文字符
+全部画成豆腐块（□）。所以 Web 客户端必须自带一份中文字体。
+
+**字体来源**：[Noto Sans CJK SC](https://github.com/googlefonts/noto-cjk)，
+SIL Open Font License 1.1（可商用 / 嵌入 / 修改 / 再分发；详见
+[OFL 1.1 中文译本](https://scripts.sil.org/OFL_web)）。
+
+**子集策略**：
+
+| Mode | 字符数 | 文件大小 | 适用 |
+|---|---|---|---|
+| `gb2312`（默认） | 7540 | ~3 MB | 加任何中文都不用重生成；首屏多 3 MB 流量 |
+| `project` | ~430 | ~210 KB | 紧凑；改 UI 字符串后要重跑脚本 |
+
+切换：`SUBSET_MODE=project bash apps/web/fonts/build-subset.sh`，然后
+`./gradlew :apps:web:wasmJsBrowserDistribution` 重新打包。
+
+**字体不签入 git？**：当前签入了 GB2312 子集（3 MB）—— 体积可控且消除"clone
+完跑不起来"的体验。若未来嫌大，可改成 build-time 自动生成（gradle task 调
+build-subset.sh）+ 把 ttf 加进 .gitignore。
