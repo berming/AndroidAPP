@@ -405,11 +405,19 @@ override fun onOpen(ws: WebSocket, response: Response) {
 
 ### 后续建议行动
 
-1. **自动化集成测试**：炸弹比较/结算/重连流程写服务端单元测试
-2. **共享规则层**：`canBeat` + `SettlementCalculator` 抽成 KMP 共享模块
-3. **监控告警**：上线 `force-advance` 计数指标，触发即告警排查
-4. **弱网测试**：集成限速工具，系统化回归重连场景
-5. **协议版本号**：添加 `protocolVersion` 字段，强制兼容检查
+1. ✅ **自动化集成测试**：已在 PR-H2 落地——`CardRulesTest.kt`（~30 用例）
+   + `ServerGameManagerTest.kt`（~25 用例）+ CI tdd-gate 硬关
+2. ✅ **共享规则层**：已在 PR #35 + PR-H3 落地——`:shared` KMP 模块持有
+   单一份 `CardRules` / `SettlementCalculator`；服务端委托调用，约束 1/4
+   编译期消除
+3. ⚪ **监控告警**：上线 `force-advance` 计数指标，触发即告警排查（暂未规划）
+4. ⚪ **弱网测试**：集成限速工具，系统化回归重连场景（暂未规划）
+5. ✅ **协议版本号**：已在 PR-H3 落地——`PROTOCOL_VERSION = 3`，
+   `Reconnect` 消息携带 + 服务端握手时校验
+6. ⚪ **客户端 SERVER_URL 集中化**（regressions #13 follow-up）：抽到
+   BuildConfig / 资源文件，避免下次拓扑变更再漏改某端
+7. ⚪ **iOS / Desktop targets**：当前 KMP 只 android+jvm+wasmJs，要做时
+   按 `docs/client_implementation_guide.md` 的路径扩
 
 ---
 
@@ -695,4 +703,144 @@ PR #52 在 `claude/docs-architecture-refresh` 分支上合并后，**本会话�
 
 **跨会话经验**：当一个特性"看起来 slider 更灵活"时，先问"用户真的需要
 连续值么？"——多数情况下 3 档够用，且压缩了边界情况测试矩阵。
+
+### 9.9 Harness L0-L4 体系搭建（PR-H1..H5 + #35 web 重构 实战）
+
+> 与 9.1-9.8 同期推进的另一条主线：把"靠开发者记忆维护约束"系统化为
+> "靠基础设施自动执行约束"。这条线产出 5 个 harness PR + 1 个 KMP 重构
+> PR + 1 个部署拓扑修复 PR，全部已合并到 main。
+
+#### 9.9.1 五层架构（L0-L4）一览
+
+```
+L0 记忆层      CLAUDE.md (主索引) + docs/regressions.md (Bug 冷藏库)
+              + docs/playbooks/{feature-development, bug-triage,
+                ci-failure-triage, adversarial-review}.md
+              ▲ 每条 Bug 带 8 字段：症状 / 根因 / commit / 教训 / 测试
+
+L1 权限&钩子层  .claude/settings.json   readonly bash 自动放行
+              .claude/hooks/SessionStart.sh   开局打印分支/CI/最近 commit
+              .claude/hooks/PostToolUse.sh    关键路径编辑→TDD 提醒；
+                                              git push→拉 review/CI 提醒
+              .claude/hooks/UserPromptSubmit.sh   ship/push 关键词→注入提醒
+              .githooks/pre-push     push 前自动跑 :shared:jvmTest
+              .githooks/commit-msg   校验 Signed-off-by + AI-Assisted-By
+
+L2 命令&子代理   .claude/commands/{test-fast, ship-check, pre-commit-scan,
+                trace-bug, review-pr}.md
+              .claude/agents/{protocol-syncer, tdd-scaffolder,
+                pr-reviewer}.md
+
+L3 TDD 强制层    CardRulesTest (~30 用例) + ServerGameManagerTest (~25 用例)
+              + GameMessageSerializationTest（协议 round-trip）
+              + CI tdd-gate job：critical path 改动必带对应 *Test.kt 改动
+
+L4 跨 vendor    Codex bot（自动，每 PR 跑）+ pr-reviewer subagent
+              （Opus 4.7 独立 context）+ 季度手动第二 vendor + 真机
+              4 关 PR 流程：CI / Codex / Claude /review-pr / 真机
+```
+
+#### 9.9.2 PR-H 系列实战回顾
+
+| PR | 范围 | 实际产出 | 检验数据 |
+|----|------|---------|---------|
+| **PR-H1 Bedrock**（settings + hooks + slash commands + playbooks）| 不动 Kotlin，纯增基础设施 | settings.json / 3 个 hook / 4 个 slash command / 3 个 playbook | 新会话 SessionStart hook 立刻可见；commit-msg hook 在第一次缺署名时确实拒绝 |
+| **PR-H1.5 Deploy**（部署 playbook + Caddy 拓扑）| 把"如何部署到腾讯云"沉淀进 docs | install.sh 一键脚本 + Caddy 80/443 反代 + systemd unit + web-deploy.md playbook | 实战在 PR #41 落地、PR #42-44 修补三层防火墙踩坑（详见 regressions #9） |
+| **PR-H2 TDD 充实**| 补关键路径测试 + CI tdd-gate 硬关 | CardRulesTest ~30 / ServerGameManagerTest ~25 用例；android-ci.yml 加 tdd-gate job；detekt 移除 continue-on-error | tdd-gate 在 PR #53 真触发过：未带测试 commit 直接红，倒逼补齐 |
+| **PR-H3 Server 合并 :shared**| 服务端改子项目，删 Messages.kt 副本 | settings.gradle.kts 加 `:server`；server/build.gradle.kts 重写；删 server/Messages.kt（364 行）；ServerGameManager 的 canBeat / computeAllFinishedScores 委托给 :shared；引入 PROTOCOL_VERSION 握手 | 约束 1/4（双份逻辑同步）从此被编译期消除；后续协议变更只改 :shared 一份 |
+| **PR-H4 Subagents + trace-bug**| 多 AI 角色化 + bug 修复入口 | protocol-syncer / tdd-scaffolder / `/trace-bug` slash command + adversarial-review playbook | trace-bug 在 PR #46（Android URL 漂移）实战入口生效 |
+| **PR-H5 pr-reviewer**| Opus 4.7 独立 context 评审 | pr-reviewer subagent + `/review-pr` slash command | PR #53 评审时与 Codex 互补：Codex 抓"语句级边界"，pr-reviewer 抓"功能性完整 + 跨文件契约"（详见 9.4） |
+
+#### 9.9.3 PR #35 KMP 重构 — wasmJs 工具链 8 层"剥洋葱"
+
+PR #35 把 model/engine/network/ai 抽到 `:shared` KMP 模块，加 wasmJs target
+让 Android + Web 共享同一份代码。第一次接触 wasmJs target，CI 连续报 8 类
+不同的兼容性错误，必须按下表顺序逐层剥：
+
+| # | 错误信号 | 根因 | 修法 |
+|---|---------|------|------|
+| 1 | `assertNull` unresolved | kotlin.test wasmJs 子集缺导入 | 显式 `import kotlin.test.assertNull` |
+| 2 | `kotlinx-coroutines-core:1.7.3` 没 wasmJs variant | 1.7.x 系列不含 wasm 编译产物 | 升 `1.8.1`（首个支持 wasmJs 的版本）|
+| 3 | jvmTarget 不一致 | :shared androidTarget 默认 1.8，与 :apps:android 不齐 | androidTarget `compilations.all { kotlinOptions.jvmTarget = "1.8" }` |
+| 4 | 跨模块 smart-cast 失败（`message.state` 是 `var`） | Kotlin 不允许跨模块对 `var` 属性 smart-cast | 局部 `val state = message.state` 快照 |
+| 5 | `kotlinx-browser:0.1` 要求 K2.0+ | 当前 K1.9.24，不兼容 | 弃用 kotlinx-browser，改 `@JsFun` 直接 interop 浏览器原生 WebSocket |
+| 6 | `kotlinx-serialization-json:1.6.0` 没 wasmJs | 1.6.0 不含 wasm | 升 `1.6.3`（首个含 wasmJs）|
+| 7 | `compose.components.resources` 要求 K2.0+ | 同 #5 | 移除（实际未用到）|
+| 8 | `RepositoriesMode.FAIL_ON_PROJECT_REPOS` 阻断 KGP NodeJsSetupTask | KGP wasmJs 工具链需要 project-level 仓库下载 Node.js | 移除该设置，回归默认 PREFER_PROJECT |
+
+**跨会话经验**：
+- wasmJs target 兼容性是**严格按 Kotlin 版本切片**的，靠"在 stackoverflow
+  搜错误"是无效的——必须查 kotlinx-* 库的 Maven Central 看哪个版本第一次
+  发了 `-wasm-js` 子产物
+- 沙箱拉不到 wasmJs 工具链时**必须 push 跑 CI**，本地永远验不通；当时
+  把 gradle stderr 通过 PR comment 发回（exfil channel，详见 9.9.5）
+  把"4 分钟一次的 CI 运行"变成了**仅次于 jvmTest 的有效反馈渠道**
+- 错误信号顺序很重要：先解决"找不到 variant"再解决"K 版本"再解决
+  "smart cast"——上层错误会掩盖下层，逐层剥才能避免反复回归
+
+#### 9.9.4 双层防火墙 / Android URL 漂移（实战入 regressions）
+
+PR-H1.5 Deploy 落地后，部署链路本身又踩了 2 个**结构性**坑，都已记入
+regressions.md：
+
+- **regressions #9**：双层防火墙（云厂商安全组 + 服务器内 ufw）任一未放
+  行 80/443 都 timeout，**症状完全相同**。修法是给 install.sh 加 ufw
+  自动配置 + playbook §3c "分层自检 3 步"决策树
+- **regressions #13**：PR #41 服务端拓扑改 Caddy 反代 → :8080 不再外露，
+  Web 客户端用相对路径直接生效，**Android 客户端 SERVER_URL 仍硬编码
+  `:8080`** → 联网失败。修法是去 `:8080`，治本是后续把 URL 抽到
+  BuildConfig（PR-H6 候选）
+
+**跨会话经验**：
+- "拓扑大改"必须扫**所有客户端**（Android + Web + 未来 iOS），不光是
+  PR 描述里提到的那一端。后续 PR 模板「服务端状态修改？」段落补一条
+  "拓扑变更时所有客户端的 SERVER_URL 是否同步更新"复选框
+- 双层防火墙是部署 bug 的"完美对称陷阱"：从公网看症状一致，必须给
+  分层自检命令，让用户能 0 歧义指出哪一层挂了，避免"重启服务器/重装
+  caddy/疑神疑鬼"的乱试
+
+#### 9.9.5 CI exfil channel：把 4 分钟反馈拉成 1 分钟
+
+PR #35 反复修不通时，沙箱里**读不到 GitHub Actions 的失败日志**——必须
+等用户人肉去复制贴回。后来定型为标准模式：
+
+```yaml
+- name: Surface assembleDebug error on failure
+  if: failure()
+  run: |
+    { echo "## :apps:android:assembleDebug 失败"
+      echo "### Kotlin compiler errors（grep 'e:' / 'error:'）"
+      grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED" assembleDebug.log | head -80
+      tail -300 assembleDebug.log
+    } > comment.md
+    gh pr comment "$PR_NUMBER" --body-file comment.md
+```
+
+**跨会话经验**：
+- 沙箱里**只能读 PR comment**——把 gradle stderr 当作 PR comment 发出
+  来，AI 拉 `mcp__github__pull_request_read action=get_comments`
+  即可读到，等同于"远程 SSH 到 CI runner"
+- `grep '^e:'` 抽硬错误（warning 是 `^w:`）；100+ 行的 unused-parameter
+  警告会把唯一一个真错误埋掉，**必须按 severity 分桶展示**
+- 模式已写入 `docs/playbooks/ci-failure-triage.md` §5；后续任何
+  "build 红但本地跑不出来"都该走这条 exfil 通道
+
+#### 9.9.6 Harness 见效的可观察证据
+
+实战中 harness 是否真在起作用？以 PR #46（Android URL 漂移修复）为例：
+
+1. SessionStart hook 自动列出"最近 5 commit"——发现 PR #41 拓扑改造
+2. PostToolUse hook 在编辑 `MainActivity.kt:43` 时弹"⚠️ 这是关键路径
+   文件，是否同改 *Test.kt？"——提醒"URL 是字符串常量没单测，但需要
+   sweep `LobbyActivity.kt:34` 同源"
+3. push 后 hook 自动注入"应主动拉 review_comments + check_runs"
+4. Codex bot 30s 内出审查（无 P0/P1）
+5. /review-pr 调 pr-reviewer subagent，独立 context 验证："此修复是
+   否治本？"——回答"治标，根因是常量硬编码两份"，登记 follow-up
+6. regressions.md #13 同 commit 写入，承载教训
+7. 防回归测试缺失（URL 是常量），流程层面在 playbook 加 "grep 所有
+   客户端 SERVER_URL"步骤
+
+每一关都有 hook / command / agent / test / doc 在背后兜底——这就是
+harness 与"靠记忆"的差距。
 
