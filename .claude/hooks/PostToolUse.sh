@@ -60,11 +60,15 @@ fi
 
 # ─────────────────────────────────────────────────────────────
 # 分支 B：git push 后 → 主动检查 Codex review 提醒
+#
+# 只匹配命令真的"以 git push 起头"（行首 / `&&` / `;` / `|` / `(` 之后）。
+# 旧版用 substring `*"git push"*` 会被 commit message 文本、grep "git push"、
+# echo 含该字符串的 JSON 等误触发（实操中确实碰到 2 次假阳性）。
+# 用 grep -E 锚定边界 + 在所有常见 shell 分隔符之后才认。
 # ─────────────────────────────────────────────────────────────
-if [ -n "$bash_cmd" ]; then
-    case "$bash_cmd" in
-        *"git push"*|*"git push -u"*|*"--force"*"git push"*|*"git push --force"*|*"git push --force-with-lease"*)
-            emit_context "🤖 [Push 后自动 review-check 提醒] 刚 push 完。
+if [ -n "$bash_cmd" ] \
+   && printf '%s' "$bash_cmd" | grep -qE '(^|[[:space:]]*[;&|(]+[[:space:]]*)git[[:space:]]+push([[:space:]]|$)'; then
+    emit_context "🤖 [Push 后自动 review-check 提醒] 刚 push 完。
 
 **主会话应当主动**（不要等用户再提一次）：
 
@@ -79,9 +83,7 @@ if [ -n "$bash_cmd" ]; then
 
 依据：用户明确要求'每次 push 后都应当自动检查 Codex review 并修复'。
 不要因为'没看到用户问'就不做 —— 这是常驻行为约定。"
-            exit 0
-            ;;
-    esac
+    exit 0
 fi
 
 exit 0

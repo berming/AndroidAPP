@@ -3,7 +3,7 @@
 # 重新生成 Web 客户端的中文字体子集
 #
 # 用途：当你想给字体改大小 / 换字体 / 换覆盖范围时跑这个脚本。
-# 默认产出：apps/web/src/wasmJsMain/resources/fonts/NotoSansSC-Subset.ttf
+# 默认产出：apps/web/src/wasmJsMain/resources/fonts/NotoSansSC-Subset.otf
 #
 # 用法：
 #   bash apps/web/fonts/build-subset.sh                 # 默认 GB2312（~3MB，7540 字）
@@ -87,16 +87,16 @@ with open('$FONTS_DIR/chars-gb2312.txt', 'w') as f:
 esac
 
 # 3. 跑 pyftsubset
-echo "==> 生成子集字体到 $WEB_RESOURCES/NotoSansSC-Subset.ttf"
+echo "==> 生成子集字体到 $WEB_RESOURCES/NotoSansSC-Subset.otf"
 pyftsubset "$SOURCE_FONT" \
     "${SUBSET_ARGS[@]}" \
-    --output-file="$WEB_RESOURCES/NotoSansSC-Subset.ttf" \
+    --output-file="$WEB_RESOURCES/NotoSansSC-Subset.otf" \
     --no-hinting \
     --desubroutinize \
     --drop-tables=BASE,JSTF,DSIG
 
 echo ""
 echo "✅ 完成"
-ls -lh "$WEB_RESOURCES/NotoSansSC-Subset.ttf"
+ls -lh "$WEB_RESOURCES/NotoSansSC-Subset.otf"
 echo ""
 echo "下一步：./gradlew :apps:web:wasmJsBrowserDistribution 重新打包；deploy.yml push 后会随产物上传"

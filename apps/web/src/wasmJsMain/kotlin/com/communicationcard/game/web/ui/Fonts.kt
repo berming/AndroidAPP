@@ -21,15 +21,23 @@ import kotlin.js.Promise
  * Skia 在浏览器 wasm 沙箱内**拿不到 OS 字体**（沙箱安全模型），它只用打进
  * wasm 包的字体；CMP 默认字体只覆盖 Latin。所以中文字符全部画成豆腐块（□）。
  *
- * 修法：fetch 一份 Noto Sans SC 子集字体（apps/web/fonts/build-subset.sh
- * 生成；当前 ~209 KB，覆盖项目源码里实际用到的 428 个 CJK 字符），
- * 通过 androidx.compose.ui.text.platform.Font(identity, data) 注册为
- * Compose 字体家族，挂在 MaterialTheme 的默认 typography 上。
+ * 修法：fetch 一份 Noto Sans CJK SC 子集字体（apps/web/fonts/build-subset.sh
+ * 生成；当前 GB2312 全集 + 项目用到的非 GB2312 符号 = 7626 codepoints，
+ * ~3 MB），通过 androidx.compose.ui.text.platform.Font(identity, data) 注册
+ * 成 Compose 字体家族，挂在 MaterialTheme 的默认 typography 上。
+ *
+ * 文件名是 `.otf`（不是 `.ttf`）—— Noto Sans CJK 用 CFF outline，sfnt magic
+ * 是 `OTTO`，是真正的 OpenType/CFF 字体；Skia 看 sfnt header 不看扩展名，
+ * 浏览器和 Caddy 也都识别。
  *
  * 加载流程异步：未加载完时返回 null（fallback 到 CMP 默认字体，仍是豆腐
  * 但短暂出现 < 1s）；加载完后整个 UI 自动 recompose 用新字体。
+ *
+ * URL 用绝对路径 `/fonts/...`：避免未来 Web 客户端被部署到 sub-path
+ * (e.g. `https://host/cards/`) 或被 SPA 路由器修改地址栏后，相对路径
+ * `fonts/...` 解析到错误位置。
  */
-private const val FONT_URL = "fonts/NotoSansSC-Subset.ttf"
+private const val FONT_URL = "/fonts/NotoSansSC-Subset.otf"
 
 /**
  * @JsFun 内部用 chunked btoa：直接 btoa(String.fromCharCode(...)) 大数组

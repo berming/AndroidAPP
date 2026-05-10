@@ -131,9 +131,9 @@
 |------|------|
 | 症状 | 浏览器打开 Web 客户端，所有中文字符（"沟通牌"、"创建房间" 等）显示为白色矩形 □□□。tab 标题里的中文正常 —— 仅 Compose 渲染部分异常 |
 | 根因 | CMP wasmJs 用 Skia 在 `<canvas>` 内画文本。Skia 在浏览器 wasm 沙箱里**拿不到 OS 字体**（沙箱安全），CMP 默认打包字体只覆盖 Latin → 所有中文 codepoint 找不到字形 → 画 .notdef glyph（豆腐块）。tab 标题正常是因为它走 HTML/DOM，由浏览器系统字体（macOS 苹方等）渲染，是另一条路径 |
-| 修复 | PR #45（计划）—— Noto Sans CJK SC GB2312 子集（7540 字，~3 MB）打进 wasmJs 资源；`Fonts.kt` 用 `@JsFun` fetch + base64 + `androidx.compose.ui.text.platform.Font(identity, data)` 注册成 `FontFamily`；`App.kt` 顶层 `MaterialTheme(typography=…)` 把所有 Material3 textStyle 的 fontFamily 设为该 family。`apps/web/fonts/build-subset.sh` 提供 `gb2312` / `project` 两种 mode 的子集生成脚本 |
+| 修复 | PR #45：commit `64fcd99`（首版 GB2312 子集 + Fonts.kt + App.kt typography）→ `d34d151`（修 try/catch 编译错）→ `ce74b39`（Codex P2：补 6 个非 GB2312 符号 `·—♠♣♥♦`）。Noto Sans CJK SC 子集（GB2312 + 项目用符号 = 7626 codepoints，~3 MB）打进 wasmJs 资源；`Fonts.kt` 用 `@JsFun` fetch + base64 + `androidx.compose.ui.text.platform.Font(identity, data)` 注册成 `FontFamily`；`App.kt` 顶层 `MaterialTheme(typography=…)` 把所有 Material3 textStyle 的 fontFamily 设为该 family。`apps/web/fonts/build-subset.sh` 提供 `gb2312` / `project` 两种 mode 的子集生成脚本 |
 | 教训 | (1) **真机验证关 = 真的把 UI 跑给人看**：bug 在 PR #41 引入 Web 客户端就存在，但被 "loader 卡住" 这个上层 P0 完全掩盖；连续 3 个 PR（#41/#42/#44）的 4 关流程里"真机验证"都没真渲染过 Home/Lobby —— 直到部署完 + 字体 bug 暴露才发现。下次任何 UI PR 的真机关都必须**至少进 1 个非 Home 屏幕看实际渲染**，不只是确认页面打开。(2) **Skia in browser ≠ Skia native**：以为"Compose 跨平台"就以为字体在所有 target 都自动可用是错的；wasmJs target 必须显式打包字体。(3) **bug 数据库的"被掩盖" pattern**：上层 bug 修了之后要主动复查"这一层之下还有没有同时存在但被掩盖的 bug" |
-| 防回归测试 | UI 文本渲染没有单元测试惯例；防回归靠 `apps/web/README.md` 的"中文字体"段 + `apps/web/fonts/build-subset.sh` 的可复现性。下次 build wasmJs 产物时只要 `resources/fonts/NotoSansSC-Subset.ttf` 在，渲染就正常；缺失 → `Fonts.kt` 静默 fallback（豆腐 + console.error），手动可观察到 |
+| 防回归测试 | UI 文本渲染没有单元测试惯例；防回归靠 `apps/web/README.md` 的"中文字体"段 + `apps/web/fonts/build-subset.sh` 的可复现性。下次 build wasmJs 产物时只要 `resources/fonts/NotoSansSC-Subset.otf` 在，渲染就正常；缺失 → `Fonts.kt` 静默 fallback（豆腐 + console.error），手动可观察到 |
 
 ---
 

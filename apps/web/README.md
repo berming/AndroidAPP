@@ -63,7 +63,7 @@ npx http-server -c-1                  # 推荐：MIME 完整 + 禁缓存
 | `src/wasmJsMain/kotlin/.../web/net/` | `WebSocketTransport`（@JsFun 直 interop） + Network/Room/GameSync |
 | `src/wasmJsMain/kotlin/.../web/singleplayer/` | 单机模式：包装 `:shared` 的 `GameEngine` |
 | `src/wasmJsMain/resources/index.html` | 加载页 + loader（`#loader` 由 wasm 启动后 fade-out 移除） |
-| `src/wasmJsMain/resources/fonts/NotoSansSC-Subset.ttf` | 中文子集字体（GB2312 7540 字，~3 MB） |
+| `src/wasmJsMain/resources/fonts/NotoSansSC-Subset.otf` | 中文子集字体（GB2312 7540 字，~3 MB） |
 | `fonts/build-subset.sh` | 字体子集重生成脚本（默认 GB2312；`SUBSET_MODE=project` 切到 ~200 KB 仅项目用字版） |
 
 依赖 Kotlin 1.9.24 + CMP 1.6.10；不引入 `kotlinx-browser:0.1`（要求 Kotlin 2.0+），
