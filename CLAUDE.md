@@ -164,8 +164,11 @@ CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 **项目档案**
 
 - `docs/architecture.md` — 项目架构总览
+- `docs/game_rules.md` — **沟通牌玩法权威定义**（玩家手册 + 开发参考；改规则先看这）
 - `docs/multiplayer_guide.md` — 联网部署 / 协议 / 调试
-- `docs/settlement_verification.md` — 结算公式（含 15 验证用例）
+- `docs/settlement_verification.md` — 结算公式（含 15 验证用例，数学规约）
+- `docs/feature_spec.md` — 跨端功能规格（MUST/SHOULD/MAY 矩阵）
+- `docs/client_implementation_guide.md` — 实现新客户端（iOS / Desktop / CLI）参考路径
 - `docs/dev_summary.md` — 开发实践总结（多 AI 协同方案）
 
 **Harness Engineering**（PR-H1/H2 引入）

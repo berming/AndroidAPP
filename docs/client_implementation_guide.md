@@ -4,8 +4,10 @@
 > 客户端的工程师。本文给你"现有 Android / Web 端是怎么做的 + 你应该怎么
 > 复用 + 哪些是平台特定"的参考架构。
 >
-> 配套：[架构总览](architecture.md) · [跨端功能规格](feature_spec.md) ·
-> [多人游戏指南](multiplayer_guide.md)
+> 配套：[游戏规则](game_rules.md) · [架构总览](architecture.md) ·
+> [跨端功能规格](feature_spec.md) · [多人游戏指南](multiplayer_guide.md)
+>
+> **实现客户端前先读完 `game_rules.md`**——它是规则单一真相来源。
 
 ---
 

@@ -74,10 +74,12 @@ AndroidAPP/                                    Kotlin Multiplatform monorepo
 │
 └── docs/
     ├── architecture.md                       本文档
+    ├── game_rules.md                         **沟通牌玩法权威定义**（玩家 + 开发者同款）
     ├── multiplayer_guide.md                  联网部署 / 协议 / 调试
     ├── web_client_architecture.md            Web 客户端深度文档
     ├── feature_spec.md                       Android vs Web 功能矩阵 + roadmap
-    ├── settlement_verification.md            结算公式 + 15 验证用例
+    ├── client_implementation_guide.md        实现新客户端（iOS / Desktop / CLI）的参考路径
+    ├── settlement_verification.md            结算公式 + 15 验证用例（数学规约）
     ├── regressions.md                        历史 P0/P1 Bug 数据库
     ├── dev_summary.md                        开发实践回顾（PR #1-#39 时期）
     └── playbooks/

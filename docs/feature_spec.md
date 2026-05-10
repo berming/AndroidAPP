@@ -4,8 +4,8 @@
 > 任何新端（iOS / Desktop / CLI / 第三方）发布前对照本表自查；维护时
 > 增改功能在本表登记一行，让"哪些端要跟进、哪些可以延后"一目了然。
 >
-> 配套：[架构总览](architecture.md) · [客户端实现指南](client_implementation_guide.md) ·
-> [多人游戏指南](multiplayer_guide.md)
+> 配套：[架构总览](architecture.md) · [游戏规则](game_rules.md) ·
+> [客户端实现指南](client_implementation_guide.md) · [多人游戏指南](multiplayer_guide.md)
 
 ---
 
