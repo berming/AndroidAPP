@@ -56,6 +56,54 @@
 ### 约束 5：会话 ID 完整性
 - 服务端 `sessionId` 用**完整 36 字符 UUID**，不要截断（避免碰撞）
 
+### 约束 6：单机 / 联网 共用同一套游戏 UI（不许两套渲染层）
+
+**每个端**的"单机 AI 对战"和"多人联网对战"必须共用**同一套游戏屏幕渲染代码**
+（同一组 Composable / Activity / View tree），不允许各做一套 UI 后反复双向同步调优。
+
+- 实现方式：单机引擎把本地 `GameEngine` 的状态**映射成与服务端推送同构的
+  `SerializedGameState`**，再喂给同一渲染层；联网模式直接用服务端推送。
+- 参考实现：`apps/web/.../singleplayer/SinglePlayerEngine.kt` 包装
+  `:shared.GameEngine`，与 `GameSyncManager` 输出同一数据形状，
+  `GameScreen` 不区分来源。
+- Android 端的 `GameActivity`（单机）与 `OnlineGameActivity`（联网）**应当**收敛到
+  同一套渲染（共享 fragment / 自定义 view），新功能默认两边同时可见、同时调优。
+- **反模式**：
+  - 复制一份 game UI 给单机用并悄悄改样式
+  - 单机走"快路径"绕过 `SerializedGameState`、自己渲染 Composable
+  - 在某一模式下私自加交互而不在另一模式同步
+
+> 教训：UI 双份必然漂移；改一边忘另一边是典型的"修了又坏"。把两条数据路径
+> 合到同一渲染入口能把回归面减半。
+
+### 约束 7：UI 适配以「Android 优化版」为基线
+
+目前 **Android 客户端的 UI 已经过若干轮优化**，作为各端布局的事实基线。新端 / 新形态
+默认**先参考 Android 版的布局结构、间距、信息密度**，再按目标终端屏幕尺寸适配，
+不要从零重新设计。
+
+- 参考维度：手牌区位置、玩家头像排布、中央出牌区、操作按钮分组、字号层级
+- 适配方向：保留 Android 版的**信息架构**，按 LayoutMode 三档（Compact / Medium /
+  Expanded）调整尺寸 / 列数 / 是否折行，**不动信息层级**
+- 偏离 Android 基线的设计需要在 PR 描述里写明理由（例如平台 HIG 强制要求）
+
+### 约束 8：设备分级与玩家数上限（小屏禁用 8+）
+
+| 终端类型 | LayoutMode | 允许的玩家数模式 | 牌副数 |
+|---------|-----------|------------------|--------|
+| 手机（普通竖屏 / 折叠机折叠态）| Compact (< 600 dp) | **仅 6 人** | 4 副 或 6 副 |
+| 平板 / 三折手机展开态 | Medium (600–1200 dp) | 6 / 8 人 | 4 / 6 副 |
+| 桌面 / Web 大窗 | Expanded (≥ 1200 dp) | 6 / 8 / 10 / 12 人 | 4 / 6 副 |
+
+- **小屏 MUST 禁用 8 / 10 / 12 人模式**（创建房间 UI 隐藏或 disable，并提示"该模式
+  需要平板及以上屏幕"）
+- 服务端在 `CreateRoom` 收到带 `expectedPlayerCount > 6` 但客户端 `screenClass = Compact`
+  的请求时**应拒绝**（防止前端绕过；具体 enforcement 路径见
+  `docs/feature_spec.md` §2.7）
+- `Deck.deal()` 当前 `require(playerCount in listOf(6, 8, 10, 12))`；新增 6 副牌选项
+  会扩到 `TOTAL_CARDS = 324` 路径，先在 `:shared` 加测试再放到 UI（详见
+  `docs/feature_spec.md` §2.7）
+
 ---
 
 ## 三、关键路径强制 TDD

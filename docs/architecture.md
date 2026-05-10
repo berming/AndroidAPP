@@ -215,6 +215,33 @@ AndroidAPP/                                    Kotlin Multiplatform monorepo
 ### 约束 5：会话 ID 完整性
 服务端 `sessionId` 用**完整 36 字符 UUID**，**不要截断**（曾经因 `take(8)` 触发碰撞，Codex 抓到，已修）
 
+### 约束 6（UI）：单机 / 联网 同端共用同一套渲染层
+每个客户端的单机 AI 模式与多人联网模式必须复用**同一套游戏屏幕渲染**——
+单机引擎把本地 `GameEngine` 状态映射成与服务端推送同构的 `SerializedGameState`
+后再交给 UI；不允许为单机/联网各写一套 game screen 然后双向同步调优。
+
+- Web 端参考实现：`apps/web/.../singleplayer/SinglePlayerEngine.kt` →
+  `SerializedGameState` → 同一 `GameScreen` Composable
+- Android 端：`GameActivity`（单机）与 `OnlineGameActivity`（联网）**应当**收敛
+  到同一渲染入口（共享 fragment / view），新增交互必须两端同时落地
+
+### 约束 7（UI）：以 Android 优化版作为各端布局基线
+Android 客户端 UI 已经经过若干轮优化，是各端布局的事实基线。新端 / 新 form factor
+**先按 Android 版的信息架构（手牌位 / 头像排布 / 中央出牌 / 按钮分组 / 字号层级）
+作为起点**，再按目标屏幕尺寸适配，不要每端从头重设计。
+
+### 约束 8（UI）：设备分级与玩家数上限
+| 终端 | LayoutMode | 允许玩家数 | 牌副数 |
+|------|-----------|-----------|--------|
+| 手机 | Compact (< 600 dp) | **仅 6 人** | 4 副 或 6 副 |
+| 平板 / 三折手机展开态 | Medium (600–1200 dp) | 6 / 8 人 | 4 / 6 副 |
+| 桌面 / Web 大窗 | Expanded (≥ 1200 dp) | 6 / 8 / 10 / 12 人 | 4 / 6 副 |
+
+- 小屏（Compact）MUST 在创建房间 UI 上 disable / 隐藏 8+ 人选项
+- 服务端对 `expectedPlayerCount > 6` 但客户端声明自己是 Compact 的请求**应拒绝**
+- `:shared/Deck.kt` 当前固定 4 副；6 副选项需先扩 `Deck.reset()` 并补
+  `commonTest`，才能放到 UI（详见 `docs/feature_spec.md` §2.7）
+
 ---
 
 ## 六、客户端 ↔ 服务端消息流
