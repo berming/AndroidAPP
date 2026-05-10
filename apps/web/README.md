@@ -59,6 +59,7 @@ npx http-server -c-1                  # 推荐：MIME 完整 + 禁缓存
 | `src/wasmJsMain/kotlin/.../web/Main.kt` | `ComposeViewport` 入口 + 移除 loader |
 | `src/wasmJsMain/kotlin/.../web/ui/` | Home / Settings / Stats / Help / Lobby / Room / Game / Settlement 八个屏幕 |
 | `src/wasmJsMain/kotlin/.../web/ui/LayoutMode.kt` | 响应式断点：Compact (<600dp) / Medium / Expanded (>=1200dp) |
+| `src/wasmJsMain/kotlin/.../web/ui/Theme.kt` | 全局 ColorScheme（GreenTableColors）+ Typography（按 LayoutMode 缩放） |
 | `src/wasmJsMain/kotlin/.../web/ui/Fonts.kt` | 中文字体加载（fetch + base64 + Skia interop） |
 | `src/wasmJsMain/kotlin/.../web/viewmodel/` | `AppViewModel` 状态机 + sessionJob 生命周期 |
 | `src/wasmJsMain/kotlin/.../web/storage/` | localStorage interop + UserPreferences + Statistics 持久化 |

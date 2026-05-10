@@ -1,5 +1,8 @@
 package com.communicationcard.game.web.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,8 +31,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -104,6 +111,7 @@ fun GameScreen(
                     hinted = state.hintedCardIds,
                     cardWidth = cardSize.first,
                     cardHeight = cardSize.second,
+                    mode = mode,
                     onToggle = onToggleSelected,
                 )
 
@@ -273,18 +281,29 @@ private fun ExpandedPlayersRow(others: List<SerializedPlayer>, currentSeat: Int)
     }
 }
 
+/**
+ * 其他玩家卡片（Stage 3 升级）：
+ * - 当前玩家边框色 animateColorAsState 平滑过渡（不再瞬切金黄）
+ * - 阴影 elevation：当前玩家 6dp / 普通 1dp（突出当前玩家）
+ * - 已走完玩家半透明 + "已走完" 标签
+ */
 @Composable
 private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean, compact: Boolean) {
-    val borderColor = if (isCurrent) Color(0xFFFFC107) else Color.Transparent
+    val targetBorder = if (isCurrent) GreenTableColors.selectedBorder else Color.Transparent
+    val borderColor by animateColorAsState(targetBorder, label = "playerBorder")
+    val targetElev = if (isCurrent) 6.dp else 1.dp
+    val elev by animateDpAsState(targetElev, label = "playerElev")
     val padding = if (compact) 6.dp else 10.dp
+    val shape = RoundedCornerShape(10.dp)
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (player.team == "TEAM_A") Color(0xFF5D2A2A) else Color(0xFF22416A),
+            containerColor = if (player.team == "TEAM_A") GreenTableColors.teamABg else GreenTableColors.teamBBg,
         ),
-        shape = RoundedCornerShape(8.dp),
+        shape = shape,
         modifier = Modifier
             .padding(if (compact) 2.dp else 4.dp)
-            .border(2.dp, borderColor, RoundedCornerShape(8.dp)),
+            .shadow(elevation = elev, shape = shape, clip = false)
+            .border(2.dp, borderColor, shape),
     ) {
         Column(
             modifier = Modifier.padding(padding),
@@ -297,13 +316,13 @@ private fun OtherPlayerCell(player: SerializedPlayer, isCurrent: Boolean, compac
                 fontSize = if (compact) 12.sp else 14.sp,
             )
             Text(
-                "剩 ${player.handSize}",
-                color = Color(0xFFE8F5E9),
+                if (player.hasFinished) "已走完" else "剩 ${player.handSize}",
+                color = if (player.hasFinished) GreenTableColors.brandSecondary else GreenTableColors.textMuted,
                 fontSize = if (compact) 10.sp else 12.sp,
             )
             Text(
                 "已收 ${player.collectedScore}",
-                color = Color(0xFFFFC107),
+                color = GreenTableColors.brandPrimary,
                 fontSize = if (compact) 10.sp else 12.sp,
             )
         }
@@ -339,6 +358,15 @@ private fun LastPlayedRow(
 /*  手牌区 + 操作按钮                                               */
 /* ────────────────────────────────────────────────────────────── */
 
+/**
+ * 手牌区（Stage 3 升级）：
+ * - **Compact 模式用 FlowRow 多行 wrap**，手机上无需横向滚动
+ * - Medium / Expanded 仍用 LazyRow（横滚），大屏单行更优雅
+ *
+ * FlowRow 是 androidx.compose.foundation.layout 的 ExperimentalLayoutApi。
+ * CMP 1.6 已经稳定可用，加 @OptIn 抑制警告。
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HandRow(
     me: SerializedPlayer?,
@@ -346,26 +374,50 @@ private fun HandRow(
     hinted: Set<String>,
     cardWidth: Dp,
     cardHeight: Dp,
+    mode: LayoutMode,
     onToggle: (String) -> Unit,
 ) {
     if (me == null) {
         Text("等待发牌 …", color = Color.White)
         return
     }
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        items(me.hand) { card ->
-            val key = keyOf(card)
-            CardView(
-                card = card,
-                selected = key in selected,
-                hinted = key in hinted,
-                modifier = Modifier
-                    .size(cardWidth, cardHeight)
-                    .clickable { onToggle(key) },
-            )
+
+    if (mode.isCompact) {
+        // 手机：多行 wrap，避免 30+ 张牌横向滚动
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(if ((selected + hinted).isNotEmpty()) 18.dp else 4.dp),
+        ) {
+            me.hand.forEach { card ->
+                val key = keyOf(card)
+                CardView(
+                    card = card,
+                    selected = key in selected,
+                    hinted = key in hinted,
+                    modifier = Modifier
+                        .size(cardWidth, cardHeight)
+                        .clickable { onToggle(key) },
+                )
+            }
+        }
+    } else {
+        // 平板 / 桌面：单行横滚（屏幕宽足够，单行更优雅）
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(me.hand) { card ->
+                val key = keyOf(card)
+                CardView(
+                    card = card,
+                    selected = key in selected,
+                    hinted = key in hinted,
+                    modifier = Modifier
+                        .size(cardWidth, cardHeight)
+                        .clickable { onToggle(key) },
+                )
+            }
         }
     }
 }
@@ -437,6 +489,13 @@ private fun ActionButtons(
 /*  CardView + 工具                                                 */
 /* ────────────────────────────────────────────────────────────── */
 
+/**
+ * 卡牌视觉（Stage 3 升级）：
+ * - 阴影 elevation：未选 2dp / hint 4dp / 选中 8dp（spring 动画过渡）
+ * - 选中上抬 -16dp，平滑 spring 动画（不再瞬切）
+ * - 边框颜色 animateColorAsState 平滑过渡（默认灰 → hint 绿 → 选中金）
+ * - 圆角放大到 8dp（更现代）
+ */
 @Composable
 private fun CardView(
     card: SerializedCard,
@@ -447,17 +506,29 @@ private fun CardView(
     val isRed = card.suit == "HEART" || card.suit == "DIAMOND" ||
         (card.suit == "JOKER" && card.rank == "BIG_JOKER")
     val textColor = if (isRed) Color(0xFFE53935) else Color.Black
-    val offset = if (selected) -16.dp else 0.dp
-    val borderColor = when {
-        selected -> Color(0xFFFFC107)
-        hinted -> Color(0xFF66BB6A)
-        else -> Color(0xFF424242)
+
+    val shape = RoundedCornerShape(8.dp)
+    val targetBorder = when {
+        selected -> GreenTableColors.selectedBorder
+        hinted -> GreenTableColors.hintBorder
+        else -> GreenTableColors.cardOutline
     }
+    val borderColor by animateColorAsState(targetBorder, label = "cardBorder")
+    val targetLift = if (selected) (-16).dp else 0.dp
+    val lift by animateDpAsState(targetLift, animationSpec = spring(), label = "cardLift")
+    val targetElev = when {
+        selected -> 8.dp
+        hinted -> 4.dp
+        else -> 2.dp
+    }
+    val elev by animateDpAsState(targetElev, label = "cardElev")
+
     Box(
         modifier = modifier
-            .offset(y = offset)
-            .background(Color.White, RoundedCornerShape(6.dp))
-            .border(if (hinted || selected) 3.dp else 2.dp, borderColor, RoundedCornerShape(6.dp)),
+            .offset(y = lift)
+            .shadow(elevation = elev, shape = shape, clip = false)
+            .background(GreenTableColors.cardWhite, shape)
+            .border(if (hinted || selected) 3.dp else 1.5.dp, borderColor, shape),
         contentAlignment = Alignment.Center,
     ) {
         Column(
