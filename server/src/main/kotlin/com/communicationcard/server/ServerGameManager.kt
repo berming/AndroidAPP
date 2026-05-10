@@ -53,6 +53,17 @@ class ServerGameManager(
      * - 否则（补位 AI）→ 用 room.serverAiDelayMs（feature_spec G37）
      * 找不到玩家时回退到房间默认值。
      */
+    /**
+     * 在 AI 决策延迟（effectiveAiDelayMs）结束后，决定是否把控制权让回给人类玩家。
+     *
+     * 规则：玩家不是 AI、未被托管（isAISubstitute=false）、且已连接 → 让出控制权（return true）。
+     * 防 Codex P2 (PR #53)：玩家在延迟期间点"我回来了"时 AI 仍代打的 race。
+     *
+     * 提取为函数便于单元测试 + 让 processAITurn 的关键逻辑可读。
+     */
+    internal fun shouldYieldToHumanPlayer(player: ServerPlayer): Boolean =
+        !player.isAI && !player.isAISubstitute && player.isConnected
+
     internal fun effectiveAiDelayMs(room: ServerRoom, seatIndex: Int): Long {
         val player = room.players.find { it.seatIndex == seatIndex }
         val ms = if (player?.isAISubstitute == true) player.takeoverAiDelayMs else room.serverAiDelayMs
@@ -538,6 +549,14 @@ class ServerGameManager(
             if (state.currentPlayerIndex != playerIndex) return@withLock
             val hand = state.hands[playerIndex] ?: return@withLock
             if (hand.isEmpty()) return@withLock
+
+            // Codex P2 (PR #53)：玩家可能在 effectiveAiDelayMs 期间点"我回来了"
+            // (ToggleAITakeover(false))；此时 isAISubstitute=false 但回合未推进。
+            // 这里若不重检，AI 仍会代打——破坏 G34/G35 即时收回控制权的语义。
+            val player = room.players.find { it.seatIndex == playerIndex }
+            if (player != null && shouldYieldToHumanPlayer(player)) {
+                return@withLock
+            }
 
             val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
             var result = when (action) {

@@ -490,4 +490,59 @@ class ServerGameManagerTest {
             gm.effectiveAiDelayMs(room, seatIndex = 0)
         )
     }
+
+    // ============================================================
+    //  shouldYieldToHumanPlayer —— Codex P2 (PR #53) 防回归
+    //  玩家在 AI 延迟期间收回控制权时，AI 必须让位
+    // ============================================================
+
+    @Test
+    fun shouldYieldToHumanPlayer_aiPlayer_doesNotYield() {
+        val ai = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        assertFalse(gm.shouldYieldToHumanPlayer(ai), "纯 AI 座位永远不让位")
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_substitute_doesNotYield() {
+        val sub = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        sub.isAISubstitute = true
+        assertFalse(
+            gm.shouldYieldToHumanPlayer(sub),
+            "玩家正在托管中（暂离 / 超时），AI 应继续代打"
+        )
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_disconnected_doesNotYield() {
+        val player = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        player.isConnected = false
+        assertFalse(
+            gm.shouldYieldToHumanPlayer(player),
+            "玩家已断线，AI 应继续代打到他重连"
+        )
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_humanReconnectedAndResumed_yields() {
+        val player = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        // 玩家在 AI delay 期间点"我回来了"：isAISubstitute=false + isConnected=true
+        player.isAISubstitute = false
+        player.isConnected = true
+        assertTrue(
+            gm.shouldYieldToHumanPlayer(player),
+            "Codex P2: 玩家在延迟期内取消托管时，AI 必须让出控制权（feature_spec G34/G35）"
+        )
+    }
 }
