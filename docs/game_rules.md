@@ -64,7 +64,8 @@
 
 ### 2.3 出牌顺序
 
-- 起手玩家随机（服务端 `randomFirstPlayer`）
+- 起手玩家：**持有黑桃3的玩家先出**；如果（极小概率）没有任何手里有 ♠3，
+  则取最小座位号（参见 [`ServerGameManager.startGame`](../server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt#L68-L71)）
 - 之后**赢牌方**（最近一手没人压住的玩家）成为下一回合的首家
 - 任意玩家走完手牌后立即离场；下一回合首家由最后一手赢牌方决定
 - 单回合超时 **30 秒**，超时由服务端 AI 接管该手出牌（仅本手；下手玩家恢复手动）

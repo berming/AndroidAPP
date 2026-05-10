@@ -60,6 +60,11 @@ sealed class Screen {
          */
         val perPlayerLastPlay: Map<Int, SerializedCardGroup> = emptyMap(),
         val message: String? = null,
+        /**
+         * 多人模式：本玩家是否处于 AI 托管 / 暂离状态（feature_spec G34/G35）。
+         * 单机模式恒为 null（GameScreen 据此决定不显示托管按钮）。
+         */
+        val imAiSubstitute: Boolean? = null,
     ) : Screen() {
         enum class Mode { SinglePlayer, Multiplayer }
     }

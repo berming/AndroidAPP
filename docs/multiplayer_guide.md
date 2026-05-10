@@ -130,6 +130,25 @@ WAITING ──(房主点开始 + 至少1名真人玩家已准备)──▶ IN_GA
 - **开始游戏**（房主）—— 状态非 WAITING 时服务端拒绝
 - **聊天**（任何阶段）—— 队内/全部两种模式；聊天 `senderId` 使用稳定的 `player.id`，重连后仍能识别本人
 
+### AI 托管 / 速度（v3 引入）
+
+- **手动 AI 托管 / 暂离**（feature_spec G34, G35）—— 玩家可在游戏中随时点
+  "AI 接管" 或 "暂离"按钮：服务端立刻设 `isAISubstitute=true`，下次轮到该
+  玩家时由 AI 出牌，无需等 30s 超时。再点取消。
+- **服务端 AI 出牌速度**（feature_spec G37，仅房主）—— 房间级设置；3 档预设
+  100 / 400（默认）/ 1000 ms；影响所有补位 AI + 玩家被托管时的 AI（除非该
+  玩家自己设了 `takeoverAiDelayMs`，会覆盖此值）；通过 `room.set_ai_speed`
+  消息修改。
+- **我的托管 AI 速度**（feature_spec G38，每个玩家）—— 仅本玩家可改自己的；
+  3 档预设 100 / 400（默认）/ 1000 ms；通过 `player.set_takeover_speed` 消息。
+- **30s 回合超时仍然触发 AI 接管**（feature_spec G35）—— 与上面手动托管语义
+  等价（都是 `isAISubstitute=true`）。区别仅是触发方式：手动 = 即时；超时 =
+  30s 不出牌后被动触发。
+
+> **协议**：以上特性需要 `PROTOCOL_VERSION ≥ 3`。新客户端连老服务端时这些
+> 消息会被忽略（老服没有对应 handler），UI 应据 `RoomInfo.serverAiDelayMs`
+> 默认值判断服务端版本能力。
+
 ### 游戏内界面元素
 
 - 中央"当前出牌"区域：显示最新一手有效牌，字号较大
@@ -159,9 +178,12 @@ WAITING ──(房主点开始 + 至少1名真人玩家已准备)──▶ IN_GA
 
 ```kotlin
 companion object {
-    private const val TURN_TIMEOUT_MS = 30_000L   // 回合超时
-    private const val AI_DELAY_MS = 1_000L        // AI 出牌前的"思考"延迟
+    private const val TURN_TIMEOUT_MS = 30_000L   // 回合超时（固定，不可配）
 }
+// AI 出牌延迟在 v3 后从常量改为 per-room / per-player 状态：
+// - room.serverAiDelayMs（房主可配，默认 400ms，feature_spec G37）
+// - player.takeoverAiDelayMs（每个玩家可配自己的，默认 400ms，feature_spec G38）
+// effectiveAiDelayMs(room, seat) 在每次 AI 决策前读上述值（clamp 到 [100, 1000]）。
 ```
 
 `server/src/main/kotlin/.../Application.kt`：
@@ -195,6 +217,9 @@ embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
 | `room.start` | C→S | 仅房主、仅 WAITING |
 | `room.kick` | C→S | 仅房主、仅 WAITING |
 | `room.add_ai` | C→S | 仅房主、仅 WAITING |
+| `room.set_ai_speed` | C→S | **v3 新增** 仅房主；改房间级 AI 出牌速度（feature_spec G37） |
+| `player.set_takeover_speed` | C→S | **v3 新增** 仅本人；改自己被 AI 接管时的速度（G38） |
+| `player.toggle_ai_takeover` | C→S | **v3 新增** 仅本人；手动开 / 关 AI 托管（G34, G35） |
 | `room.list` | C→S | 列出 WAITING 状态房间 |
 | `room.list_result` | S→C | 房间列表 |
 

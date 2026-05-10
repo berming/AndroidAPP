@@ -329,6 +329,13 @@ class ServerRoom(
     var status: RoomStatus = RoomStatus.WAITING
     var gameState: ServerGameState? = null
 
+    /**
+     * 房间级 AI 出牌延迟（毫秒）。仅 host 可改（feature_spec G37）。
+     * 默认 400ms（GameMessage.AI_DELAY_DEFAULT_MS）；范围 [100, 1000]。
+     * 影响所有补位 AI 座位 + 玩家被托管时的 AI（除非该玩家自己设了 takeoverAiDelayMs）。
+     */
+    @Volatile var serverAiDelayMs: Int = com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS
+
     fun toRoomInfo(): RoomInfo {
         return RoomInfo(
             roomId = roomId,
@@ -337,7 +344,8 @@ class ServerRoom(
             hostId = hostId,
             players = players.map { it.toRoomPlayer() },
             maxPlayers = maxPlayers,
-            status = status
+            status = status,
+            serverAiDelayMs = serverAiDelayMs
         )
     }
 }
@@ -356,6 +364,11 @@ data class ServerPlayer(
 ) {
     var isConnected: Boolean = true  // AI players are always "connected"
     var isAISubstitute: Boolean = false
+    /**
+     * 该玩家被 AI 接管时的出牌延迟（毫秒）。仅本玩家可改（feature_spec G38）。
+     * 默认 400ms；范围 [100, 1000]。覆盖房间级 serverAiDelayMs。
+     */
+    @Volatile var takeoverAiDelayMs: Int = com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS
 
     fun toRoomPlayer(): RoomPlayer {
         return RoomPlayer(
@@ -365,7 +378,9 @@ data class ServerPlayer(
             isConnected = isConnected,
             isAI = isAI,
             team = team,
-            seatIndex = seatIndex
+            seatIndex = seatIndex,
+            takeoverAiDelayMs = takeoverAiDelayMs,
+            isAISubstitute = isAISubstitute
         )
     }
 }

@@ -262,12 +262,15 @@ class AppViewModel {
                 if (state == null) return@collect
                 val mySeat = s.localSeatIndex.value
                 trackPerPlayerLastPlay(state, perPlayerLastPlay)
+                // 从 currentRoom 取本玩家的 isAISubstitute（feature_spec G34/G35）
+                val me = r.currentRoom.value?.players?.find { it.id == r.localPlayerId.value }
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = mySeat,
                     mode = Screen.Game.Mode.Multiplayer,
                     selectedCardIds = currentSelectionFor(state, mySeat),
                     perPlayerLastPlay = perPlayerLastPlay.toMap(),
+                    imAiSubstitute = me?.isAISubstitute == true,
                 )
             }
         }
@@ -277,6 +280,18 @@ class AppViewModel {
                 val breakdown = state?.let(::buildPlayerBreakdown).orEmpty()
                 recordStatsForResult(result, mySeatIndex = s.localSeatIndex.value, players = state?.players)
                 _screen.value = Screen.Settlement(result, Screen.Game.Mode.Multiplayer, breakdown)
+            }
+        }
+        // 当 RoomUpdate 改变 isAISubstitute（feature_spec G34/G35）但 gameState 不变时，
+        // 仍然要刷新 Game 屏的 imAiSubstitute 字段。
+        sessionScope.launch {
+            r.currentRoom.collect { cr ->
+                val current = _screen.value as? Screen.Game ?: return@collect
+                val me = cr?.players?.find { it.id == r.localPlayerId.value }
+                val newVal = me?.isAISubstitute == true
+                if (newVal != current.imAiSubstitute) {
+                    _screen.value = current.copy(imAiSubstitute = newVal)
+                }
             }
         }
 
@@ -300,6 +315,22 @@ class AppViewModel {
 
     fun startGame() { room?.startGame() }
     fun addAI() { room?.addAI() }
+
+    /** feature_spec G34/G35：手动切换 AI 接管 / 暂离。仅多人模式有意义。 */
+    fun toggleAITakeover() {
+        val current = (_screen.value as? Screen.Game)?.imAiSubstitute ?: false
+        net?.send(com.communicationcard.game.network.ToggleAITakeover(enabled = !current))
+    }
+
+    /** feature_spec G37：仅房主；改房间级 AI 出牌速度（100 / 400 / 1000 ms）。 */
+    fun setRoomAiSpeed(delayMs: Int) {
+        net?.send(com.communicationcard.game.network.SetRoomAISpeed(delayMs = delayMs))
+    }
+
+    /** feature_spec G38：每个玩家独立改自己被 AI 接管时的速度。 */
+    fun setMyTakeoverSpeed(delayMs: Int) {
+        net?.send(com.communicationcard.game.network.SetMyTakeoverSpeed(delayMs = delayMs))
+    }
 
     fun leaveRoom() {
         room?.leaveRoom()

@@ -377,4 +377,172 @@ class ServerGameManagerTest {
         version = 1,
         playerScores = playerScores.toMutableMap(),
     )
+
+    // ============================================================
+    //  AI 速度配置（feature_spec G37 / G38）
+    //  测试 ServerRoom / ServerPlayer 上的字段可以被读写并被 toRoomInfo 序列化；
+    //  effectiveAiDelayMs() 是 private，本组测试通过黑盒断言其等价行为
+    // ============================================================
+
+    @Test
+    fun room_serverAiDelayMs_defaultsToProtocolConstant() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS,
+            room.serverAiDelayMs,
+            "默认应为 AI_DELAY_DEFAULT_MS（400ms），feature_spec G37"
+        )
+    }
+
+    @Test
+    fun room_serverAiDelayMs_persistsToRoomInfo() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 100
+        assertEquals(100, room.toRoomInfo().serverAiDelayMs)
+    }
+
+    @Test
+    fun player_takeoverAiDelayMs_defaultsToProtocolConstant() {
+        val player = ServerPlayer(
+            id = "p1", name = "Alice", session = null, isReady = false,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_DEFAULT_MS,
+            player.takeoverAiDelayMs,
+            "默认应为 AI_DELAY_DEFAULT_MS（400ms），feature_spec G38"
+        )
+    }
+
+    @Test
+    fun player_takeoverFields_persistToRoomPlayer() {
+        val player = ServerPlayer(
+            id = "p1", name = "Alice", session = null, isReady = false,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        player.takeoverAiDelayMs = 1000
+        player.isAISubstitute = true
+        val rp = player.toRoomPlayer()
+        assertEquals(1000, rp.takeoverAiDelayMs)
+        assertTrue(rp.isAISubstitute, "isAISubstitute 必须随 RoomUpdate 广播给客户端")
+    }
+
+    // ============================================================
+    //  effectiveAiDelayMs —— feature_spec G37/G38 行为测试
+    //  规约：isAISubstitute=true → player.takeoverAiDelayMs；否则 room.serverAiDelayMs
+    // ============================================================
+
+    @Test
+    fun effectiveAiDelayMs_filledAi_usesRoomDelay() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 200
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 1, team = "TEAM_B"
+        )
+        aiPlayer.takeoverAiDelayMs = 999  // 不应被读取（不是 substitute）
+        room.players.add(aiPlayer)
+        assertEquals(200L, gm.effectiveAiDelayMs(room, seatIndex = 1))
+    }
+
+    @Test
+    fun effectiveAiDelayMs_substitute_usesPlayerTakeoverDelay() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 200  // 不应被读取（玩家自己的 takeover 优先）
+        val substitute = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 2, team = "TEAM_A"
+        )
+        substitute.takeoverAiDelayMs = 800
+        substitute.isAISubstitute = true
+        room.players.add(substitute)
+        assertEquals(800L, gm.effectiveAiDelayMs(room, seatIndex = 2))
+    }
+
+    @Test
+    fun effectiveAiDelayMs_clampsBelowMin() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 5  // 远低于 MIN_MULTIPLAYER_MS=100
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        room.players.add(aiPlayer)
+        // 防御：恶意 / 旧客户端把值推到 < 100ms 时，effectiveAiDelayMs 必须 clamp 到 100
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MIN_MULTIPLAYER_MS.toLong(),
+            gm.effectiveAiDelayMs(room, seatIndex = 0),
+            "速度低于 MIN 应被 clamp 到 100ms 防止 AI 雪崩"
+        )
+    }
+
+    @Test
+    fun effectiveAiDelayMs_clampsAboveMax() {
+        val room = ServerRoom("r1", "ABCD", "test", "host1", maxPlayers = 6)
+        room.serverAiDelayMs = 99999  // 远高于 MAX_MS=1000
+        val aiPlayer = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        room.players.add(aiPlayer)
+        assertEquals(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MAX_MS.toLong(),
+            gm.effectiveAiDelayMs(room, seatIndex = 0)
+        )
+    }
+
+    // ============================================================
+    //  shouldYieldToHumanPlayer —— Codex P2 (PR #53) 防回归
+    //  玩家在 AI 延迟期间收回控制权时，AI 必须让位
+    // ============================================================
+
+    @Test
+    fun shouldYieldToHumanPlayer_aiPlayer_doesNotYield() {
+        val ai = ServerPlayer(
+            id = "AI_1", name = "电脑1", session = null, isReady = true,
+            isAI = true, seatIndex = 0, team = "TEAM_A"
+        )
+        assertFalse(gm.shouldYieldToHumanPlayer(ai), "纯 AI 座位永远不让位")
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_substitute_doesNotYield() {
+        val sub = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        sub.isAISubstitute = true
+        assertFalse(
+            gm.shouldYieldToHumanPlayer(sub),
+            "玩家正在托管中（暂离 / 超时），AI 应继续代打"
+        )
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_disconnected_doesNotYield() {
+        val player = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        player.isConnected = false
+        assertFalse(
+            gm.shouldYieldToHumanPlayer(player),
+            "玩家已断线，AI 应继续代打到他重连"
+        )
+    }
+
+    @Test
+    fun shouldYieldToHumanPlayer_humanReconnectedAndResumed_yields() {
+        val player = ServerPlayer(
+            id = "alice", name = "Alice", session = null, isReady = true,
+            isAI = false, seatIndex = 0, team = "TEAM_A"
+        )
+        // 玩家在 AI delay 期间点"我回来了"：isAISubstitute=false + isConnected=true
+        player.isAISubstitute = false
+        player.isConnected = true
+        assertTrue(
+            gm.shouldYieldToHumanPlayer(player),
+            "Codex P2: 玩家在延迟期内取消托管时，AI 必须让出控制权（feature_spec G34/G35）"
+        )
+    }
 }

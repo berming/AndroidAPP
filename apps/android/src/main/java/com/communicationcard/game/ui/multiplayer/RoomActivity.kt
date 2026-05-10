@@ -42,6 +42,8 @@ class RoomActivity : AppCompatActivity() {
     private var btnReady: Button? = null
     private var btnStart: Button? = null
     private var btnAddAI: Button? = null
+    private var btnRoomAiSpeed: Button? = null
+    private var btnMyTakeoverSpeed: Button? = null
     private var teamAPlayers: LinearLayout? = null
     private var teamBPlayers: LinearLayout? = null
     private var fabChat: View? = null
@@ -188,6 +190,8 @@ class RoomActivity : AppCompatActivity() {
         btnReady = findViewById(R.id.btnReady)
         btnStart = findViewById(R.id.btnStart)
         btnAddAI = findViewById(R.id.btnAddAI)
+        btnRoomAiSpeed = findViewById(R.id.btnRoomAiSpeed)
+        btnMyTakeoverSpeed = findViewById(R.id.btnMyTakeoverSpeed)
         teamAPlayers = findViewById(R.id.teamAPlayers)
         teamBPlayers = findViewById(R.id.teamBPlayers)
         fabChat = findViewById(R.id.fabChat)
@@ -224,6 +228,25 @@ class RoomActivity : AppCompatActivity() {
         btnAddAI?.setOnClickListener {
             val roomId = roomManager?.currentRoom?.value?.roomId ?: return@setOnClickListener
             networkManager?.send(AddAI(roomId))
+        }
+
+        // 房主：服务端 AI 速度（feature_spec G37）
+        btnRoomAiSpeed?.setOnClickListener {
+            showAiSpeedDialog(
+                titleRes = R.string.settings_room_ai_speed,
+                currentMs = roomManager?.currentRoom?.value?.serverAiDelayMs ?: GameMessage.AI_DELAY_DEFAULT_MS,
+                onSelected = { ms -> networkManager?.send(SetRoomAISpeed(delayMs = ms)) }
+            )
+        }
+
+        // 玩家：自己的托管 AI 速度（feature_spec G38）
+        btnMyTakeoverSpeed?.setOnClickListener {
+            val me = roomManager?.currentRoom?.value?.players?.find { it.id == roomManager?.localPlayerId }
+            showAiSpeedDialog(
+                titleRes = R.string.settings_my_takeover_speed,
+                currentMs = me?.takeoverAiDelayMs ?: GameMessage.AI_DELAY_DEFAULT_MS,
+                onSelected = { ms -> networkManager?.send(SetMyTakeoverSpeed(delayMs = ms)) }
+            )
         }
 
         fabChat?.setOnTouchListener(DraggableTouchListener { toggleChat() })
@@ -445,6 +468,35 @@ class RoomActivity : AppCompatActivity() {
         btnReady?.visibility = if (isHost) View.GONE else View.VISIBLE
         btnStart?.visibility = if (isHost) View.VISIBLE else View.GONE
         btnAddAI?.visibility = if (isHost) View.VISIBLE else View.GONE
+        // 房间 AI 速度仅房主可改（feature_spec G37）；我的托管速度对所有玩家可见（G38）
+        btnRoomAiSpeed?.visibility = if (isHost) View.VISIBLE else View.GONE
+        btnMyTakeoverSpeed?.visibility = View.VISIBLE
+    }
+
+    /**
+     * 弹一个 3 选 1 的 AI 速度选择对话框（feature_spec G37/G38）。
+     * 档位：100 / 400 (默认) / 1000 ms。
+     */
+    private fun showAiSpeedDialog(
+        @androidx.annotation.StringRes titleRes: Int,
+        currentMs: Int,
+        onSelected: (Int) -> Unit
+    ) {
+        val labels = arrayOf(
+            getString(R.string.ai_speed_100),
+            getString(R.string.ai_speed_400),
+            getString(R.string.ai_speed_1000)
+        )
+        val values = intArrayOf(100, 400, 1000)
+        val selected = values.indexOf(currentMs).let { if (it < 0) 1 else it } // 默认选 400
+        AlertDialog.Builder(this)
+            .setTitle(titleRes)
+            .setSingleChoiceItems(labels, selected) { dialog, which ->
+                onSelected(values[which])
+                dialog.dismiss()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun handleRoomEvent(event: RoomEvent) {

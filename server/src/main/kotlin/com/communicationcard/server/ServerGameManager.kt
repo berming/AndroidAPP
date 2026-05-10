@@ -37,7 +37,6 @@ class ServerGameManager(
 ) {
     companion object {
         private const val TURN_TIMEOUT_MS = 30_000L
-        private const val AI_DELAY_MS = 1000L
     }
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -47,6 +46,33 @@ class ServerGameManager(
 
     private fun mutexFor(room: ServerRoom): Mutex =
         roomMutexes.getOrPut(room.roomId) { Mutex() }
+
+    /**
+     * 当前 AI 出牌前的"思考"延迟（毫秒）。读 room/player 状态：
+     * - 玩家被 AI 接管（isAISubstitute=true）→ 用 player.takeoverAiDelayMs（feature_spec G38）
+     * - 否则（补位 AI）→ 用 room.serverAiDelayMs（feature_spec G37）
+     * 找不到玩家时回退到房间默认值。
+     */
+    /**
+     * 在 AI 决策延迟（effectiveAiDelayMs）结束后，决定是否把控制权让回给人类玩家。
+     *
+     * 规则：玩家不是 AI、未被托管（isAISubstitute=false）、且已连接 → 让出控制权（return true）。
+     * 防 Codex P2 (PR #53)：玩家在延迟期间点"我回来了"时 AI 仍代打的 race。
+     *
+     * 提取为函数便于单元测试 + 让 processAITurn 的关键逻辑可读。
+     */
+    internal fun shouldYieldToHumanPlayer(player: ServerPlayer): Boolean =
+        !player.isAI && !player.isAISubstitute && player.isConnected
+
+    internal fun effectiveAiDelayMs(room: ServerRoom, seatIndex: Int): Long {
+        val player = room.players.find { it.seatIndex == seatIndex }
+        val ms = if (player?.isAISubstitute == true) player.takeoverAiDelayMs else room.serverAiDelayMs
+        // 防御性 clamp，避免被恶意 / 旧客户端推到 0 / 负 / 无穷大
+        return ms.coerceIn(
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MIN_MULTIPLAYER_MS,
+            com.communicationcard.game.network.GameMessage.AI_DELAY_MAX_MS
+        ).toLong()
+    }
 
     /**
      * 开始游戏
@@ -215,7 +241,8 @@ class ServerGameManager(
         // 触发AI回合（仅在游戏未结束时）
         if (gameResult == null) {
             scope.launch {
-                delay(AI_DELAY_MS)
+                val nextSeat = room.gameState?.currentPlayerIndex ?: 0
+                delay(effectiveAiDelayMs(room, nextSeat))
                 checkAndProcessAITurn(room)
             }
         } else {
@@ -266,7 +293,8 @@ class ServerGameManager(
         // 触发AI回合（仅在游戏未结束时）
         if (gameResult == null) {
             scope.launch {
-                delay(AI_DELAY_MS)
+                val nextSeat = room.gameState?.currentPlayerIndex ?: 0
+                delay(effectiveAiDelayMs(room, nextSeat))
                 checkAndProcessAITurn(room)
             }
         } else {
@@ -489,7 +517,7 @@ class ServerGameManager(
 
     // ========== AI逻辑 ==========
 
-    private suspend fun checkAndProcessAITurn(room: ServerRoom) {
+    internal suspend fun checkAndProcessAITurn(room: ServerRoom) {
         if (room.status != RoomStatus.IN_GAME) return
         val state = room.gameState ?: return
         if (state.phase != "PLAYING") return
@@ -509,7 +537,7 @@ class ServerGameManager(
         val hand0 = state0.hands[playerIndex] ?: return
         if (hand0.isEmpty()) return
 
-        delay(AI_DELAY_MS)
+        delay(effectiveAiDelayMs(room, playerIndex))
 
         // 在临界区内决策并修改状态；广播放在锁外执行，避免慢的网络发送阻塞其他玩家动作
         var resultToBroadcast: ActionResult? = null
@@ -521,6 +549,14 @@ class ServerGameManager(
             if (state.currentPlayerIndex != playerIndex) return@withLock
             val hand = state.hands[playerIndex] ?: return@withLock
             if (hand.isEmpty()) return@withLock
+
+            // Codex P2 (PR #53)：玩家可能在 effectiveAiDelayMs 期间点"我回来了"
+            // (ToggleAITakeover(false))；此时 isAISubstitute=false 但回合未推进。
+            // 这里若不重检，AI 仍会代打——破坏 G34/G35 即时收回控制权的语义。
+            val player = room.players.find { it.seatIndex == playerIndex }
+            if (player != null && shouldYieldToHumanPlayer(player)) {
+                return@withLock
+            }
 
             val action = decideAIAction(hand, state.lastPlayedGroup, playerIndex)
             var result = when (action) {
@@ -572,7 +608,8 @@ class ServerGameManager(
             player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
         }
         scope.launch {
-            delay(AI_DELAY_MS)
+            val nextSeat = room.gameState?.currentPlayerIndex ?: 0
+            delay(effectiveAiDelayMs(room, nextSeat))
             checkAndProcessAITurn(room)
         }
     }

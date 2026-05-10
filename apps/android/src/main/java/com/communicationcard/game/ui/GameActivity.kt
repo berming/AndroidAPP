@@ -57,6 +57,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var btnPlay: Button
     private lateinit var btnPass: Button
     private lateinit var btnHint: Button
+    private lateinit var btnAiTakeover: Button
+    private lateinit var btnAfk: Button
     private lateinit var btnHistory: Button
     private lateinit var gameOverOverlay: FrameLayout
     private lateinit var tvGameOverTitle: TextView
@@ -179,6 +181,10 @@ class GameActivity : AppCompatActivity() {
         btnPlay = findViewById(R.id.btnPlay)
         btnPass = findViewById(R.id.btnPass)
         btnHint = findViewById(R.id.btnHint)
+        btnAiTakeover = findViewById(R.id.btnAiTakeover)
+        btnAfk = findViewById(R.id.btnAfk)
+        // 单机模式不需要"暂离"语义；隐藏（layout 默认已 gone，这里显式确保）
+        btnAfk.visibility = View.GONE
         btnHistory = findViewById(R.id.btnHistory)
         gameOverOverlay = findViewById(R.id.gameOverOverlay)
         tvGameOverTitle = findViewById(R.id.tvGameOverTitle)
@@ -295,8 +301,13 @@ class GameActivity : AppCompatActivity() {
             finish()
         }
 
-        // Auto-play toggle button
+        // Auto-play toggle button (legacy "托管" / "取消" 按钮，feature_spec G34
+        // 引入 btnAiTakeover 后两者同步 isAutoPlayEnabled 状态)
         btnAutoPlay.setOnClickListener {
+            toggleAutoPlay()
+        }
+        // AI 接管按钮（feature_spec G34，单机也支持）
+        btnAiTakeover.setOnClickListener {
             toggleAutoPlay()
         }
 
@@ -522,8 +533,7 @@ class GameActivity : AppCompatActivity() {
                 // Disable auto-play when game ends
                 if (isAutoPlayEnabled) {
                     isAutoPlayEnabled = false
-                    btnAutoPlay.text = "托管"
-                    btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
+                    syncAutoPlayUi()
                 }
 
                 showGameOver(event.result)
@@ -1258,8 +1268,7 @@ class GameActivity : AppCompatActivity() {
 
         // Reset auto-play state
         isAutoPlayEnabled = false
-        btnAutoPlay.text = "托管"
-        btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
+        syncAutoPlayUi()
 
         // Reset replay auto-play
         stopReplayAutoPlay()
@@ -1285,11 +1294,9 @@ class GameActivity : AppCompatActivity() {
 
     private fun toggleAutoPlay() {
         isAutoPlayEnabled = !isAutoPlayEnabled
+        syncAutoPlayUi()
         if (isAutoPlayEnabled) {
-            btnAutoPlay.text = "取消"
-            btnAutoPlay.setBackgroundResource(R.drawable.button_primary)
             showMessage("已开启托管模式")
-
             // If it's human's turn, immediately start auto-play
             val currentPlayer = gameEngine.getCurrentPlayer()
             if (currentPlayer.type == PlayerType.HUMAN &&
@@ -1298,9 +1305,23 @@ class GameActivity : AppCompatActivity() {
                 scheduleAutoPlayTurn()
             }
         } else {
+            showMessage("已关闭托管模式")
+        }
+    }
+
+    /**
+     * 同步两个托管按钮的视觉状态（feature_spec G34）。
+     * btnAutoPlay 是历史按钮（"托管/取消"）；btnAiTakeover 是 v3 引入的统一按钮。
+     */
+    private fun syncAutoPlayUi() {
+        if (isAutoPlayEnabled) {
+            btnAutoPlay.text = "取消"
+            btnAutoPlay.setBackgroundResource(R.drawable.button_primary)
+            btnAiTakeover.text = getString(R.string.btn_ai_takeover_off)
+        } else {
             btnAutoPlay.text = "托管"
             btnAutoPlay.setBackgroundResource(R.drawable.button_secondary)
-            showMessage("已关闭托管模式")
+            btnAiTakeover.text = getString(R.string.btn_ai_takeover_on)
         }
     }
 

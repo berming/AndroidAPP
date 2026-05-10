@@ -60,6 +60,10 @@ class OnlineGameActivity : AppCompatActivity() {
     private lateinit var btnPlay: Button
     private lateinit var btnPass: Button
     private lateinit var btnHint: Button
+    private lateinit var btnAiTakeover: Button
+    private lateinit var btnAfk: Button
+    /** 玩家是否处于 AI 托管 / 暂离状态（来自服务端 RoomUpdate.players[me].isAISubstitute） */
+    private var imAiSubstitute: Boolean = false
     private lateinit var btnHistory: Button
     private lateinit var btnAutoPlay: Button
     private lateinit var gameOverOverlay: FrameLayout
@@ -172,6 +176,10 @@ class OnlineGameActivity : AppCompatActivity() {
         btnPlay = findViewById(R.id.btnPlay)
         btnPass = findViewById(R.id.btnPass)
         btnHint = findViewById(R.id.btnHint)
+        btnAiTakeover = findViewById(R.id.btnAiTakeover)
+        btnAfk = findViewById(R.id.btnAfk)
+        // 多人模式下 AFK 按钮可见（feature_spec G35）
+        btnAfk.visibility = View.VISIBLE
         btnHistory = findViewById(R.id.btnHistory)
         btnAutoPlay = findViewById(R.id.btnAutoPlay)
         gameOverOverlay = findViewById(R.id.gameOverOverlay)
@@ -278,6 +286,22 @@ class OnlineGameActivity : AppCompatActivity() {
         }
 
         btnHint.setOnClickListener { showHint() }
+
+        // AI 接管 / 取消（feature_spec G34）
+        btnAiTakeover.setOnClickListener {
+            val target = !imAiSubstitute
+            networkManager.send(ToggleAITakeover(enabled = target))
+            // UI 立即反馈；服务端 RoomUpdate 回来时会再 reconcile（一次性切换是安全的）
+        }
+
+        // 暂离 / 我回来了（feature_spec G35）
+        // 暂离 = ToggleAITakeover(true)；我回来了 = ToggleAITakeover(false)
+        // 与 AI 接管按钮共享同一服务端状态，只是 UI 文本 / 含义不同
+        btnAfk.setOnClickListener {
+            val target = !imAiSubstitute
+            networkManager.send(ToggleAITakeover(enabled = target))
+        }
+
         btnHistory.setOnClickListener { showHistory() }
         btnShowHistory.setOnClickListener { showHistory() }
         btnCloseHistory.setOnClickListener { historyOverlay.visibility = View.GONE }
@@ -304,6 +328,15 @@ class OnlineGameActivity : AppCompatActivity() {
         lifecycleScope.launch {
             gameSyncManager.turnTimeRemaining.collectLatest { seconds ->
                 updateTurnTimer(seconds)
+            }
+        }
+
+        // 监听 RoomUpdate（同步本玩家的 isAISubstitute 状态 → 按钮文本）
+        lifecycleScope.launch {
+            roomManager.currentRoom.collectLatest { room ->
+                val me = room?.players?.find { it.id == roomManager.localPlayerId }
+                imAiSubstitute = me?.isAISubstitute == true
+                updateAiTakeoverButtons()
             }
         }
 
@@ -814,14 +847,31 @@ class OnlineGameActivity : AppCompatActivity() {
     private fun updateButtonStates() {
         val isMyTurn = multiplayerEngine.isMyTurn()
         val hasSelection = selectedCards.isNotEmpty()
-        btnPlay.isEnabled = isMyTurn && hasSelection
-        btnPass.isEnabled = isMyTurn && multiplayerEngine.canHumanPass()
-        btnHint.isEnabled = isMyTurn
+        // 托管中所有手动出牌按钮全禁用（feature_spec G34/G35）
+        btnPlay.isEnabled = isMyTurn && hasSelection && !imAiSubstitute
+        btnPass.isEnabled = isMyTurn && multiplayerEngine.canHumanPass() && !imAiSubstitute
+        btnHint.isEnabled = isMyTurn && !imAiSubstitute
 
         // 调试：如果是自己的回合但出牌按钮禁用
         if (isMyTurn && !hasSelection && btnPlay.isEnabled != (isMyTurn && hasSelection)) {
             DebugLogManager.d(TAG, "出牌按钮状态: isMyTurn=$isMyTurn, selectedCards=${selectedCards.size}")
         }
+    }
+
+    /**
+     * 同步 AI 接管 / 暂离按钮的文本与游戏状态条提示。
+     * 由 RoomUpdate 推 → imAiSubstitute 变化时调用（feature_spec G34/G35）。
+     */
+    private fun updateAiTakeoverButtons() {
+        if (imAiSubstitute) {
+            btnAiTakeover.text = getString(R.string.btn_ai_takeover_off)
+            btnAfk.text = getString(R.string.btn_back_from_afk)
+        } else {
+            btnAiTakeover.text = getString(R.string.btn_ai_takeover_on)
+            btnAfk.text = getString(R.string.btn_afk)
+        }
+        // 同步刷新出牌按钮 enabled 态
+        updateButtonStates()
     }
 
     private fun updateScores() {
