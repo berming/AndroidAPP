@@ -39,6 +39,14 @@ android {
             )
         }
     }
+    // APK 文件名：GouTong-Pai-<buildType>-<versionName>.apk（用户要求）
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "GouTong-Pai-${variant.name}-${variant.versionName}.apk"
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
