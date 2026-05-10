@@ -85,3 +85,8 @@ generated/
 *~
 .DS_Store
 Thumbs.db
+
+# Python build artifacts (docs/build_html.py + docs/build_pptx.py 跑出的缓存)
+__pycache__/
+*.pyc
+*.pyo
