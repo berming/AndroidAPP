@@ -31,10 +31,11 @@ class GamePreferences(context: Context) {
         private const val KEY_TOTAL_SCORE = "total_score"
 
         // 游戏速度选项
-        const val SPEED_SLOW = 0      // 慢速 (800ms)
-        const val SPEED_NORMAL = 1    // 正常 (500ms)
-        const val SPEED_FAST = 2      // 快速 (300ms)
-        const val SPEED_VERY_FAST = 3 // 极速 (150ms)
+        // 单机 AI 出牌速度（feature_spec G36：3 档预设 50/400/1000ms）
+        const val SPEED_SLOW = 0      // 慢速 (1000ms)
+        const val SPEED_NORMAL = 1    // 默认 (400ms)
+        const val SPEED_VERY_FAST = 2 // 极快 (50ms)
+        // 历史 SPEED_FAST(300ms) 在 v3 移除；老偏好值 2 / 3 都映射到 SPEED_VERY_FAST
     }
 
     // ========== 设置 ==========
@@ -72,11 +73,10 @@ class GamePreferences(context: Context) {
      */
     fun getAIDelayMs(): Long {
         return when (gameSpeed) {
-            SPEED_SLOW -> 800L
-            SPEED_NORMAL -> 500L
-            SPEED_FAST -> 300L
-            SPEED_VERY_FAST -> 150L
-            else -> 500L
+            SPEED_SLOW -> 1000L
+            SPEED_NORMAL -> 400L
+            SPEED_VERY_FAST -> 50L
+            else -> 400L  // 含老偏好值 2 (former SPEED_FAST)、3 (former SPEED_VERY_FAST)
         }
     }
 
@@ -87,7 +87,6 @@ class GamePreferences(context: Context) {
         return when (gameSpeed) {
             SPEED_SLOW -> 1000L
             SPEED_NORMAL -> 600L
-            SPEED_FAST -> 400L
             SPEED_VERY_FAST -> 200L
             else -> 600L
         }

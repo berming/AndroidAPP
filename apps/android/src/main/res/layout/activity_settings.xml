@@ -112,7 +112,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="慢"
+                    android:text="@string/ai_speed_1000"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
 
@@ -122,16 +122,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:checked="true"
-                    android:text="正常"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
-
-                <RadioButton
-                    android:id="@+id/rbSpeedFast"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="快"
+                    android:text="@string/ai_speed_400"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
 
@@ -140,7 +131,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="极速"
+                    android:text="@string/ai_speed_50"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
 

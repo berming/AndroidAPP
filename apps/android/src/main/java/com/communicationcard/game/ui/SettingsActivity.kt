@@ -26,7 +26,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var rgSpeed: RadioGroup
     private lateinit var rbSpeedSlow: RadioButton
     private lateinit var rbSpeedNormal: RadioButton
-    private lateinit var rbSpeedFast: RadioButton
     private lateinit var rbSpeedVeryFast: RadioButton
     private lateinit var btnBack: Button
 
@@ -74,7 +73,6 @@ class SettingsActivity : AppCompatActivity() {
         rgSpeed = findViewById(R.id.rgSpeed)
         rbSpeedSlow = findViewById(R.id.rbSpeedSlow)
         rbSpeedNormal = findViewById(R.id.rbSpeedNormal)
-        rbSpeedFast = findViewById(R.id.rbSpeedFast)
         rbSpeedVeryFast = findViewById(R.id.rbSpeedVeryFast)
         btnBack = findViewById(R.id.btnBack)
 
@@ -93,11 +91,12 @@ class SettingsActivity : AppCompatActivity() {
         switchSound.isChecked = preferences.isSoundEnabled
         switchVibration.isChecked = preferences.isVibrationEnabled
 
+        // 3 档预设映射（feature_spec G36：1000 / 400 / 50ms）
         when (preferences.gameSpeed) {
             GamePreferences.SPEED_SLOW -> rbSpeedSlow.isChecked = true
             GamePreferences.SPEED_NORMAL -> rbSpeedNormal.isChecked = true
-            GamePreferences.SPEED_FAST -> rbSpeedFast.isChecked = true
             GamePreferences.SPEED_VERY_FAST -> rbSpeedVeryFast.isChecked = true
+            else -> rbSpeedNormal.isChecked = true  // 旧偏好值（former SPEED_FAST 等）回归默认
         }
     }
 
@@ -124,7 +123,6 @@ class SettingsActivity : AppCompatActivity() {
             val speed = when (checkedId) {
                 R.id.rbSpeedSlow -> GamePreferences.SPEED_SLOW
                 R.id.rbSpeedNormal -> GamePreferences.SPEED_NORMAL
-                R.id.rbSpeedFast -> GamePreferences.SPEED_FAST
                 R.id.rbSpeedVeryFast -> GamePreferences.SPEED_VERY_FAST
                 else -> GamePreferences.SPEED_NORMAL
             }

@@ -44,6 +44,21 @@
     <string name="btn_play_again">再来一局</string>
     <string name="btn_back_menu">返回主界面</string>
 
+    <!-- AI 托管 / 速度（feature_spec G34-G38） -->
+    <string name="btn_ai_takeover_on">AI 接管</string>
+    <string name="btn_ai_takeover_off">取消托管</string>
+    <string name="btn_afk">暂离</string>
+    <string name="btn_back_from_afk">我回来了</string>
+    <string name="ai_speed_50">极快 (50ms)</string>
+    <string name="ai_speed_100">很快 (100ms)</string>
+    <string name="ai_speed_400">默认 (400ms)</string>
+    <string name="ai_speed_1000">慢 (1000ms)</string>
+    <string name="settings_sp_ai_speed">单机 AI 出牌速度</string>
+    <string name="settings_my_takeover_speed">我的托管 AI 速度（多人）</string>
+    <string name="settings_room_ai_speed">房间 AI 速度（仅房主）</string>
+    <string name="ai_takeover_status_self">已托管，AI 代你出牌</string>
+    <string name="ai_takeover_status_afk">已暂离</string>
+
     <!-- 难度 -->
     <string name="difficulty">AI难度</string>
     <string name="difficulty_easy">简单</string>

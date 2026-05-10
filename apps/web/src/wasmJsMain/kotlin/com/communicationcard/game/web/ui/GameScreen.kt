@@ -188,6 +188,10 @@ private fun TopBar(
     onPass: () -> Unit,
     onLeave: () -> Unit,
     onPlay: () -> Unit,
+    /** 当前玩家是否被 AI 接管（feature_spec G34/G35）；null = 单机模式不显示按钮 */
+    imAiSubstitute: Boolean? = null,
+    /** 切换 AI 接管 / 暂离的回调（仅多人传递；单机为 null） */
+    onToggleAITakeover: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -253,9 +257,24 @@ private fun TopBar(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp),
         ) { Text("过牌", color = Color.White, fontSize = 12.sp) }
         Spacer(Modifier.width(4.dp))
+        // AI 接管 / 取消（feature_spec G34/G35），仅多人模式
+        if (imAiSubstitute != null && onToggleAITakeover != null) {
+            OutlinedButton(
+                onClick = onToggleAITakeover,
+                modifier = Modifier.height(36.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
+            ) {
+                Text(
+                    if (imAiSubstitute) "我回来了" else "AI 接管",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+        }
         Button(
             onClick = onPlay,
-            enabled = canPlay,
+            enabled = canPlay && (imAiSubstitute != true),
             modifier = Modifier.height(36.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp),
             colors = ButtonDefaults.buttonColors(
