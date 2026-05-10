@@ -100,6 +100,11 @@ CI 的 `tdd-gate` job 会 mechanically 校验：上表中任一文件被改但�
 
 详见 `.github/pull_request_template.md`。
 
+> **常驻行为约定**：Claude Code 主会话**每次 `git push` 之后都应主动**：
+> (a) 等 60 秒；(b) 拉 PR review_comments + check_runs；(c) 发现 P0/P1/P2 直接修 + 回复 thread + push；
+> (d) CI 红则查 PR comment 里 exfil 的 gradle 日志，定位 + 修。
+> 不要等用户再提醒。`.claude/hooks/PostToolUse.sh` 的 Bash 分支会在 push 后注入这条提醒。
+
 新功能开发的标准流程：`docs/playbooks/feature-development.md`（Loop A）。
 CI 失败排错路由：`docs/playbooks/ci-failure-triage.md`（Loop D）。
 
