@@ -1,6 +1,7 @@
 package com.communicationcard.game.web.viewmodel
 
 import com.communicationcard.game.network.RoomInfo
+import com.communicationcard.game.network.SerializedCard
 import com.communicationcard.game.network.SerializedCardGroup
 import com.communicationcard.game.network.SerializedGameResult
 import com.communicationcard.game.network.SerializedGameState
@@ -65,8 +66,32 @@ sealed class Screen {
          * 单机模式恒为 null（GameScreen 据此决定不显示托管按钮）。
          */
         val imAiSubstitute: Boolean? = null,
+        /**
+         * Stage F：中央面板的瞬时消息（如"X 抢得本轮 +25 分"）。3 秒后自动清空，
+         * 由 [com.communicationcard.game.web.viewmodel.AppViewModel] 监听
+         * SerializedGameEvent.RoundWon / GameEnd 等事件填充。
+         */
+        val transientMessage: TransientMessage? = null,
+        /**
+         * Stage F：出牌历史日志（"更多…"菜单 → 查看出牌记录 弹层数据源）。
+         * 由 ViewModel 订阅 events 累计；保留最近 200 条避免无限增长。
+         */
+        val playLog: List<PlayLogEntry> = emptyList(),
     ) : Screen() {
         enum class Mode { SinglePlayer, Multiplayer }
+
+        /** 中央面板瞬时消息：3 秒后由 ViewModel 清空。 */
+        data class TransientMessage(val text: String, val seq: Long)
+
+        /** 出牌历史日志条目。 */
+        data class PlayLogEntry(
+            val seq: Long,
+            val playerName: String,
+            val team: String,
+            val text: String,
+            /** 出牌时的具体牌；过牌 / 系统消息时为空。 */
+            val cards: List<SerializedCard> = emptyList(),
+        )
     }
 
     /** 结算：显示队伍最终分数 + 各玩家明细（与 Android 端结算页对齐）。 */

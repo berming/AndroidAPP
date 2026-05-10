@@ -6,6 +6,7 @@ import com.communicationcard.game.model.CardRank
 import com.communicationcard.game.model.CardSuit
 import com.communicationcard.game.network.SerializedCard
 import com.communicationcard.game.network.SerializedCardGroup
+import com.communicationcard.game.network.SerializedGameEvent
 import com.communicationcard.game.network.SerializedGameState
 import com.communicationcard.game.web.net.GameSyncManager
 import com.communicationcard.game.web.net.NetworkClient
@@ -20,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -93,12 +95,16 @@ class AppViewModel {
             engine.state.collect { state ->
                 if (state == null) return@collect
                 trackPerPlayerLastPlay(state, perPlayerLastPlay)
+                val current = _screen.value as? Screen.Game
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = engine.humanSeatIndex,
                     mode = Screen.Game.Mode.SinglePlayer,
                     selectedCardIds = currentSelectionFor(state, engine.humanSeatIndex),
                     perPlayerLastPlay = perPlayerLastPlay.toMap(),
+                    // 保留事件订阅累积出来的 transientMessage / playLog（state 流刷新不应清空）
+                    transientMessage = current?.transientMessage,
+                    playLog = current?.playLog.orEmpty(),
                 )
             }
         }
@@ -110,6 +116,7 @@ class AppViewModel {
                 _screen.value = Screen.Settlement(result, Screen.Game.Mode.SinglePlayer, breakdown)
             }
         }
+        subscribeGameEvents(engine.events, sessionScope)
     }
 
     fun startMultiplayer() {
@@ -264,6 +271,7 @@ class AppViewModel {
                 trackPerPlayerLastPlay(state, perPlayerLastPlay)
                 // 从 currentRoom 取本玩家的 isAISubstitute（feature_spec G34/G35）
                 val me = r.currentRoom.value?.players?.find { it.id == r.localPlayerId.value }
+                val current = _screen.value as? Screen.Game
                 _screen.value = Screen.Game(
                     state = state,
                     localSeatIndex = mySeat,
@@ -271,9 +279,12 @@ class AppViewModel {
                     selectedCardIds = currentSelectionFor(state, mySeat),
                     perPlayerLastPlay = perPlayerLastPlay.toMap(),
                     imAiSubstitute = me?.isAISubstitute == true,
+                    transientMessage = current?.transientMessage,
+                    playLog = current?.playLog.orEmpty(),
                 )
             }
         }
+        subscribeGameEvents(s.events, sessionScope)
         sessionScope.launch {
             s.gameEnd.collect { result ->
                 val state = s.gameState.value
@@ -472,6 +483,109 @@ class AppViewModel {
         // 仅在与已记录的不同时更新（避免重复 set 触发不必要的 recompose）
         if (store[pid] != group) store[pid] = group
     }
+
+    /**
+     * Stage F：订阅游戏事件流，把 CardsPlayed / PlayerPassed / RoundWon /
+     * PlayerFinished 累积成 [Screen.Game.playLog]；RoundWon 同时设置
+     * [Screen.Game.transientMessage]，3 秒后由 [transientClearJob] 自动清空。
+     */
+    private var transientClearJob: Job? = null
+    private var eventSeq: Long = 0L
+    private val PLAY_LOG_MAX = 200
+    private val TRANSIENT_DURATION_MS = 3000L
+
+    private fun subscribeGameEvents(events: SharedFlow<SerializedGameEvent>, sessionScope: CoroutineScope) {
+        sessionScope.launch {
+            events.collect { event ->
+                eventSeq++
+                val game = _screen.value as? Screen.Game ?: return@collect
+                val pid = playerIdOf(event)
+                val player = pid?.let { id -> game.state.players.find { it.id == id } }
+                val name = player?.name ?: "?"
+                val team = player?.team ?: ""
+                val (logText, transientText, cards) = describeEvent(event, name)
+
+                val newLog = if (logText != null) {
+                    val entry = Screen.Game.PlayLogEntry(
+                        seq = eventSeq,
+                        playerName = name,
+                        team = team,
+                        text = logText,
+                        cards = cards,
+                    )
+                    (game.playLog + entry).takeLast(PLAY_LOG_MAX)
+                } else game.playLog
+
+                val newTransient = if (transientText != null) {
+                    Screen.Game.TransientMessage(text = transientText, seq = eventSeq)
+                } else game.transientMessage
+
+                _screen.value = game.copy(playLog = newLog, transientMessage = newTransient)
+
+                if (transientText != null) {
+                    transientClearJob?.cancel()
+                    val mySeq = eventSeq
+                    transientClearJob = sessionScope.launch {
+                        delay(TRANSIENT_DURATION_MS)
+                        val current = _screen.value as? Screen.Game ?: return@launch
+                        if (current.transientMessage?.seq == mySeq) {
+                            _screen.value = current.copy(transientMessage = null)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun playerIdOf(e: SerializedGameEvent): Int? = when (e) {
+        is SerializedGameEvent.CardsPlayed -> e.playerId
+        is SerializedGameEvent.PlayerPassed -> e.playerId
+        is SerializedGameEvent.RoundWon -> e.playerId
+        is SerializedGameEvent.PlayerFinished -> e.playerId
+        is SerializedGameEvent.TurnStart -> e.playerId
+        is SerializedGameEvent.CardsDealt, is SerializedGameEvent.ScoreUpdate -> null
+    }
+
+    /** Returns (logText, transientText, cards). null logText = 不写日志；null transientText = 不弹瞬时消息。 */
+    private fun describeEvent(
+        e: SerializedGameEvent,
+        playerName: String,
+    ): Triple<String?, String?, List<SerializedCard>> = when (e) {
+        is SerializedGameEvent.CardsPlayed -> Triple(
+            "出牌",
+            null,
+            e.cardGroup.cards,
+        )
+        is SerializedGameEvent.PlayerPassed -> Triple("过牌", null, emptyList())
+        is SerializedGameEvent.RoundWon -> {
+            val text = "$playerName 抢得本轮 +${e.score} 分"
+            Triple(text, text, emptyList())
+        }
+        is SerializedGameEvent.PlayerFinished -> Triple(
+            "走完（第 ${e.order} 名）",
+            "$playerName 走完（第 ${e.order} 名）",
+            emptyList(),
+        )
+        is SerializedGameEvent.CardsDealt, is SerializedGameEvent.TurnStart, is SerializedGameEvent.ScoreUpdate ->
+            Triple(null, null, emptyList())
+    }
+
+    // ============================================================
+    //  Stage F：游戏内"更多…"菜单的子动作（不退出 GameScreen）
+    // ============================================================
+
+    /** 游戏内修改昵称：与 Settings 屏共用同一份 prefs 持久化路径。 */
+    fun updateNicknameInGame(name: String) {
+        updatePrefs { it.copy(nickname = name) }
+    }
+
+    /** 游戏内修改 AI 速度：单机模式立即生效（下一手 AI 用新延迟）；多人模式仅本地落盘。 */
+    fun updateGameSpeedInGame(speed: GameSpeed) {
+        updatePrefs { it.copy(gameSpeed = speed) }
+    }
+
+    /** Stage F：暴露当前 prefs 给 GameScreen 的"更多…"子弹层使用 default value。 */
+    fun currentPrefs(): UserPreferences = prefs
 
     /** 与 GameScreen.kt 的 keyOf 保持一致：suit|rank|deckIndex 唯一标识一张实例。 */
     private fun keyOf(c: Card): String = "${c.suit.name}|${c.rank.name}|${c.deckIndex}"

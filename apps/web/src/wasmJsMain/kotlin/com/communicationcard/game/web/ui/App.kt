@@ -76,23 +76,33 @@ fun App() {
                             onAddAi = vm::addAI,
                             onLeave = vm::leaveRoom,
                         )
-                        is Screen.Game -> GameScreen(
-                            state = s,
-                            onPlayCards = vm::playCards,
-                            onPass = vm::pass,
-                            onHint = vm::hint,
-                            onToggleSelected = vm::toggleSelectedCard,
-                            onLeave = vm::leaveGame,
-                            // feature_spec G34/G35：仅多人模式传非 null（GameScreen 据此显示按钮）
-                            // 用 lambda 而非 KFunction reference，避开 wasmJs/Compose
-                            // psi2ir backend NPE（PR #53 第二轮 CI 失败的根因之一）
-                            imAiSubstitute = if (s.mode == Screen.Game.Mode.Multiplayer) {
-                                s.imAiSubstitute ?: false
-                            } else null,
-                            onToggleAITakeover = if (s.mode == Screen.Game.Mode.Multiplayer) {
-                                { vm.toggleAITakeover() }
-                            } else null,
-                        )
+                        is Screen.Game -> {
+                            // Stage F：从 vm 拉当前 prefs（仅用于"更多…"菜单中
+                            // 昵称 / AI 速度的子弹层 default value），不订阅整个 prefs
+                            // 流（避免每帧重组）。
+                            val currentPrefs = vm.currentPrefs()
+                            GameScreen(
+                                state = s,
+                                onPlayCards = vm::playCards,
+                                onPass = vm::pass,
+                                onHint = vm::hint,
+                                onToggleSelected = vm::toggleSelectedCard,
+                                onLeave = vm::leaveGame,
+                                // feature_spec G34/G35：仅多人模式传非 null
+                                // 用 lambda 而非 KFunction reference，避开 wasmJs/Compose
+                                // psi2ir backend NPE（PR #53 第二轮 CI 失败的根因之一）
+                                imAiSubstitute = if (s.mode == Screen.Game.Mode.Multiplayer) {
+                                    s.imAiSubstitute ?: false
+                                } else null,
+                                onToggleAITakeover = if (s.mode == Screen.Game.Mode.Multiplayer) {
+                                    { vm.toggleAITakeover() }
+                                } else null,
+                                nickname = currentPrefs.nickname,
+                                onUpdateNickname = vm::updateNicknameInGame,
+                                gameSpeed = currentPrefs.gameSpeed,
+                                onUpdateGameSpeed = vm::updateGameSpeedInGame,
+                            )
+                        }
                         is Screen.Settlement -> SettlementScreen(
                             state = s,
                             onPlayAgain = vm::playAgain,
