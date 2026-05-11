@@ -31,8 +31,8 @@ sudo bash install.sh
 sudo vim /etc/caddy/Caddyfile
 ```
 
-- **方案 A（纯 IP，HTTP）**：保留 `:80 { ... }` 段，删掉下面注释起来的域名段
-- **方案 B（域名 + HTTPS）**：把 `cards.example.com` 改成你的域名，把 `:80` 段删掉
+- **方案 A（纯 IP，HTTP）**：删掉默认的 `bermin.cn` 段，把 `:80 {}` 内的 `redir https://bermin.cn{uri}` 改回 `file_server`（参考 git 历史 `60ca617` 之前的版本）
+- **方案 B（域名 + HTTPS，当前默认）**：仓库 `deploy/Caddyfile` 已用 `bermin.cn`（2026-05 切换）。要换成自己的域名，把所有 `bermin.cn` 替换即可；Caddy 自动申请并续期 Let's Encrypt 证书
 
 ```bash
 sudo systemctl reload caddy

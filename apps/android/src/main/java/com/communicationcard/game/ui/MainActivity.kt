@@ -40,9 +40,11 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        // PR #41 起服务器拓扑改为 Caddy(80/443) → 反代 → :server(127.0.0.1:8080)。
-        // 8080 仅本机回环，外网走 Caddy 同源路径 /game。Tencent 安全组只开 22/80/443。
-        private const val SERVER_URL = "ws://175.178.158.35/game"
+        // 域名 + Let's Encrypt HTTPS（2026-05 起）：bermin.cn 走 Caddy 443 →
+        // 反代 → 127.0.0.1:8080。旧 ws://<ip>/game 仍能通（Caddy :80 fallback
+        // 保留 /game WS 路径），但新版客户端统一走 wss 以避免 Chrome HSTS / HTTPS
+        // upgrade 偶发拦截（详见 docs/regressions.md #14）。
+        private const val SERVER_URL = "wss://bermin.cn/game"
         private const val MAX_NAME_LENGTH = 12
     }
 
