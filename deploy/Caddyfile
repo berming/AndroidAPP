@@ -1,14 +1,12 @@
 # 沟通牌 · Caddy 配置
 #
-# 二选一：把不要的那段整段删掉。两段同时保留会冲突（同一端口被两个 site block 抢）。
-#
-# 只用 IP（无域名）→ 保留方案 A，删掉方案 B
-# 有域名（例：cards.example.com）→ 保留方案 B（Caddy 自动申请 HTTPS），删掉方案 A
+# 当前模式：bermin.cn 域名 + Let's Encrypt 自动 HTTPS（方案 B）+ IP fallback
+# DNS 前提：A 记录 bermin.cn → 服务器公网 IP，且腾讯云安全组已放行 80/443
 
 # ============================================================
-# 方案 A：纯 IP，HTTP（默认 :80）
+# 主站：bermin.cn — 自动 HTTPS（Caddy 自动申请 + 续期 Let's Encrypt 证书）
 # ============================================================
-:80 {
+bermin.cn {
     # 用 handle 块互斥：ws 走 reverse_proxy，其他走静态文件。
     # 不能用 `try_files {path} /index.html` —— 它会重写请求 path，
     # 导致 @ws matcher 的 `path /game` 失配，ws 握手挂掉。
@@ -39,31 +37,22 @@
 }
 
 # ============================================================
-# 方案 B：有域名 + 自动 HTTPS（Let's Encrypt）
-# 启用前：把 cards.example.com 替换为你的域名；删掉上面 :80 那整段。
+# IP 访问 fallback（保留以兼容旧客户端 / DNS 未生效）：
+#   · 旧 Android (≤ a5d050e) 硬编码 ws://<ip>/game，仍能走这条
+#   · 浏览器访问 http://<ip>/ 自动 301 到 https://bermin.cn
 # ============================================================
-# cards.example.com {
-#     @ws {
-#         path /game
-#         header Connection *Upgrade*
-#         header Upgrade websocket
-#     }
-#     handle @ws {
-#         reverse_proxy 127.0.0.1:8080
-#     }
-#
-#     handle {
-#         root * /var/www/communication-card-web
-#         encode gzip zstd
-#
-#         @wasm path *.wasm
-#         header @wasm Content-Type application/wasm
-#
-#         file_server
-#     }
-#
-#     log {
-#         output file /var/log/caddy/communication-card.log
-#         format console
-#     }
-# }
+:80 {
+    @ws {
+        path /game
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    handle @ws {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    handle {
+        # 浏览器/HTTP 静态请求 → 引导到正式域名 HTTPS
+        redir https://bermin.cn{uri} permanent
+    }
+}

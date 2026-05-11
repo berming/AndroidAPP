@@ -154,7 +154,7 @@ cat <<EOF
 
      Name:   DEPLOY_SSH_HOST
      Value:  $PUBLIC_IP
-     （或你的域名，如 cards.example.com）
+     （或你的域名，如 bermin.cn）
 
      Name:   DEPLOY_SSH_USER
      Value:  $DEPLOY_USER
@@ -176,8 +176,10 @@ cat <<EOF
     没设这个，下面第 5 步无论怎么按都不会跑。）
 
 4) 【必做】编辑 /etc/caddy/Caddyfile：
-   - 用 IP 访问：保留 ":80" 那段，删掉域名段
-   - 用域名访问：把 cards.example.com 改成你的域名，删掉 ":80" 段
+   - 仓库默认配置已切到 bermin.cn 域名 + Let's Encrypt HTTPS + :80 IP fallback。
+   - 改用其他域名：把所有 bermin.cn 替换成你的域名。
+   - 只用纯 IP：把 bermin.cn 段整段删除，仅留 :80 段（去掉 redir 行，改回
+     原 file_server 配置）。
    然后：sudo systemctl reload caddy
 
 5) 【必做】触发首次部署：
