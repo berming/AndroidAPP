@@ -8,6 +8,7 @@ import com.communicationcard.game.network.GameMessage
 import com.communicationcard.game.network.GameStart
 import com.communicationcard.game.network.GameSync
 import com.communicationcard.game.network.PlayerAction
+import com.communicationcard.game.network.ReconnectSuccess
 import com.communicationcard.game.network.SerializedCard
 import com.communicationcard.game.network.SerializedGameEvent
 import com.communicationcard.game.network.SerializedGameResult
@@ -72,6 +73,15 @@ class GameSyncManager(private val net: NetworkClient) {
             }
             is GameEventMessage -> _events.emit(message.event)
             is GameEnd -> _gameEnd.emit(message.result)
+            is ReconnectSuccess -> {
+                // Codex P1 on PR #59：自动重连后服务端推回当前 game state（如果重连
+                // 时正在游戏中）。state 为 null 表示玩家在大厅或房间内但游戏未开始，
+                // 由 RoomManager 的 RoomUpdate 路径恢复 UI；此处仅恢复游戏中状态。
+                message.state?.let { newState ->
+                    applyState(newState)
+                    if (_localSeatIndex.value < 0) findLocalSeat(newState)
+                }
+            }
             else -> { /* 房间消息由 RoomManager 处理 */ }
         }
     }

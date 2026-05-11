@@ -185,6 +185,18 @@
 
 ---
 
+## #14  Chrome 本地状态损坏 → 偶发 ERR_CONNECTION_REFUSED（非代码 bug，留档诊断流程）
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | 用户从手机 Chrome 访问 `http://<server-ip>/` 偶发 ERR_CONNECTION_REFUSED；同设备同 WiFi 下华为浏览器、iPhone Chrome、桌面 Chrome 全部正常；同一 Chrome 实例"傍晚 OK / 现在不行"，时间相关。`x-deny-reason: host_not_allowed` 在 sandbox 探测时是沙箱代理拦截，不是真实服务器；服务器 :80 / Caddy / Ktor / ufw / 安全组全部正常 |
+| 根因 | **Chrome 本地缓存的网络栈状态损坏** —— 具体子项不能从外部唯一确定，候选：(1) HSTS 缓存把目标 IP 标成 HTTPS-only，HTTPS-First Mode 关掉也照样升级；(2) HTTP/3 alt-svc 缓存指向不存在的 QUIC endpoint，fallback 异常；(3) Chrome socket pool 拿到一个坏 entry；(4) Safe Browsing 黑名单推送误命中。这类故障的共同特征：**同一 Chrome 实例**+**特定时间**重现，**同设备其他浏览器**或**其他设备 Chrome**全部正常 |
+| 修复 | 用户侧操作：(a) 验证假设——隐身模式访问，能上即确证是本地 state 损坏；(b) 一次性清理：`chrome://net-internals/#hsts` 删 IP 条目 + Flush socket pools + Chrome 设置清"缓存的图片和文件" + "Cookie 和其他站点数据" + 重启 Chrome。**服务端无需任何改动**。代码层面附带做了 PR #59：`apps/web/.../net/WebSocketTransport.kt` 加指数退避自动重连（防御 4G/WiFi 切换、移动 NAT 超时类的偶发 close，**不**对 Chrome 本地状态损坏起作用——每次 retry 同样 refused，只是 5 次后停下不耗电）|
+| 教训 | (1) **症状先验证维度，再定根因**：用户首报"手机 Chrome 不行"时，第一反应跳到"运营商 80 端口劫持"假设——但只要让用户跑"同设备其他浏览器" + "桌面同时间访问" + "出问题 Chrome 隐身模式" 三个对照，就能在 5 分钟内排除"服务器 / 网络 / Chrome 通用 bug" 三类，剩下唯一可能就是"该 Chrome 实例本地状态"。**先收维度，再下结论**。(2) **"傍晚 OK / 现在不行"≠ 不可复现**：时间相关 + 缓存机制刚好能解释；不要因为"偶发"就认定查不到根因。(3) **未上 HTTPS 是隐性技术债**：纯 IP HTTP 是各种现代浏览器实验组的"反向白名单"——HTTPS-First Mode、HSTS、QUIC、Safe Browsing 全都对 HTTP-IP 站点有更严格 / 更不一致的行为。一旦后续频次升高，应当升级方案 B（域名 + Let's Encrypt）|
+| 防回归测试 | 非代码 bug，无单测可写。流程层防御：(a) `WebSocketTransport.kt` 内置自动重连，把"偶发 refused / 中途断"的影响降低；(b) 本条目本身——下次类似报告（用户描述 ERR_CONNECTION_REFUSED + 同时间其他设备/浏览器正常 + 时间相关），按本条目的"症状-根因-修复"对照即可 5 分钟收尾，不再绕"服务器 → 网络 → Caddy → 备案"一圈 |
+
+---
+
 ## 防回归策略（PR-H2 起逐步落地）
 
 | 类别 | 落地点 |

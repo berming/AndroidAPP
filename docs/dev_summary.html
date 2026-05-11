@@ -1,0 +1,2439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>沟通牌 · AI 辅助联网游戏开发完整实践总结</title>
+  <style>
+/* 沟通牌项目 · dev_summary 渲染样式 */
+:root {
+  --fg: #1f2937;
+  --fg-muted: #475569;
+  --bg: #fafafa;
+  --accent: #2563eb;
+  --accent-warn: #ea580c;
+  --code-bg: #f3f4f6;
+  --border: #e5e7eb;
+  --container: 1180px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+               "Helvetica Neue", Arial, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.7;
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+}
+.wrap { max-width: var(--container); margin: 0 auto; padding: 32px 28px 80px; }
+header.title {
+  background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+  color: #fff;
+  padding: 36px 28px;
+  margin-bottom: 28px;
+  border-radius: 0;
+}
+header.title h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0.5px; }
+header.title .meta { opacity: 0.85; font-size: 14px; }
+h1, h2, h3, h4 { color: var(--fg); line-height: 1.35; }
+h2 {
+  font-size: 22px;
+  margin-top: 48px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+}
+h3 {
+  font-size: 17px;
+  margin-top: 30px;
+  color: var(--accent);
+}
+h4 { font-size: 15px; margin-top: 22px; color: var(--fg-muted); }
+p { margin: 12px 0; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted; }
+a:hover { color: #1d4ed8; }
+ul, ol { padding-left: 26px; }
+li { margin: 4px 0; }
+strong { color: #111; }
+em { color: var(--accent-warn); font-style: normal; }
+blockquote {
+  margin: 16px 0;
+  padding: 10px 16px;
+  background: #fffbeb;
+  border-left: 4px solid var(--accent-warn);
+  color: #78350f;
+  border-radius: 0 6px 6px 0;
+  font-size: 14px;
+}
+blockquote p { margin: 4px 0; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 14px 0;
+  font-size: 13.5px;
+  overflow-x: auto;
+  display: block;
+}
+table thead { background: #eef2ff; }
+th, td {
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+th { font-weight: 700; color: #1e3a8a; white-space: nowrap; }
+tr:nth-child(even) td { background: #fafbff; }
+code {
+  font-family: "JetBrains Mono", "SF Mono", Monaco, Consolas, monospace;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 13px;
+  color: #b91c1c;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 14px 18px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+}
+hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+.diagram {
+  display: block;
+  margin: 18px auto;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.diagram-arch { background: #fff; }
+.toc {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 24px;
+  margin: 0 0 28px;
+  font-size: 14px;
+}
+.toc h3 { margin-top: 0; color: var(--fg); border: none; }
+.toc ul { padding-left: 22px; margin: 0; }
+.toc a { color: var(--fg-muted); }
+.footer {
+  margin-top: 60px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+}
+@media (max-width: 768px) {
+  .wrap { padding: 16px; }
+  h2 { font-size: 19px; }
+  h3 { font-size: 16px; }
+  table { font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+  <header class="title">
+    <div class="wrap" style="padding: 0">
+      <h1>AI 辅助联网游戏开发——完整实践总结</h1>
+      <div class="meta">沟通牌项目 · 约 25 分钟 · 移动端 / 后端 / 全栈开发团队</div>
+    </div>
+  </header>
+  <div class="wrap">
+    <nav class="toc">
+      <h3>目录</h3>
+      <div class="toc">
+<ul>
+<li><a href="#ai">AI 辅助联网游戏开发——完整实践总结</a><ul>
+<li><a href="#_1">第一章：项目背景</a><ul>
+<li><a href="#_2">产品简介</a></li>
+<li><a href="#_3">技术栈</a></li>
+<li><a href="#pr-54">代码规模（PR #54 后）</a></li>
+</ul>
+</li>
+<li><a href="#_4">第二章：开发过程全貌</a><ul>
+<li><a href="#_5">开发阶段时间线</a></li>
+<li><a href="#_6">版本总量</a></li>
+</ul>
+</li>
+<li><a href="#_7">第三章：架构设计</a><ul>
+<li><a href="#_8">整体架构：多端共享 + 服务端权威</a></li>
+<li><a href="#_9">关键架构决策</a></li>
+<li><a href="#_10">关键不变量（设计契约）</a></li>
+<li><a href="#_11">架构演进路径（从遗憾到修复）</a></li>
+</ul>
+</li>
+<li><a href="#vs-ai">第四章：问题发现全景——人工 vs AI</a><ul>
+<li><a href="#pr-154">汇总：发现来源与数量（PR #1–54 全程）</a></li>
+<li><a href="#35">人工发现的问题（~35 个）</a><ul>
+<li><a href="#11-pr-114">单机游戏阶段（约 11 个，PR #1–14）</a></li>
+<li><a href="#9-pr-1733">联网构建与部署阶段（约 9 个，PR #17–33）</a></li>
+<li><a href="#10-pr-3134">联网游戏功能阶段（约 10 个，PR #31–34）</a></li>
+<li><a href="#web-5-pr-3554">Web / 部署 / 功能阶段（约 5 个，PR #35–54）</a></li>
+</ul>
+</li>
+<li><a href="#aiclaude-55-4-post-34">AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）</a><ul>
+<li><a href="#pr-134-35-4">PR #1–34 阶段（~35 个，4 轮统一明细）</a></li>
+<li><a href="#pr-3554-20">PR #35–54 阶段（~20 个，新增明细）</a></li>
+</ul>
+</li>
+<li><a href="#claude-pr-reviewer-15-pr-h5">Claude pr-reviewer 发现的问题（~15 个，PR-H5 后引入）</a></li>
+<li><a href="#chatgpt-codex-review-bot13">ChatGPT Codex Review Bot（~13 条，全程）</a></li>
+</ul>
+</li>
+<li><a href="#ai_1">第五章：人工与 AI 协同模式深度解析</a><ul>
+<li><a href="#_12">协同的四个层次</a></li>
+<li><a href="#_13">实际分工矩阵</a></li>
+<li><a href="#ai_2">AI 显著优于人工的场景</a></li>
+<li><a href="#_14">人工不可替代的场景</a></li>
+<li><a href="#_15">协同反模式（要避免）</a></li>
+<li><a href="#_16">高效协同最佳实践</a></li>
+<li><a href="#_17">协同效率数据</a></li>
+</ul>
+</li>
+<li><a href="#_18">第六章：关键技术修复</a><ul>
+<li><a href="#_19">游戏卡死——四层防御</a></li>
+<li><a href="#_20">重连失效——异步时序陷阱</a></li>
+<li><a href="#_21">两端结算不一致——统一公式</a></li>
+<li><a href="#web-cjk">Web 中文字体（CJK 豆腐块）</a></li>
+<li><a href="#_22">双层防火墙——部署对称陷阱</a></li>
+<li><a href="#android-url">Android URL 漂移——拓扑变更盲区</a></li>
+</ul>
+</li>
+<li><a href="#_23">第七章：工程经验与后续建议</a><ul>
+<li><a href="#_24">核心经验</a></li>
+<li><a href="#_25">交付成果（全程）</a></li>
+<li><a href="#_26">后续建议行动</a></li>
+</ul>
+</li>
+<li><a href="#ai-claude">第八章：AI 质量改进路径——多 Claude 模型协同</a><ul>
+<li><a href="#81-ai-bug">8.1 反思：为什么 AI 写的代码 Bug 不少？</a><ul>
+<li><a href="#bug">生成阶段必然有 Bug 的结构性原因</a></li>
+<li><a href="#_27">多轮自审仍能发现新问题的原因</a></li>
+</ul>
+</li>
+<li><a href="#82-claude">8.2 多 Claude 模型协同</a></li>
+<li><a href="#83-claude">8.3 多 Claude 协同的天花板</a><ul>
+<li><a href="#vendor">真正补盲区的是"换 vendor + 加静态工具 + 人工真机"</a></li>
+</ul>
+</li>
+<li><a href="#84">8.4 本项目的实际实施结果</a></li>
+<li><a href="#85">8.5 核心洞察</a></li>
+</ul>
+</li>
+<li><a href="#harness-pr-h-ai">第九章：harness 跨会话经验（PR-H 系列 + AI 托管特性）</a><ul>
+<li><a href="#91-phase-pr-53-g34-g38">9.1 大特性的"Phase 分段"模式（PR #53 G34-G38 实战）</a></li>
+<li><a href="#92-commit-testkt-tdd-gate">9.2 同 commit *Test.kt 配对（tdd-gate 实战）</a></li>
+<li><a href="#93-wasmjs-jvmtest-wasmjs-pr-53-ci">9.3 wasmJs 的 "jvmTest 过 ≠ wasmJs 过" 教训（PR #53 第二轮 CI 红）</a></li>
+<li><a href="#94-codex-bot-claude-review-pr-pr-53-p2">9.4 Codex bot 与 Claude /review-pr 的互补（PR #53 双 P2 实战）</a></li>
+<li><a href="#95-push-review-checkhook">9.5 push 后自动 review-check（hook 实战）</a></li>
+<li><a href="#96-pr-vs-prpr-5253">9.6 PR 流转的"分支 vs PR"错位（PR #52→#53 实战）</a></li>
+<li><a href="#97-pr-53-p1">9.7 文档单一真相 + 自动同步检测（PR #53 P1 实战）</a></li>
+<li><a href="#98-ai-feature_spec-g36-g38">9.8 AI 接管 / 速度档位的设计取舍（feature_spec G36-G38 实战）</a></li>
+<li><a href="#99-harness-l0-l4-pr-h1h5-35-web">9.9 Harness L0-L4 体系搭建（PR-H1..H5 + #35 web 重构 实战）</a><ul>
+<li><a href="#991-l0-l4">9.9.1 五层架构（L0-L4）一览</a></li>
+<li><a href="#992-pr-h">9.9.2 PR-H 系列实战回顾</a></li>
+<li><a href="#993-pr-35-kmp-wasmjs-8">9.9.3 PR #35 KMP 重构 — wasmJs 工具链 8 层"剥洋葱"</a></li>
+<li><a href="#994-android-url-regressions">9.9.4 双层防火墙 / Android URL 漂移（实战入 regressions）</a></li>
+<li><a href="#995-ci-exfil-channel-4">9.9.5 CI exfil channel：把 4 分钟反馈变成可读日志</a></li>
+<li><a href="#996-harness">9.9.6 Harness 见效的可观察证据</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+
+    </nav>
+    <main>
+<h1 id="ai">AI 辅助联网游戏开发——完整实践总结</h1>
+<blockquote>
+<p>约 25 分钟 | 目标受众：移动端 / 后端 / 全栈开发团队</p>
+</blockquote>
+<hr>
+<h2 id="_1">第一章：项目背景</h2>
+<h3 id="_2">产品简介</h3>
+<p><strong>沟通牌</strong>：4 副牌 216 张，6 人 3v3 卡牌游戏，支持三种运行模式：
+- <strong>单机模式</strong>：本机 5 个 AI 对手
+- <strong>联网对抗</strong>：WebSocket 实时 6 人对战
+- <strong>Web 浏览器版</strong>：同一套游戏逻辑，Compose Multiplatform / Wasm-JS 渲染</p>
+<h3 id="_3">技术栈</h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>技术</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>共享逻辑</td>
+<td><strong>Kotlin Multiplatform (KMP)</strong> — android + jvm + wasmJs targets；含 CardRules / SettlementCalculator / GameEngine / AIPlayer / GameMessage DTO</td>
+</tr>
+<tr>
+<td>Android 客户端语言</td>
+<td>Kotlin + Coroutines + Flow</td>
+</tr>
+<tr>
+<td>Android UI</td>
+<td>Android XML 布局（不使用 Compose）</td>
+</tr>
+<tr>
+<td>Android WebSocket</td>
+<td>OkHttp</td>
+</tr>
+<tr>
+<td>Web 客户端</td>
+<td><strong>Compose Multiplatform 1.6.10 (wasmJs)</strong>，浏览器原生 WebSocket（@JsFun interop）</td>
+</tr>
+<tr>
+<td>服务端框架</td>
+<td>Ktor 2.3.6 + Netty + WebSockets（<code>:server</code> Gradle 子项目，依赖 <code>:shared</code>）</td>
+</tr>
+<tr>
+<td>序列化</td>
+<td>kotlinx.serialization 1.6.3（JSON，所有 target 共用）</td>
+</tr>
+<tr>
+<td>反代 / 部署</td>
+<td>Caddy（80/443）→ 反代 → <code>127.0.0.1:8080</code>；systemd；GitHub Actions auto-deploy</td>
+</tr>
+<tr>
+<td>构建</td>
+<td>AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x（单一 root project）</td>
+</tr>
+<tr>
+<td>CI</td>
+<td>GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pr-54">代码规模（PR #54 后）</h3>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>Kotlin 文件数</th>
+<th>行数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>:apps:android</code>（Android UI + 网络层）</td>
+<td>19</td>
+<td>~6,300</td>
+</tr>
+<tr>
+<td><code>:apps:web</code>（Compose MP / wasmJs）</td>
+<td>23</td>
+<td>~3,470</td>
+</tr>
+<tr>
+<td><code>:shared</code>（KMP 公共逻辑，commonMain）</td>
+<td>9</td>
+<td>~2,670</td>
+</tr>
+<tr>
+<td><code>:server</code>（Ktor 服务端）</td>
+<td>4</td>
+<td>~1,960</td>
+</tr>
+<tr>
+<td>测试（commonTest + serverTest）</td>
+<td>4</td>
+<td>~1,530</td>
+</tr>
+<tr>
+<td>Android XML 布局</td>
+<td>20 个</td>
+<td>~3,320</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td><strong>59 个 Kotlin 文件</strong></td>
+<td><strong>约 19,250 行</strong></td>
+</tr>
+</tbody>
+</table>
+<p>关键大文件：<code>OnlineGameActivity.kt</code>（1,051 行）、<code>ServerGameManager.kt</code>（955 行）、
+<code>AppViewModel.kt</code>（509 行）、<code>Application.kt</code>（554 行）</p>
+<hr>
+<h2 id="_4">第二章：开发过程全貌</h2>
+<h3 id="_5">开发阶段时间线</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>时间</th>
+<th>PR</th>
+<th>主要内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单机游戏开发</td>
+<td>2026-02-02 / 02-07~02-12 / 02-24</td>
+<td>#1–14</td>
+<td>游戏引擎 / 牌型 / AI / 结算 / UI；约 11 轮人工反馈</td>
+</tr>
+<tr>
+<td>联网模式首次完整实现</td>
+<td>2026-04-30</td>
+<td>#16</td>
+<td>服务端 + 客户端网络层 + 联网 UI；一次性 6,529 行</td>
+</tr>
+<tr>
+<td>构建与编译修复</td>
+<td>2026-05-01</td>
+<td>#17–21</td>
+<td>CI 失败 / Gradle 缺失 / 编译错误</td>
+</tr>
+<tr>
+<td>部署与连通性修复</td>
+<td>2026-05-03</td>
+<td>#22–31</td>
+<td>服务器 URL / 网络安全 / 503 调试 / Lobby UI</td>
+</tr>
+<tr>
+<td>Lobby 崩溃与 UI 调整</td>
+<td>2026-05-04</td>
+<td>#32–33</td>
+<td>枚举不匹配 / AI 离线 / 房间列表</td>
+</tr>
+<tr>
+<td>联网游戏逻辑深度修复</td>
+<td>2026-05-07</td>
+<td>#34</td>
+<td>AI 全量审查 ×4 轮 / 8 次 commit / ~50 个 Bug</td>
+</tr>
+<tr>
+<td>KMP 重构 + Web 客户端</td>
+<td>2026-05-08</td>
+<td>#35</td>
+<td>抽取 <code>:shared</code> KMP；Compose MP wasmJs 浏览器端；8 层工具链兼容适配</td>
+</tr>
+<tr>
+<td>Harness 基础设施（H1–H5）</td>
+<td>2026-05-08</td>
+<td>#36–40, #43</td>
+<td>settings / hooks / TDD / server 合并 / subagents / pr-reviewer；CI tdd-gate 硬关</td>
+</tr>
+<tr>
+<td>服务器自托管 + 自动部署</td>
+<td>2026-05-08</td>
+<td>#41–44</td>
+<td>Caddy 反代；systemd；GitHub Actions auto-deploy；双层防火墙修复</td>
+</tr>
+<tr>
+<td>Web UI 功能补齐（4 阶段）</td>
+<td>2026-05-09</td>
+<td>#47–50</td>
+<td>Stage1 菜单 / Stage2 响应式 / Stage3 视觉 / Stage4 Android 同等功能</td>
+</tr>
+<tr>
+<td>Web CJK 字体 / Android URL</td>
+<td>2026-05-09</td>
+<td>#45–46</td>
+<td>中文豆腐块修复；去 :8080 走 Caddy 80</td>
+</tr>
+<tr>
+<td>AI 托管 + 速度配置</td>
+<td>2026-05-10</td>
+<td>#52–53</td>
+<td>feature_spec G34-G38；PROTOCOL_VERSION = 3；Android + Web 跨端</td>
+</tr>
+<tr>
+<td>单机按钮去重 / 文档刷新</td>
+<td>2026-05-10</td>
+<td>#51, #54</td>
+<td>CI 折叠；SP 重复托管按钮修复</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">版本总量</h3>
+<ul>
+<li>总 PR：<strong>54 个</strong> | 总 commit：<strong>约 170 次（非 merge）</strong> | <strong>有效开发 18 天</strong>（2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 7 天）</li>
+</ul>
+<hr>
+<h2 id="_7">第三章：架构设计</h2>
+<h3 id="_8">整体架构：多端共享 + 服务端权威</h3>
+
+<svg viewBox="0 0 920 620" xmlns="http://www.w3.org/2000/svg" class="diagram diagram-arch" role="img" aria-label="整体架构图">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+    <linearGradient id="gAndroid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcfce7"/><stop offset="1" stop-color="#bbf7d0"/>
+    </linearGradient>
+    <linearGradient id="gWeb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dbeafe"/><stop offset="1" stop-color="#bfdbfe"/>
+    </linearGradient>
+    <linearGradient id="gShared" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fef3c7"/><stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="gServer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fce7f3"/><stop offset="1" stop-color="#fbcfe8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Android client -->
+  <g transform="translate(40 30)">
+    <rect width="380" height="100" rx="10" fill="url(#gAndroid)" stroke="#16a34a" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15">:apps:android（Android 客户端，XML 布局）</text>
+    <text x="20" y="50" font-size="12">ui/ → GameActivity（单机）/ OnlineGameActivity（联网）</text>
+    <text x="20" y="68" font-size="12">network/ → NetworkManager / RoomManager / GameSyncManager</text>
+    <text x="20" y="86" font-size="12">engine/ → MultiplayerGameEngine（桥接 :shared GameEngine）</text>
+  </g>
+
+  <!-- Web client -->
+  <g transform="translate(500 30)">
+    <rect width="380" height="100" rx="10" fill="url(#gWeb)" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15">:apps:web（Compose Multiplatform / wasmJs）</text>
+    <text x="20" y="50" font-size="12">AppViewModel → 统一状态机；Screen.{Home/Lobby/Room/Game/Settlement}</text>
+    <text x="20" y="68" font-size="12">SinglePlayerEngine → 包装 :shared GameEngine</text>
+    <text x="20" y="86" font-size="12">net/ → 浏览器原生 WebSocket（@JsFun）；NetworkClient 与 Android 同职</text>
+  </g>
+
+  <!-- shared -->
+  <g transform="translate(140 175)">
+    <rect width="640" height="135" rx="10" fill="url(#gShared)" stroke="#d97706" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15">:shared（KMP：android + jvm + wasmJs）</text>
+    <text x="20" y="52" font-size="12">model/   Card · Deck · Player</text>
+    <text x="20" y="70" font-size="12">engine/  CardRules · SettlementCalculator · GameEngine</text>
+    <text x="20" y="88" font-size="12">ai/      AIPlayer</text>
+    <text x="20" y="106" font-size="12">network/ GameMessage（所有 sealed class + SerializedXxx DTO）</text>
+    <text x="20" y="124" font-size="12">commonTest/ CardRulesTest · SettlementCalculatorTest · GameMessageSerializationTest</text>
+  </g>
+
+  <!-- server -->
+  <g transform="translate(140 360)">
+    <rect width="640" height="125" rx="10" fill="url(#gServer)" stroke="#be185d" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15">:server（Ktor + Netty，Gradle 子项目）</text>
+    <text x="20" y="50" font-size="12">Application.kt → ServerRoomManager（房间 / AI 填充）</text>
+    <text x="20" y="68" font-size="12">             └→ ServerGameManager（权威状态 / AI / 计时）</text>
+    <text x="20" y="90" font-size="12" fill="#7f1d1d">• 每房间一把 Mutex 串行化所有状态修改</text>
+    <text x="20" y="108" font-size="12" fill="#7f1d1d">• force-advance 兜底 + 三级 AI 回退 + 30s 超时</text>
+  </g>
+
+  <!-- Caddy -->
+  <g transform="translate(280 530)">
+    <rect width="360" height="60" rx="8" fill="#fff" stroke="#475569" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="20" y="28" font-weight="700" font-size="14">Caddy（80 / 443 TLS）</text>
+    <text x="20" y="48" font-size="12" fill="#475569">反代 → 127.0.0.1:8080；公网 ws:// 或 wss:// /game</text>
+  </g>
+
+  <!-- arrows -->
+  <line x1="230" y1="135" x2="380" y2="170" stroke="#4b5563" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="690" y1="135" x2="540" y2="170" stroke="#4b5563" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="460" y1="315" x2="460" y2="355" stroke="#4b5563" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="460" y1="490" x2="460" y2="525" stroke="#4b5563" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <!-- side label -->
+  <text x="48" y="170" font-size="11" fill="#475569">依赖 :shared</text>
+  <text x="780" y="170" font-size="11" fill="#475569">依赖 :shared</text>
+  <text x="470" y="345" font-size="11" fill="#475569">依赖 :shared</text>
+  <text x="470" y="520" font-size="11" fill="#475569">WebSocket /game</text>
+</svg>
+
+
+<h3 id="_9">关键架构决策</h3>
+<table>
+<thead>
+<tr>
+<th>决策</th>
+<th>选择</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>状态权威性</td>
+<td>服务端权威，客户端乐观响应</td>
+<td>避免作弊，简化冲突解决</td>
+</tr>
+<tr>
+<td>状态同步策略</td>
+<td>全量状态 + 单调递增 <code>version</code></td>
+<td>比增量简单，便于断线重连</td>
+</tr>
+<tr>
+<td>序列化协议</td>
+<td>JSON + sealed class + <code>classDiscriminator</code></td>
+<td>可读性 + 类型安全</td>
+</tr>
+<tr>
+<td>并发模型</td>
+<td>协程 + 每房间 Mutex</td>
+<td>避免线程开销，状态修改串行化</td>
+</tr>
+<tr>
+<td>重连机制</td>
+<td><code>sessionToken = playerId</code>（重连不变）</td>
+<td>断线 30s 内可无缝恢复</td>
+</tr>
+<tr>
+<td><strong>共享逻辑</strong></td>
+<td><strong>PR #35 + H3：<code>:shared</code> KMP 模块</strong></td>
+<td><strong>编译期保证一致，约束 1/4 消除</strong></td>
+</tr>
+<tr>
+<td>反代拓扑</td>
+<td>Caddy 80/443 → <code>:8080</code>（仅 loopback）</td>
+<td>TLS 终止；客户端统一走 80/443</td>
+</tr>
+<tr>
+<td>协议版本</td>
+<td><code>PROTOCOL_VERSION = 3</code>（<code>Reconnect</code> 携带）</td>
+<td>服务端握手时拒绝旧版客户端</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_10">关键不变量（设计契约）</h3>
+<pre><code>• player.id = 创建/加入时 session.id，断线重连不变
+• state.version 单调递增，客户端丢弃倒退状态
+• 服务端权威：humanPlay/humanPass 是乐观响应，最终以服务端广播为准
+• AI 替补：玩家中途退出 → 标记 isAISubstitute，不删玩家槽
+• PROTOCOL_VERSION：Reconnect 消息携带；不匹配服务端拒绝连接
+• 所有客户端 URL：走 Caddy 80（或 wss:// 443），不直接打 :8080
+</code></pre>
+<h3 id="_11">架构演进路径（从遗憾到修复）</h3>
+<table>
+<thead>
+<tr>
+<th>遗憾（初版）</th>
+<th>状态</th>
+<th>修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>未提取 KMP 共享模块 → <code>canBeat</code> 双份</td>
+<td>✅ 已解决</td>
+<td>PR #35 + H3：<code>:shared</code> + 编译期唯一份</td>
+</tr>
+<tr>
+<td>无协议版本号 → 客服端协议演进无强制检查</td>
+<td>✅ 已解决</td>
+<td>PR-H3：<code>PROTOCOL_VERSION</code> + 握手</td>
+</tr>
+<tr>
+<td>无事件溯源 → 全量状态调试困难</td>
+<td>⚪ 未规划</td>
+<td>全量同步目前够用，溯源暂不规划</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="vs-ai">第四章：问题发现全景——人工 vs AI</h2>
+<h3 id="pr-154">汇总：发现来源与数量（PR #1–54 全程）</h3>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>数量</th>
+<th>占比</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>人工测试 / 反馈</strong></td>
+<td>~35</td>
+<td>27%</td>
+<td>UI 体验、部署环境、运行时崩溃；真机发现</td>
+</tr>
+<tr>
+<td><strong>Claude Code（主会话）</strong><br/>claude-opus-4-7 / sonnet-4-6</td>
+<td>~55</td>
+<td>43%</td>
+<td>全量扫描、跨文件链路、并发/工具链陷阱</td>
+</tr>
+<tr>
+<td><strong>Claude pr-reviewer</strong><br/>（Opus 4.7 独立 context，PR-H5 后）</td>
+<td>~15</td>
+<td>12%</td>
+<td>独立角度审查功能完整性、协议契约、跨文件一致性</td>
+</tr>
+<tr>
+<td><strong>ChatGPT Codex Review Bot</strong><br/>chatgpt-codex-connector[bot]</td>
+<td>~13</td>
+<td>10%</td>
+<td>PR 自动审查；语句级边界、entropy、UI 文案</td>
+</tr>
+<tr>
+<td><strong>重叠 / 联合发现</strong></td>
+<td>~10</td>
+<td>8%</td>
+<td>Codex 标记 → Claude 深挖根因</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td><strong>~128</strong></td>
+<td>100%</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>核心规律</strong>：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
+pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
+四种视角几乎不重叠 —— 只用其中任意一种都会漏掉大量问题。</p>
+</blockquote>
+<hr>
+<h3 id="35">人工发现的问题（~35 个）</h3>
+<h4 id="11-pr-114">单机游戏阶段（约 11 个，PR #1–14）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状 / 反馈</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>看不到每个玩家打出了什么牌</td>
+<td>重新设计 UI，每玩家槽显示出牌 (#2)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>玩家 ID 映射错位，玩家 2 不显示</td>
+<td>ID 从 1 开始但代码从 2 映射 (#5)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>队伍积分只显示个人，不是全队合计</td>
+<td>改为 totalCollectedScore (#6)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>炸弹牌重叠比例不对，显示拥挤</td>
+<td>调整为 20% 重叠 (#7/#8)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>AI 过于激进，动不动打炸弹</td>
+<td>炸弹作为最后手段策略 (#8)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>手牌顺序混乱，炸弹应排在前面</td>
+<td>按炸弹优先排序 (#11)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>更新 APK 提示签名不匹配</td>
+<td>添加固定 debug keystore (#11)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>重构后卡片圆角消失</td>
+<td>恢复 10dp 圆角 (#12)</td>
+</tr>
+<tr>
+<td>9</td>
+<td>五子棋图标在旧 Android 上崩溃</td>
+<td>修复 API &lt; 26 矢量图兼容性 (#1/#3)</td>
+</tr>
+<tr>
+<td>10</td>
+<td>字体大小不统一</td>
+<td>统一为 14sp (#5)</td>
+</tr>
+<tr>
+<td>11</td>
+<td>布局太拥挤</td>
+<td>两行手牌 / 水平玩家排列 (#3/#4)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="9-pr-1733">联网构建与部署阶段（约 9 个，PR #17–33）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12</td>
+<td>CI 失败：服务端模块被 Android 构建拉入</td>
+<td>从 settings.gradle 移除服务端 (#18)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>服务端无 Gradle Wrapper，无法启动</td>
+<td>补充 gradlew + wrapper (#17)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>联网模块编译错误</td>
+<td>修复 CardGroup/GameResult/ConnectionState (#19)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>服务端 JVM 工具链配置错误</td>
+<td>修复 toolchain 配置 (#20)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>ChatAdapter 引用不存在的 View ID</td>
+<td>修正为实际存在的 tvSender (#21)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>部署腾讯云后连接不上（URL 未更新）</td>
+<td>更新服务器地址 (#24)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Android 9+ 报 cleartext 连接被拒绝</td>
+<td>添加 network_security_config.xml (#26/#28)</td>
+</tr>
+<tr>
+<td>19</td>
+<td>连接时返回 503，无法诊断</td>
+<td>添加健康检查接口 + 详细日志 (#29/#30)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>"开始游戏"按钮让用户困惑</td>
+<td>改为"单机游戏" (#32)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="10-pr-3134">联网游戏功能阶段（约 10 个，PR #31–34）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>21</td>
+<td>Loading 遮罩断线后永远不消失</td>
+<td>断线后直接反馈错误 (#31)</td>
+</tr>
+<tr>
+<td>22</td>
+<td>单个中文昵称被 2 字符限制拒绝</td>
+<td>移除最低长度限制 (#31)</td>
+</tr>
+<tr>
+<td>23</td>
+<td><strong>进入大厅崩溃</strong>（CardSuit 枚举不匹配）</td>
+<td>统一枚举值 (#33)</td>
+</tr>
+<tr>
+<td>24</td>
+<td>AI 玩家显示为离线状态</td>
+<td>AI 默认 isConnected=true (#33)</td>
+</tr>
+<tr>
+<td>25</td>
+<td>房间内没有踢人按钮</td>
+<td>添加房主踢人功能 (#33)</td>
+</tr>
+<tr>
+<td>26</td>
+<td>看不到有哪些房间可以加入</td>
+<td>添加房间列表功能 (#33)</td>
+</tr>
+<tr>
+<td>27</td>
+<td><strong>截图：等待电脑 54 出牌，卡死</strong></td>
+<td>canBeat 炸弹逻辑 + AI 回退链 (#34)</td>
+</tr>
+<tr>
+<td>28</td>
+<td><strong>截图：修复后依然卡死</strong>（反复 3 次）</td>
+<td>并发 Mutex + 兜底推进 (#34)</td>
+</tr>
+<tr>
+<td>29</td>
+<td><strong>截图：已收分全是 0</strong></td>
+<td>playerScores 追踪 + 结算公式 (#34)</td>
+</tr>
+<tr>
+<td>30</td>
+<td>游戏逻辑反复修复反复复现</td>
+<td>触发 4 轮 AI 全量自查 (#34)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="web-5-pr-3554">Web / 部署 / 功能阶段（约 5 个，PR #35–54）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>31</td>
+<td>Web 所有中文字符显示为白色豆腐块</td>
+<td>打包 Noto Sans CJK SC 子集 (#45)</td>
+</tr>
+<tr>
+<td>32</td>
+<td>公网 curl 持续 timeout（双层防火墙）</td>
+<td>install.sh 自动配 ufw + 分层自检 playbook (#44)</td>
+</tr>
+<tr>
+<td>33</td>
+<td>同步 main 后 Android 联网超时（:8080 硬编码）</td>
+<td>去 :8080，改走 Caddy 80 (#46)</td>
+</tr>
+<tr>
+<td>34</td>
+<td>顺子规则在多端解释不一致</td>
+<td>移除 straight card type，更新 game_rules.md (#52)</td>
+</tr>
+<tr>
+<td>35</td>
+<td>单机模式出现多余"AI 接管"按钮</td>
+<td>按钮仅在多人模式显示 (#54)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="aiclaude-55-4-post-34">AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）</h3>
+<blockquote>
+<p><strong>AI 来源</strong>：Claude Code Agent（claude-opus-4-7 / claude-sonnet-4-6）
+<strong>工作模式</strong>：Level 3-4 — 截图 / 症状 → AI 自主推理；或开放性指令"自查自纠"全量扫描
+<strong>核心规律</strong>：每轮"在问不同的问题"，症状被消除后下一层根因才暴露 ⇒ 单轮无法到底</p>
+</blockquote>
+<h4 id="pr-134-35-4">PR #1–34 阶段（~35 个，4 轮统一明细）</h4>
+<p><strong>第 1 轮：综合审查（~20 个）</strong></p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>数量</th>
+<th>主要问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>协议 / 序列化</td>
+<td>4</td>
+<td>sealed class 缺 <code>classDiscriminator</code>；枚举值客户端 / 服务端不对齐；JSON 反序列化抛 SerializationException；老消息字段无默认值</td>
+</tr>
+<tr>
+<td>会话 / 重连</td>
+<td>3</td>
+<td>sessionToken 创建房间后未设置；leaveRoom 未清空 token；同一玩家被映射到两个房间</td>
+</tr>
+<tr>
+<td>房间状态机</td>
+<td>4</td>
+<td><code>handleStartGame</code> 未检查 WAITING；玩家退出不补 AI；重复加入同一房间；STARTING → IN_GAME 缺保护</td>
+</tr>
+<tr>
+<td>UI / 状态同步</td>
+<td>6</td>
+<td>seatIndex%2 误算队伍；初始化后未刷新按钮；onDestroy 未 guard lateinit；ChatAdapter 引用不存在 View ID；玩家槽错位；状态广播粒度过粗</td>
+</tr>
+<tr>
+<td>版本控制</td>
+<td>1</td>
+<td><code>applyState</code> 版本比较方向反了（接受了旧状态）</td>
+</tr>
+<tr>
+<td>其他</td>
+<td>2</td>
+<td>senderId 用不稳定 session.id；<code>generateRoomCode</code> 碰撞无重试</td>
+</tr>
+</tbody>
+</table>
+<p><strong>第 2-3 轮：深层审查（~8 个）</strong></p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>类型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>handleRoundEnd</code> 赢家未设为下轮 <code>currentPlayerIndex</code>（回合错位）</td>
+<td>状态机契约违反</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>ArrayList</code> → <code>CopyOnWriteArrayList</code>（玩家列表并发修改异常）</td>
+<td>并发安全</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AI 回退链完全缺失（首选失败 → 游戏永久挂起）</td>
+<td>兜底逻辑缺失</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>getStateForPlayer</code> 中 <code>collectedScore</code> 硬编码为 0</td>
+<td>占位符未实装</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>handleDisconnect</code> 对 FINISHED 房间处理不当</td>
+<td>状态机边界</td>
+</tr>
+<tr>
+<td>6</td>
+<td>多处空指针风险（<code>seats</code> 为 null 时无保护）</td>
+<td>null safety</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>kickPlayer</code> 后未广播房间更新</td>
+<td>事件遗漏</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>addAI</code> 在 IN_GAME 状态下被允许</td>
+<td>状态机契约</td>
+</tr>
+</tbody>
+</table>
+<p><strong>第 4 轮：专项根因审查（~7 个）</strong></p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>根因层级</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>WebSocket <code>send()</code> 在 CONNECTING 状态静默丢弃（重连失效根本原因）</td>
+<td>异步 API 时序陷阱</td>
+</tr>
+<tr>
+<td>2</td>
+<td>多协程无锁并发写 <code>state.hands</code>（卡死的并发根因）</td>
+<td>共享可变状态</td>
+</tr>
+<tr>
+<td>3</td>
+<td>AI 失败无最终兜底（<code>broadcastForceAdvance</code> 缺失）</td>
+<td>兜底链路缺口</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>playerScores</code> 字段整体缺失 → <code>collectedScore</code> 永远为 0</td>
+<td>数据模型缺字段</td>
+</tr>
+<tr>
+<td>5</td>
+<td>结算公式漏算"输方未走完玩家已收分"（金额错算）</td>
+<td>公式遗漏分支</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>computeAllFinishedScores</code> 两端逻辑不一致（约束 1 违反）</td>
+<td>双份代码漂移</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>checkGameEnd</code> 提前结算条件判断有误（200 分阈值边界）</td>
+<td>边界条件错</td>
+</tr>
+</tbody>
+</table>
+<h4 id="pr-3554-20">PR #35–54 阶段（~20 个，新增明细）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>问题</th>
+<th>类别</th>
+<th>修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>assertNull</code> 未导入 → 测试编译失败</td>
+<td>wasmJs 工具链</td>
+<td>commit 3bd979a</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>kotlinx-coroutines-core:1.7.3</code> 没 wasmJs variant</td>
+<td>wasmJs 工具链</td>
+<td>commit fe1aa60（升 1.8.1）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>androidTarget jvmTarget 与 consumer 不齐 → AGP 报错</td>
+<td>wasmJs 工具链</td>
+<td>commit ae00dfc</td>
+</tr>
+<tr>
+<td>4</td>
+<td>跨模块对 <code>var message.state</code> smart-cast 失败</td>
+<td>wasmJs 工具链</td>
+<td>commit 16782d9（local val 快照）</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>kotlinx-browser:0.1</code> 要求 Kotlin 2.0+</td>
+<td>wasmJs 工具链</td>
+<td>commit 2eff0ca（@JsFun interop）</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>kotlinx-serialization-json:1.6.0</code> 没 wasmJs</td>
+<td>wasmJs 工具链</td>
+<td>commit b332375（升 1.6.3）</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>compose.components.resources</code> 要求 K2.0+</td>
+<td>wasmJs 工具链</td>
+<td>commit b332375（移除）</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>RepositoriesMode.FAIL_ON_PROJECT_REPOS</code> 阻断 KGP NodeJsSetupTask</td>
+<td>wasmJs 工具链</td>
+<td>commit a6cc8dd</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Caddy reverse_proxy 缺 WebSocket upgrade 头</td>
+<td>部署</td>
+<td>PR #41 self-review P0</td>
+</tr>
+<tr>
+<td>10</td>
+<td>systemd service 缺 <code>Restart=always</code> + <code>WorkingDirectory</code></td>
+<td>部署</td>
+<td>PR #41 self-review P1</td>
+</tr>
+<tr>
+<td>11</td>
+<td>install.sh 未自动配 ufw（用户得手动）</td>
+<td>部署</td>
+<td>commit f26a66d</td>
+</tr>
+<tr>
+<td>12</td>
+<td>GitHub Actions deploy workflow 缺 secret 授权</td>
+<td>部署</td>
+<td>PR #42 dogfood P1</td>
+</tr>
+<tr>
+<td>13</td>
+<td>健康检查端点暴露内部状态</td>
+<td>部署</td>
+<td>PR #42 dogfood P1</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Web stuck "loading" overlay（flow collector 未取消）</td>
+<td>Web 功能</td>
+<td>commit 400917e</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Web SinglePlayer <code>lastPlayerId</code> 初始化错（首轮显示空）</td>
+<td>Web 功能</td>
+<td>commit d484dbc</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Web <code>kotlinx-serialization</code> plugin 未 apply → DTO 序列化抛</td>
+<td>Web 功能</td>
+<td>commit 7f83753</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Web <code>GreenTableColors.teamA/teamB</code> 缺 → 编译失败</td>
+<td>Web 功能</td>
+<td>commit 8dcba8e</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Web 出牌后 selection 未清空（下一手仍高亮）</td>
+<td>Web 功能</td>
+<td>commit 7f83753</td>
+</tr>
+<tr>
+<td>19</td>
+<td><code>processAITurn</code> <code>delay()</code> 后只重检 currentPlayerIndex，漏检 isAISubstitute</td>
+<td>AI 托管 race</td>
+<td>commit c9988fd（Codex P2 触发）</td>
+</tr>
+<tr>
+<td>20</td>
+<td>AI 炸弹决策阈值用 <code>rank.value</code>（1-based），比较值偏移</td>
+<td>AI 托管</td>
+<td>commit 49ded62（Codex P2 触发）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>跨会话观察</strong>：第 1 轮发现的多是"代码长得不对"（语法 / 命名 / 类型）；
+越往后越是"行为长得不对"（时序 / 并发 / 跨文件契约）；
+PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮模式覆盖范围内</strong>——
+这印证了 §8.3："训练相关性盲区"不会被多轮自审消除，只能靠真实环境暴露。</p>
+</blockquote>
+<hr>
+<h3 id="claude-pr-reviewer-15-pr-h5">Claude pr-reviewer 发现的问题（~15 个，PR-H5 后引入）</h3>
+<blockquote>
+<p><strong>角色</strong>：Claude Opus 4.7 新会话（零上下文），独立拉 PR diff 审查
+<strong>互补定位</strong>：功能完整性 + 跨文件契约；Codex 偏语句级边界</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>发现</th>
+<th>优先级</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>#41（部署自审）</td>
+<td>Caddy config 缺 <code>header_up Host</code> / <code>flush_interval -1</code>；service 文件无 Restart 策略；健康检查无 auth</td>
+<td>P0 + 2×P1</td>
+<td>✅ 同 PR 修复</td>
+</tr>
+<tr>
+<td>#42（dogfood）</td>
+<td>3 个 deploy 安全 / 配置 P1</td>
+<td>3×P1</td>
+<td>✅ PR #42 fix commit</td>
+</tr>
+<tr>
+<td>#47（web 菜单）</td>
+<td>统计 key 名与序列化 DTO 不符；Hint 逻辑边界</td>
+<td>P1 + 3×P2</td>
+<td>✅ 同 PR fix</td>
+</tr>
+<tr>
+<td>#49（视觉）</td>
+<td>CardView recompose 触发过多（unstable lambda）；pass 按钮在本轮先手时逻辑错</td>
+<td>P1 + 4×P2</td>
+<td>✅ 同 PR fix</td>
+</tr>
+<tr>
+<td>#53（AI 托管）</td>
+<td>game_rules.md 声称"随机首出"但服务端是 ♠3 先出（文档漂移）</td>
+<td>P1</td>
+<td>✅ 同 PR 修正 game_rules</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>发现规律</strong>：pr-reviewer 对"新会话看到的逻辑矛盾"最敏感；对 delay 之后
+的 race condition 不敏感（由 Codex 补盲）。两者组合才完整。</p>
+</blockquote>
+<hr>
+<h3 id="chatgpt-codex-review-bot13">ChatGPT Codex Review Bot（~13 条，全程）</h3>
+<blockquote>
+<p><strong>工作模式</strong>：PR 创建时自动触发；聚焦语句级风险，按 P1 / P2 标注</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>PR</th>
+<th>优先级</th>
+<th>位置</th>
+<th>意见</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>#29</td>
+<td>P1</td>
+<td>Application.kt</td>
+<td>UUID 截到 8 字符 → 32 位熵，会话碰撞</td>
+<td>✅ commit 06d445c（完整 36 字符 UUID）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>#31</td>
+<td>P1</td>
+<td>LobbyActivity</td>
+<td>Reconnecting 路径不触发 hideLoading，遮罩永久卡住</td>
+<td>✅ PR #33 三状态都加 hideLoading</td>
+</tr>
+<tr>
+<td>3</td>
+<td>#33</td>
+<td>P2</td>
+<td>MainActivity</td>
+<td>UI 提示"房间名"但服务端只解析 roomCode，必失败</td>
+<td>✅ UI 改为房间列表点击加入</td>
+</tr>
+<tr>
+<td>4</td>
+<td>#35</td>
+<td>P1</td>
+<td>detekt</td>
+<td><code>!!</code> 和 swallowed exceptions 超阈值</td>
+<td>✅ PR #34/35 null safety 修复 + baseline</td>
+</tr>
+<tr>
+<td>5</td>
+<td>PR-H1</td>
+<td>P2</td>
+<td>PreCommitScan</td>
+<td>MultiEdit matcher 潜在误匹配 + doc-only filter 绕过</td>
+<td>✅ commit 369e682</td>
+</tr>
+<tr>
+<td>6</td>
+<td>PR-H3</td>
+<td>P2</td>
+<td>ServerGameManager</td>
+<td>AI 炸弹决策阈值用 rank.value（1-based），比较值偏移</td>
+<td>✅ commit 49ded62（<code>&gt;= 8</code> / <code>&lt;= 3</code>）</td>
+</tr>
+<tr>
+<td>7</td>
+<td>PR-H4</td>
+<td>P2</td>
+<td>trace-bug</td>
+<td>allowed-tools 声称的工具权限与实际不符；缺 git add/commit</td>
+<td>✅ commit c888ad5</td>
+</tr>
+<tr>
+<td>8</td>
+<td>#43</td>
+<td>P2</td>
+<td>settings.json</td>
+<td>allowed-tools Bash 表达式语法不精确</td>
+<td>✅ commit 6ef2aea</td>
+</tr>
+<tr>
+<td>9</td>
+<td>#45</td>
+<td>P2</td>
+<td>fonts</td>
+<td>字体子集漏包"·"/"—"/"♠♣♥♦"等 UI 字符</td>
+<td>✅ commit ce74b39</td>
+</tr>
+<tr>
+<td>10</td>
+<td>#47</td>
+<td>P1+P2</td>
+<td>web</td>
+<td>kotlinx.serialization plugin 缺 apply；出牌后未清空 selection</td>
+<td>✅ commit 7f83753</td>
+</tr>
+<tr>
+<td>11</td>
+<td>#49</td>
+<td>P1</td>
+<td>web GameScreen</td>
+<td>pass 按钮条件逻辑在本轮先手场景有误</td>
+<td>✅ commit 1779890</td>
+</tr>
+<tr>
+<td>12</td>
+<td>#50</td>
+<td>P2</td>
+<td>web SinglePlayer</td>
+<td>lastPlayerId 中央 fallback 缺失；SP 结束状态判断</td>
+<td>✅ commit d484dbc</td>
+</tr>
+<tr>
+<td>13</td>
+<td>#53</td>
+<td>P2</td>
+<td>ServerGameManager</td>
+<td>processAITurn <code>delay()</code> 后只重检 currentPlayerIndex，漏检 isAISubstitute</td>
+<td>✅ commit c9988fd</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键观察</strong>：
+- Codex 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量"，pr-reviewer
+  抓"功能完整 / 文档漂移 / 跨文件契约"。第 13 条（race condition）只被 Codex 发现。
+- 13 条 Codex 意见中 <strong>1 条 P0、5 条 P1、7 条 P2</strong>，全部已修复。
+- UUID 截断（#1）在 PR #29 审查后拖了 4 天才修，其余 P1 全部在当 PR 内修。</p>
+<hr>
+<h2 id="ai_1">第五章：人工与 AI 协同模式深度解析</h2>
+<h3 id="_12">协同的四个层次</h3>
+<svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="协同的四个层次">
+<g transform="translate(40 20)">
+  <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="15" fill="#dc2626">Level 1　AI 执行人工指令</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">传统：人主导。人写完整指令 → AI 按指令完成 → 等待下一条。AI 沦为'会编程的工具'</text>
+</g>
+<g transform="translate(40 100)">
+  <rect width="800" height="64" rx="8" fill="#fed7aa" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="15" fill="#ea580c">Level 2　AI 提建议，人工决策</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">审稿：人审 AI。AI 完成后输出方案+备选 → 人工选择/调整/驳回</text>
+</g>
+<g transform="translate(40 180)">
+  <rect width="800" height="64" rx="8" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="15" fill="#16a34a">Level 3　人工反馈现象，AI 自主排查 ← 本项目大量使用</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">人工：截图+'还卡住'/'分数错了'  AI：看代码+推理+多轮自查+修复</text>
+</g>
+<g transform="translate(40 260)">
+  <rect width="800" height="64" rx="8" fill="#bfdbfe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="15" fill="#2563eb">Level 4　AI 主动审查，人工验证 ← 最高效模式</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">人工：开放性指令（'自查自纠所有问题'）  AI：全量扫描+输出清单+修复  人工：真机验证</text>
+</g>
+</svg>
+
+<h3 id="_13">实际分工矩阵</h3>
+<table>
+<thead>
+<tr>
+<th>任务类型</th>
+<th>人工占比</th>
+<th>AI 占比</th>
+<th>协同方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>需求定义</td>
+<td>100%</td>
+<td>0%</td>
+<td>人工口述 / 截图</td>
+</tr>
+<tr>
+<td>架构设计</td>
+<td>60%</td>
+<td>40%</td>
+<td>人工拍板，AI 提供方案对比</td>
+</tr>
+<tr>
+<td>编码实现</td>
+<td>3%</td>
+<td>97%</td>
+<td>AI 主导，人工偶尔修正方向</td>
+</tr>
+<tr>
+<td>UI 调试</td>
+<td>60%</td>
+<td>40%</td>
+<td>人工真机截图，AI 改代码</td>
+</tr>
+<tr>
+<td>协议/逻辑 Bug 排查</td>
+<td>15%</td>
+<td>85%</td>
+<td>人工提症状，AI 深挖根因</td>
+</tr>
+<tr>
+<td>部署/网络问题</td>
+<td>80%</td>
+<td>20%</td>
+<td>人工诊断环境，AI 改配置</td>
+</tr>
+<tr>
+<td>文档编写</td>
+<td>10%</td>
+<td>90%</td>
+<td>AI 起草，人工指出遗漏</td>
+</tr>
+<tr>
+<td>代码审查</td>
+<td>20%</td>
+<td>80%</td>
+<td>Claude 主会话 + pr-reviewer + Codex 三层</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ai_2">AI 显著优于人工的场景</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全量代码审查</td>
+<td>单次 ~35 个问题，覆盖整个代码库</td>
+</tr>
+<tr>
+<td>跨文件链路追踪</td>
+<td>消息从客户端到服务端处理的完整链路</td>
+</tr>
+<tr>
+<td>重复模式识别</td>
+<td>多处类似并发问题一次性发现</td>
+</tr>
+<tr>
+<td>工具链兼容性排查</td>
+<td>wasmJs 8 层兼容性问题，逐层按序剥</td>
+</tr>
+<tr>
+<td>测试用例生成</td>
+<td>CardRulesTest ~30 用例 / ServerGameManagerTest ~25 用例 自动覆盖边界</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_14">人工不可替代的场景</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>真机环境验证</td>
+<td>cleartext / 503 / 字体豆腐块，AI 看不见</td>
+</tr>
+<tr>
+<td>时序竞争复现</td>
+<td>需真机才能稳定复现</td>
+</tr>
+<tr>
+<td>用户体验判断</td>
+<td>"布局太挤" / "字体不对"，AI 无视觉感知</td>
+</tr>
+<tr>
+<td>部署决策</td>
+<td>云服务器选择、密钥管理，AI 不应自主决定</td>
+</tr>
+<tr>
+<td>业务规则确认</td>
+<td>顺子是否保留、AI 速度默认值，人工最终拍板</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_15">协同反模式（要避免）</h3>
+<table>
+<thead>
+<tr>
+<th>反模式</th>
+<th>后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>过度信任 AI，不做真机验证</td>
+<td>表层修复未触根因，反复复现</td>
+</tr>
+<tr>
+<td>模糊指令"把这个 bug 修了"</td>
+<td>AI 只修表象，根因仍在</td>
+</tr>
+<tr>
+<td>一次到位幻想</td>
+<td>本项目实际经历 4 轮才彻底解决卡死问题</td>
+</tr>
+<tr>
+<td>只用一个 AI 工具</td>
+<td>Claude + Codex + pr-reviewer 三层才完整</td>
+</tr>
+<tr>
+<td>CI 红不读报错只猜</td>
+<td>沙箱看不到 CI 日志，应走 exfil channel（§9.9.5）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_16">高效协同最佳实践</h3>
+<blockquote>
+<p>6 条经验自原 PR #1-34 阶段沉淀；PR #35-54 阶段加入 4 条 harness-era 补充。</p>
+</blockquote>
+<p><strong>原始 6 条（症状-修复回路）</strong></p>
+<ol>
+<li><strong>症状描述要具体</strong>："等待电脑 54 出牌不动了"比"卡了"信息量大 10 倍。
+   屏幕里看到的具体牌点 / 玩家 ID / 时机，AI 可以直接 grep 锁定代码路径</li>
+<li><strong>截图优于文字</strong>：UI / 现象类问题，截图让 AI 直接获得视觉上下文，省去
+   "你的意思是…吗" 的来回；本项目 #27/#28/#29 三个截图各自直接定位到根因</li>
+<li><strong>允许多轮迭代</strong>：第 1 轮修表象，第 2 轮挖根因，第 3 轮加防护；
+   "卡死"经历 4 轮才彻底，<strong>强行要求一次到位反而出更多 Bug</strong></li>
+<li><strong>关键决策人工拍板</strong>：架构、协议、依赖选择，AI 提方案、人工选；
+   AI 不应擅自决定"用哪个序列化库"或"是否引入新模块"</li>
+<li><strong>人工把守发布闸门</strong>：commit / push 前人工最终 review；CLAUDE.md 第八章
+   commit 署名规范确保责任归属</li>
+<li><strong>开放性指令激发全量审查</strong>："全部自查自纠"比"修这个 bug"更有效——
+   前者触发系统性扫描，后者只修指定行；本项目 4 轮根因审查全部由开放
+   指令激发</li>
+</ol>
+<p><strong>Harness-era 新增 4 条（结构-自动化）</strong></p>
+<ol>
+<li><strong>优先用基础设施替代自律</strong>：每条"约束"都问"能不能让机器自动检查"——
+   能就写 hook / CI gate / lint 规则，不能再写文档；
+   本项目 5 大约束（CLAUDE.md 第二章）3 条已机器化（tdd-gate / commit-msg
+   hook / detekt baseline），剩 2 条仍靠 review</li>
+<li><strong>多 AI 互补而非替代</strong>：Codex（语句级）+ Claude 主会话（全局根因）+
+   pr-reviewer（功能完整 / 文档漂移）+ Haiku 静态扫描，<strong>4 套都跑</strong>比
+   "找最强的一套" 更可靠；本项目 13 条 Codex 意见中 7 条 Claude 自查没发现</li>
+<li><strong>CI red 走 exfil channel，不要猜</strong>：沙箱里读不到 GitHub Actions 日志，
+   <code>.github/workflows/android-ci.yml</code> 把 gradle stderr 自动 post 成 PR
+   comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）</li>
+<li><strong>每条 Bug 入 regressions.md</strong>：修完不仅 push 代码，<strong>还要写 8 字段
+    Bug 卡片</strong>（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 13 条入库</li>
+</ol>
+<h3 id="_17">协同效率数据</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>人工总投入时间</td>
+<td>~50 小时（需求 + 反馈 + 真机测试，含两个会话）</td>
+</tr>
+<tr>
+<td>AI 等效工作时间</td>
+<td>~500 小时（按工程师正常速度估算）</td>
+</tr>
+<tr>
+<td><strong>提速比</strong></td>
+<td><strong>约 10 倍</strong></td>
+</tr>
+<tr>
+<td>代码提交（非 merge）</td>
+<td>约 170 次</td>
+</tr>
+<tr>
+<td>从"单机 Android"到"双端 + 服务端 + Harness"</td>
+<td>有效开发 18 天</td>
+</tr>
+<tr>
+<td>单次修复成功率</td>
+<td>~12%（卡死问题 8 次 commit 才彻底解决）</td>
+</tr>
+<tr>
+<td>→ 启示</td>
+<td>提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="_18">第六章：关键技术修复</h2>
+<h3 id="_19">游戏卡死——四层防御</h3>
+<svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="游戏卡死 4 层防御">
+<defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
+<g transform="translate(60 20)">
+  <rect width="760" height="50" rx="6" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.4"/>
+  <text x="20" y="22" font-weight="700" font-size="14" fill="#b91c1c">[症状]</text>
+  <text x="100" y="22" font-size="13" fill="#111827">等待电脑出牌，永不响应</text>
+</g>
+<line x1="440" y1="70" x2="440" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+<g transform="translate(60 90)">
+  <rect width="760" height="50" rx="6" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="22" font-weight="700" font-size="14" fill="#a16207">[层 1]</text>
+  <text x="100" y="22" font-size="13" fill="#111827">canBeat 炸弹比较错误 — 修复：大张数直接胜，张数相同再比牌点</text>
+</g>
+<line x1="440" y1="140" x2="440" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+<g transform="translate(60 160)">
+  <rect width="760" height="50" rx="6" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="22" font-weight="700" font-size="14" fill="#a16207">[层 2]</text>
+  <text x="100" y="22" font-size="13" fill="#111827">AI 失败无任何回退 — 修复：首选 → 过牌 → 最小单张（三级回退）</text>
+</g>
+<line x1="440" y1="210" x2="440" y2="230" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+<g transform="translate(60 230)">
+  <rect width="760" height="50" rx="6" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="22" font-weight="700" font-size="14" fill="#a16207">[层 3]</text>
+  <text x="100" y="22" font-size="13" fill="#111827">多协程无锁并发写 state.hands — 修复：每房间一把 Mutex（写锁内，广播锁外）</text>
+</g>
+<line x1="440" y1="280" x2="440" y2="300" stroke="#475569" stroke-width="1.5" marker-end="url(#arr2)"/>
+<g transform="translate(60 300)">
+  <rect width="760" height="50" rx="6" fill="#dcfce7" stroke="#15803d" stroke-width="1.4"/>
+  <text x="20" y="22" font-weight="700" font-size="14" fill="#15803d">[层 4]</text>
+  <text x="100" y="22" font-size="13" fill="#111827">所有回退均失败时游戏仍卡住 — 修复：broadcastForceAdvance 强制推进 + 同步所有客户端</text>
+</g>
+</svg>
+
+<h3 id="_20">重连失效——异步时序陷阱</h3>
+<pre><code class="language-kotlin">// ❌ 修复前：ws 还在 CONNECTING，send() 返回 false 被静默丢弃
+ws = client.newWebSocket(request, listener)
+sessionToken?.let { send(Reconnect(it)) }   // BUG
+
+// ✅ 修复后：在 onOpen 回调内，确保 ws 已 OPEN
+override fun onOpen(ws: WebSocket, response: Response) {
+    sessionToken?.let { send(Reconnect(it)) }  // OK
+}
+</code></pre>
+<blockquote>
+<p><strong>教训</strong>：WebSocket 异步 API 中，"创建连接" ≠ "连接已建立"</p>
+</blockquote>
+<h3 id="_21">两端结算不一致——统一公式</h3>
+
+<svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="结算公式">
+  <g transform="translate(40 30)">
+    <rect width="800" height="90" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15" fill="#15803d">赢方得分</text>
+    <text x="20" y="55" font-size="13" fill="#111827">  = 赢方所有已收</text>
+    <text x="20" y="78" font-size="13" fill="#dc2626">  + 输方未走完玩家（已收 + 手牌分）   ← 旧版漏了这一项</text>
+  </g>
+  <g transform="translate(40 145)">
+    <rect width="800" height="56" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+    <text x="20" y="28" font-weight="700" font-size="15" fill="#b91c1c">输方得分</text>
+    <text x="20" y="48" font-size="13" fill="#111827">  = 输方已走完玩家的已收</text>
+  </g>
+  <g transform="translate(40 222)">
+    <rect width="800" height="40" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.4"/>
+    <text x="20" y="25" font-size="13" fill="#854d0e">新增 state.playerScores: MutableMap&lt;Int, Int&gt; → 追踪每人实时已收分（原来硬编码 0）</text>
+  </g>
+</svg>
+
+
+<h3 id="web-cjk">Web 中文字体（CJK 豆腐块）</h3>
+<svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img">
+<g transform="translate(40 15)">
+  <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#dc2626">[症状]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">浏览器中所有中文显示为白色方块 □□□；tab 标题正常</text>
+</g>
+<g transform="translate(40 95)">
+  <rect width="800" height="64" rx="8" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#a16207">[根因]</text>
+  <text x="80" y="26" font-size="13" fill="#111827">CMP wasmJs 用 Skia 在 <canvas> 渲染；Skia 在 wasm 沙箱拿不到 OS 字体；默认打包字体只覆盖 Lati</text>
+  <text x="80" y="46" font-size="13" fill="#111827">n</text>
+</g>
+<g transform="translate(40 175)">
+  <rect width="800" height="64" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#16a34a">[修复]</text>
+  <text x="80" y="26" font-size="13" fill="#111827">PR #45：Noto Sans CJK SC GB2312 子集（7540 字, ~3MB）打入 wasmJs resources；Fon</text>
+  <text x="80" y="46" font-size="13" fill="#111827">ts.kt @JsFun fetch + base64；MaterialTheme typography 全局替换</text>
+</g>
+<g transform="translate(40 255)">
+  <rect width="800" height="64" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#2563eb">[教训]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">Compose 跨平台 ≠ 字体跨平台；wasmJs target 必须显式打包字体</text>
+</g>
+</svg>
+
+<h3 id="_22">双层防火墙——部署对称陷阱</h3>
+<svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img">
+<g transform="translate(40 15)">
+  <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#dc2626">[症状]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">install.sh 跑完、Caddy 监听 80；从公网 curl 仍 connect timeout</text>
+</g>
+<g transform="translate(40 95)">
+  <rect width="800" height="64" rx="8" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#a16207">[根因]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">云厂商安全组（L1）+ 服务器内 ufw（L2）两层独立；任一未放行 80 症状完全相同，无法从外部区分是哪层</text>
+</g>
+<g transform="translate(40 175)">
+  <rect width="800" height="64" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#16a34a">[修复]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">PR #44：install.sh 自动配 ufw；playbook §3c 分层自检 3 步</text>
+</g>
+<g transform="translate(40 255)">
+  <rect width="800" height="64" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#2563eb">[教训]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">部署 bug 的对称陷阱——给分层自检命令让用户 0 歧义定位哪层挂了，避免乱试</text>
+</g>
+</svg>
+
+<h3 id="android-url">Android URL 漂移——拓扑变更盲区</h3>
+<svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img">
+<g transform="translate(40 15)">
+  <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#dc2626">[症状]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">拉最新 main 后 Android 联网超时；Web 客户端正常</text>
+</g>
+<g transform="translate(40 95)">
+  <rect width="800" height="64" rx="8" fill="#fef3c7" stroke="#a16207" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#a16207">[根因]</text>
+  <text x="80" y="26" font-size="13" fill="#111827">PR #41 把拓扑改为 Caddy 80 反代，:8080 不再外露；Web 用相对路径自动适配；Android SERVER_URL 仍</text>
+  <text x="80" y="46" font-size="13" fill="#111827">硬编码 :8080</text>
+</g>
+<g transform="translate(40 175)">
+  <rect width="800" height="64" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#16a34a">[修复]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">PR #46：两处 SERVER_URL 去 :8080，走默认 80</text>
+</g>
+<g transform="translate(40 255)">
+  <rect width="800" height="64" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+  <text x="20" y="26" font-weight="700" font-size="14" fill="#2563eb">[教训]</text>
+  <text x="80" y="40" font-size="13" fill="#111827">大改部署拓扑必须扫所有客户端；SERVER_URL 是配置项不是常量</text>
+</g>
+</svg>
+
+<hr>
+<h2 id="_23">第七章：工程经验与后续建议</h2>
+<h3 id="_24">核心经验</h3>
+<ol>
+<li><strong>"修了又坏"的根因</strong>：只修表层症状，没往深挖根因</li>
+<li>卡死历经 4 层才彻底解决</li>
+<li>
+<p><strong>原则</strong>：找到最小可复现场景，分层排除，验证到底</p>
+</li>
+<li>
+<p><strong>Harness = 把记忆固化为基础设施</strong></p>
+</li>
+<li>5 层架构（L0 记忆 / L1 权限钩子 / L2 命令代理 / L3 TDD / L4 对抗审查）</li>
+<li>不是再写一篇文档，而是让机器在每次 push / edit / session 开始时自动提醒</li>
+<li>
+<p><strong>原则</strong>：结构性约束优于自律，编译期检查优于代码注释</p>
+</li>
+<li>
+<p><strong>共享逻辑必须物理唯一</strong></p>
+</li>
+<li>两份 canBeat / 两份 DTO → 三处不一致；最终必须 KMP 模块解决</li>
+<li>
+<p><strong>原则</strong>：重复代码是 Bug 的温床，不是"性能优化"</p>
+</li>
+<li>
+<p><strong>四层审查缺一不可</strong></p>
+</li>
+<li>Claude 主会话（全局逻辑）+ pr-reviewer（功能完整 / 文档漂移）+
+     Codex（语句级边界 / entropy）+ 真机验证（看不见的环境问题）</li>
+<li>
+<p><strong>原则</strong>：单一 AI 视角有系统性盲区，异构比同构更重要</p>
+</li>
+<li>
+<p><strong>CI 是第二套反馈系统</strong></p>
+</li>
+<li>沙箱里 90% 的改动可以快速验证（<code>:shared:jvmTest</code> ≤30s）</li>
+<li>wasmJs / Android 构建必须 push 才知道对不对</li>
+<li><strong>原则</strong>：把 gradle stderr exfil 到 PR comment，让 AI 能读 CI 日志</li>
+</ol>
+<h3 id="_25">交付成果（全程）</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>合并 PR 数</td>
+<td>54 个 (#1–#54)</td>
+</tr>
+<tr>
+<td>非 merge commit 数</td>
+<td>约 170 次</td>
+</tr>
+<tr>
+<td>修复问题</td>
+<td>~128 个</td>
+</tr>
+<tr>
+<td>客户端</td>
+<td>Android (XML) + Web (CMP/wasmJs)</td>
+</tr>
+<tr>
+<td>共享模块</td>
+<td><code>:shared</code> KMP（消灭约束 1/4）</td>
+</tr>
+<tr>
+<td>Harness 基础设施</td>
+<td>L0–L4 五层，PR-H1~H5 落地</td>
+</tr>
+<tr>
+<td>自动化测试</td>
+<td>~70 个（CardRules + Settlement + ServerGameManager + 协议 round-trip）</td>
+</tr>
+<tr>
+<td>部署</td>
+<td>Caddy + systemd + GitHub Actions auto-deploy</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_26">后续建议行动</h3>
+<ol>
+<li>✅ <strong>自动化集成测试</strong>：PR-H2 落地 — <code>CardRulesTest.kt</code>（~30 用例）+
+   <code>ServerGameManagerTest.kt</code>（~25 用例）+ CI tdd-gate 硬关</li>
+<li>✅ <strong>共享规则层</strong>：PR #35 + PR-H3 落地 — <code>:shared</code> KMP；约束 1/4 编译期消除</li>
+<li>⚪ <strong>监控告警</strong>：上线 <code>force-advance</code> 计数指标，触发即告警排查（暂未规划）</li>
+<li>⚪ <strong>弱网测试</strong>：集成限速工具，系统化回归重连场景（暂未规划）</li>
+<li>✅ <strong>协议版本号</strong>：PR-H3 落地 — <code>PROTOCOL_VERSION = 3</code>，握手时校验</li>
+<li>⚪ <strong>SERVER_URL 集中化</strong>（regressions #13 follow-up）：抽到 BuildConfig /
+   资源文件，避免下次拓扑变更再漏改某端</li>
+<li>⚪ <strong>iOS / Desktop targets</strong>：KMP 骨架已就绪，按 <code>docs/client_implementation_guide.md</code>
+   路径扩展，目前无规划</li>
+</ol>
+<hr>
+<h2 id="ai-claude">第八章：AI 质量改进路径——多 Claude 模型协同</h2>
+<h3 id="81-ai-bug">8.1 反思：为什么 AI 写的代码 Bug 不少？</h3>
+<h4 id="bug">生成阶段必然有 Bug 的结构性原因</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>原因</th>
+<th>本项目例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>生成 vs 验证是不同认知任务</td>
+<td>canBeat 套用"同张数比大小"模式，忽略大炸弹直胜规则</td>
+</tr>
+<tr>
+<td>2</td>
+<td>无执行反馈，时序/并发盲区</td>
+<td>WebSocket CONNECTING 时 send() 静默失败</td>
+</tr>
+<tr>
+<td>3</td>
+<td>自然语言规格隐式不完整</td>
+<td>"重连后游戏继续"——多少秒？保留多少状态？</td>
+</tr>
+<tr>
+<td>4</td>
+<td>模式匹配编码"常用 ≠ 正确"</td>
+<td><code>UUID.take(8)</code>、<code>ArrayList</code> 常见但联网场景错</td>
+</tr>
+<tr>
+<td>5</td>
+<td>跨文件一致性盲区</td>
+<td>单机 CardRules vs 服务端 canBeat 双份</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_27">多轮自审仍能发现新问题的原因</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>原因</th>
+<th>本项目体现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>每轮"在问不同的问题"</td>
+<td>R1 问整洁；R4 被迫问"为什么 3 次修了还卡"</td>
+</tr>
+<tr>
+<td>2</td>
+<td>症状被消除后下一层才暴露</td>
+<td>canBeat → 回退链 → Mutex → 兜底，按序解锁</td>
+</tr>
+<tr>
+<td>3</td>
+<td>自审有确认偏差，用户"还卡住"打破</td>
+<td>4 轮挖到 send() 静默失败</td>
+</tr>
+<tr>
+<td>4</td>
+<td>工具链兼容性是知识盲区</td>
+<td>wasmJs 8 层问题，每次 CI 红才暴露下一层</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82-claude">8.2 多 Claude 模型协同</h3>
+<p><strong>模式 1：开新会话（零成本）</strong></p>
+<p>上下文重置 ≈ 换"陌生代码"审计视角 → 消除确认偏差</p>
+<p><strong>模式 2：Generator / Reviewer 分工（推荐）</strong></p>
+<svg viewBox="0 0 1020 180" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img">
+<defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/></marker></defs>
+<g transform="translate(40 40)">
+  <rect width="220" height="100" rx="10" fill="#fce7f3" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="110.0" y="34" text-anchor="middle" font-weight="700" font-size="15" fill="#111827">Opus 4.7</text>
+  <text x="110.0" y="62" text-anchor="middle" font-size="12" fill="#1f2937">架构设计 + 协议定义 + 根因分析</text>
+</g>
+<line x1="260" y1="90" x2="280" y2="90" stroke="#1f2937" stroke-width="1.6" marker-end="url(#arr3)"/>
+<g transform="translate(280 40)">
+  <rect width="220" height="100" rx="10" fill="#dbeafe" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="110.0" y="34" text-anchor="middle" font-weight="700" font-size="15" fill="#111827">Sonnet 4.6</text>
+  <text x="110.0" y="62" text-anchor="middle" font-size="12" fill="#1f2937">主要实现（默认模型）</text>
+</g>
+<line x1="500" y1="90" x2="520" y2="90" stroke="#1f2937" stroke-width="1.6" marker-end="url(#arr3)"/>
+<g transform="translate(520 40)">
+  <rect width="220" height="100" rx="10" fill="#fef3c7" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="110.0" y="34" text-anchor="middle" font-weight="700" font-size="15" fill="#111827">Haiku 4.5</text>
+  <text x="110.0" y="62" text-anchor="middle" font-size="12" fill="#1f2937">/pre-commit-scan 批</text>
+  <text x="110.0" y="80" text-anchor="middle" font-size="12" fill="#1f2937">量静态扫描</text>
+</g>
+<line x1="740" y1="90" x2="760" y2="90" stroke="#1f2937" stroke-width="1.6" marker-end="url(#arr3)"/>
+<g transform="translate(760 40)">
+  <rect width="220" height="100" rx="10" fill="#fce7f3" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="110.0" y="34" text-anchor="middle" font-weight="700" font-size="15" fill="#111827">Opus（pr-reviewer）</text>
+  <text x="110.0" y="62" text-anchor="middle" font-size="12" fill="#1f2937">功能完整 + 跨文件契约审查</text>
+</g>
+</svg>
+
+<p><strong>模式 3：对抗式审查（Adversarial Review）</strong></p>
+<p>A 实例实现 → B 实例攻击（"找出所有让代码崩溃的输入"）→ C 实例仲裁</p>
+<blockquote>
+<p>本项目结算公式若走过此流程，"输方未走完已收分漏算"大概率第一轮被找出。</p>
+</blockquote>
+<p><strong>模式 4：TDD 反向流</strong></p>
+
+<svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="TDD 反向流">
+  <defs><marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/></marker></defs>
+  <g transform="translate(60 40)">
+    <rect width="240" height="80" rx="10" fill="#fef3c7" stroke="#a16207" stroke-width="1.5"/>
+    <text x="120" y="32" text-anchor="middle" font-weight="700" font-size="15">Haiku 4.5</text>
+    <text x="120" y="56" text-anchor="middle" font-size="12">先写边界测试用例（红）</text>
+  </g>
+  <g transform="translate(380 40)">
+    <rect width="240" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="120" y="32" text-anchor="middle" font-weight="700" font-size="15">Sonnet 4.6</text>
+    <text x="120" y="56" text-anchor="middle" font-size="12">实现代码让测试绿</text>
+  </g>
+  <g transform="translate(700 40)">
+    <rect width="160" height="80" rx="10" fill="#fce7f3" stroke="#be185d" stroke-width="1.5"/>
+    <text x="80" y="32" text-anchor="middle" font-weight="700" font-size="15">Opus 4.7</text>
+    <text x="80" y="56" text-anchor="middle" font-size="12">审查测试覆盖</text>
+  </g>
+  <line x1="300" y1="80" x2="380" y2="80" stroke="#1f2937" stroke-width="1.6" marker-end="url(#arr4)"/>
+  <line x1="620" y1="80" x2="700" y2="80" stroke="#1f2937" stroke-width="1.6" marker-end="url(#arr4)"/>
+  <!-- loop arrow -->
+  <path d="M 780 130 Q 780 240 460 240 Q 180 240 180 130" fill="none" stroke="#1f2937" stroke-width="1.6" stroke-dasharray="4 4" marker-end="url(#arr4)"/>
+  <text x="460" y="265" text-anchor="middle" font-size="12" fill="#475569">补测试 → 循环</text>
+</svg>
+
+
+<blockquote>
+<p>本项目 <code>SettlementCalculator</code> 有 15 个用例，3 个月无回归；联网版无测试，反复出问题。</p>
+</blockquote>
+<h3 id="83-claude">8.3 多 Claude 协同的天花板</h3>
+<p>要诚实说：<strong>多 Claude 协同有用，但有结构性上限。</strong></p>
+<p>因为它们共享：</p>
+<ol>
+<li><strong>同一训练语料</strong> → 共享"常见模式"假设</li>
+<li><strong>同一训练目标</strong> → 共享"什么是好代码"的偏好</li>
+<li><strong>同一架构</strong> → 共享类似的注意力分布</li>
+</ol>
+<p>→ <strong>相关性盲区</strong>会同时存在于所有 Claude 模型里。</p>
+<p>本项目 <strong>~13 个 Codex 意见</strong>中，大量是多个 Claude 自查也大概率找不出来的：</p>
+<ul>
+<li><code>UUID.take(8)</code>：训练语料里到处是，所有 LLM 都视为"常用模式"</li>
+<li>"房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项</li>
+<li>Loading 遮罩边界：UI 状态机 + 用户视角</li>
+<li>AI 炸弹阈值偏移（1-based vs 0-based）：Codex 逐行数，Claude 偏全局</li>
+<li>语句级 race condition（delay 后漏检 isAISubstitute）：Codex 偏逐行问"这里的边界在哪？"</li>
+</ul>
+<h4 id="vendor">真正补盲区的是"换 vendor + 加静态工具 + 人工真机"</h4>
+<table>
+<thead>
+<tr>
+<th>组合</th>
+<th>找到的问题类型</th>
+<th>互补程度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>多个 Claude 实例</td>
+<td>全局架构 + 逻辑链路（多个角度）</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>Claude + Codex（OpenAI）</td>
+<td>增加细粒度风险点</td>
+<td><strong>较高</strong></td>
+</tr>
+<tr>
+<td>+ Claude pr-reviewer（Opus 独立 context）</td>
+<td>功能完整 / 文档漂移 / 跨文件契约</td>
+<td><strong>更高</strong></td>
+</tr>
+<tr>
+<td>Claude + Codex + Gemini</td>
+<td>不同训练目标，覆盖最广</td>
+<td><strong>最高</strong>（季度手动）</td>
+</tr>
+<tr>
+<td>Claude + 静态分析（Detekt / SpotBugs / kover）</td>
+<td>规则化盲区</td>
+<td><strong>必要</strong></td>
+</tr>
+<tr>
+<td>+ 人工真机验证</td>
+<td>部署 / 字体 / cleartext 等环境问题</td>
+<td><strong>必要</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="84">8.4 本项目的实际实施结果</h3>
+<blockquote>
+<p>8.1-8.3 描述的协同方案在 PR-H1~H5 中<strong>已全部落地</strong>：</p>
+</blockquote>
+
+<svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="实施结果">
+  <g transform="translate(20 20)">
+    <rect width="280" height="320" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+    <text x="140" y="32" text-anchor="middle" font-weight="700" font-size="15" fill="#15803d">✅ 开发阶段</text>
+    <text x="20" y="70" font-size="13">Opus 4.7（1M）</text>
+    <text x="40" y="88" font-size="11" fill="#475569">架构 + 协议 + harness 设计</text>
+    <text x="20" y="120" font-size="13">Sonnet 4.6（默认）</text>
+    <text x="40" y="138" font-size="11" fill="#475569">主要实现</text>
+    <text x="20" y="170" font-size="13">Haiku 4.5</text>
+    <text x="40" y="188" font-size="11" fill="#475569">/pre-commit-scan 静态扫描</text>
+  </g>
+  <g transform="translate(310 20)">
+    <rect width="260" height="320" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+    <text x="130" y="32" text-anchor="middle" font-weight="700" font-size="15" fill="#1d4ed8">✅ PR 阶段四道关</text>
+    <text x="20" y="70" font-size="13">① Codex Bot</text>
+    <text x="40" y="88" font-size="11" fill="#475569">细粒度风险（自动）</text>
+    <text x="20" y="120" font-size="13">② Claude pr-reviewer</text>
+    <text x="40" y="138" font-size="11" fill="#475569">Opus 新会话 + 跨文件契约</text>
+    <text x="20" y="170" font-size="13">③ CI</text>
+    <text x="40" y="188" font-size="11" fill="#475569">tdd-gate + detekt + tests</text>
+    <text x="20" y="220" font-size="13">④ 真机验证</text>
+    <text x="40" y="238" font-size="11" fill="#475569">环境问题兜底</text>
+  </g>
+  <g transform="translate(580 20)">
+    <rect width="280" height="320" rx="12" fill="#fef3c7" stroke="#a16207" stroke-width="1.5"/>
+    <text x="140" y="32" text-anchor="middle" font-weight="700" font-size="15" fill="#854d0e">✅ 关键路径 TDD</text>
+    <text x="20" y="70" font-size="13">CardRulesTest</text>
+    <text x="40" y="88" font-size="11" fill="#475569">~30 用例</text>
+    <text x="20" y="120" font-size="13">ServerGameManagerTest</text>
+    <text x="40" y="138" font-size="11" fill="#475569">~25 用例</text>
+    <text x="20" y="170" font-size="13">SettlementCalculatorTest</text>
+    <text x="40" y="188" font-size="11" fill="#475569">15 用例（3 个月无回归）</text>
+    <text x="20" y="220" font-size="13">GameMessageSerializationTest</text>
+    <text x="40" y="238" font-size="11" fill="#475569">协议 round-trip</text>
+    <text x="20" y="280" font-size="11" fill="#854d0e">CI tdd-gate 强制：critical path 改</text>
+    <text x="20" y="296" font-size="11" fill="#854d0e">动必带对应 *Test.kt 改动</text>
+  </g>
+</svg>
+
+
+<p><strong>实测效果</strong>（PR #35–54 vs PR #1–34）：
+- Codex P1 数：3 → 10（绝对值增加，但 PR 数也多了；都在当 PR 修）
+- 因 "缺测试导致回归" 的 Bug：0（PR-H2 后无一例）
+- <code>docs/regressions.md</code> 追踪的"修了又坏"事件：0（PR #35 后）
+- 卡死类 P0：0（PR #34 之后未复发；force-advance + Mutex 兜底有效）
+- 协议双端漂移：编译期消除（PR-H3 之后任一 GameMessage 改动两端同步）</p>
+<p>预计前面"修了又坏"的 4 轮压到 1-2 轮的目标已<strong>基本达成</strong>：
+PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因为
+1 次 wasmJs psi2ir bug CI 红 2 轮，但属于 wasmJs 后端本身的编译器 bug
+（外部依赖问题），不是逻辑回归。</p>
+<h3 id="85">8.5 核心洞察</h3>
+<blockquote>
+<ul>
+<li>单一 Claude 多轮，本质是<strong>用时间换覆盖率</strong></li>
+<li>多个 Claude 协同，是<strong>用视角换覆盖率</strong></li>
+<li>多 vendor + 静态工具 + 真机验证，是<strong>用异构换覆盖率</strong></li>
+</ul>
+</blockquote>
+<p><strong>异构换覆盖率的边际收益最大</strong>，应作为关键代码的标配。</p>
+<p>本项目实证：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>投入</th>
+<th>产出</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>时间换覆盖率（单 Claude 多轮）</td>
+<td>4 轮自审</td>
+<td>~35 个 Bug</td>
+</tr>
+<tr>
+<td>视角换覆盖率（多 Claude 协同）</td>
+<td>Opus + Sonnet + Haiku</td>
+<td>+20 个 Bug（post-#34 阶段）</td>
+</tr>
+<tr>
+<td>异构换覆盖率（Codex + 真机）</td>
+<td>自动 + 季度手动</td>
+<td>+13 个 Codex + 5 个真机；<strong>90% 是前两者找不到的</strong></td>
+</tr>
+</tbody>
+</table>
+<p>异构换覆盖率不只是"多找 Bug"，更重要的是它<strong>找的是另一类 Bug</strong>——
+否则三种来源会大量重叠，边际收益迅速递减。本项目 13 个 Codex 与 ~55 个
+Claude 发现几乎不重叠，正是异构有效的实证。</p>
+<hr>
+<h2 id="harness-pr-h-ai">第九章：harness 跨会话经验（PR-H 系列 + AI 托管特性）</h2>
+<blockquote>
+<p>本章记录 PR-H1 / PR-H2 / PR-H3 之后的<strong>跨大会话</strong>协同经验。每条都来自
+一次真实的"AI 与人协作出 bug → 复盘 → 沉淀回 harness"的闭环。</p>
+</blockquote>
+<h3 id="91-phase-pr-53-g34-g38">9.1 大特性的"Phase 分段"模式（PR #53 G34-G38 实战）</h3>
+<p><strong>问题</strong>：PR #53 一次性想把 <code>feature_spec G34-G38</code>（5 个 AI 托管 + 速度配置
+特性）打包发出，触及协议层（PROTOCOL_VERSION 升 2→3）/ 服务端 / Android /
+Web / 测试，跨 ~700 行。</p>
+<p><strong>实践</strong>：拆 3 个 Phase，每个 Phase 独立 commit：
+- Phase 1：协议层 + 服务端 + 单测（底层稳了再动客户端）
+- Phase 2：Android UI（一份客户端先吃通）
+- Phase 3：Web UI + 跨端协议 roundtrip 测</p>
+<p><strong>沉淀</strong>：
+- Phase split 让 Codex / pr-reviewer 的反馈精确到单层
+- 协议先行：Phase 1 落地后，Phase 2/3 即便未完成，server 已能跑</p>
+<p><strong>反例</strong>：本次 Phase 3 一次塞下 SP UI + Room speed picker + Web wiring +
+12 个测试 ~320 行，结果 wasmJs 一个 psi2ir 隐藏 bug 把 CI 红了 2 轮（详见
+9.3）。<strong>教训</strong>：Phase 内部还能再切，按"编译单元"切（Android / Web 拆成两个
+commit）能更早发现编译错误——本来 Phase 3 应该至少拆为 "3a Web wiring
++ 测试" 和 "3b SP UI + Room speed picker"，前者过 CI 之后再叠后者。</p>
+<h3 id="92-commit-testkt-tdd-gate">9.2 同 commit <code>*Test.kt</code> 配对（tdd-gate 实战）</h3>
+<p>PR #53 每次改 <code>CardRules.kt</code> / <code>ServerGameManager.kt</code> / <code>SettlementCalculator.kt</code>
+都在<strong>同一 commit</strong> 内附测试。tdd-gate 机械校验"关键路径文件改动 ⇒ 对应 <code>*Test.kt</code>
+同改动"——一次都没误报，也一次都没漏报。</p>
+<h3 id="93-wasmjs-jvmtest-wasmjs-pr-53-ci">9.3 wasmJs 的 "jvmTest 过 ≠ wasmJs 过" 教训（PR #53 第二轮 CI 红）</h3>
+<p>Phase 3 commit <code>d976e81</code> 在 jvmTest 全过的前提下，wasmJs 编译报
+<code>Backend Internal error: Exception during psi2ir + NullPointerException</code>。</p>
+<p><strong>根因</strong>：可空 lambda 传给 <code>@Composable</code> 参数时，wasmJs 后端对"可空 + 函数引用"
+组合存在已知 NPE（详见 <code>docs/regressions.md</code> #12）。</p>
+<p><strong>跨会话经验</strong>：
+- 写完 Web UI <strong>必须 push 跑 CI</strong>，本地永远验不了 wasmJs
+- 防御 pattern：可空 lambda 用 local <code>val</code> 固化；函数引用写显式 lambda</p>
+<h3 id="94-codex-bot-claude-review-pr-pr-53-p2">9.4 Codex bot 与 Claude /review-pr 的互补（PR #53 双 P2 实战）</h3>
+<p>Codex 抓"语句级边界"（race condition 在 delay 后漏检 isAISubstitute）。
+Claude pr-reviewer 抓"功能完整"（game_rules.md 文档漂移）。两个同时 pass
+才算稳。</p>
+<p><strong>跨会话经验</strong>：
+- Codex 评论时间戳可能早于最新 push：回复时<strong>直接列 commit hash</strong> 证明已修
+- 两个 AI 工具缺一不可</p>
+<h3 id="95-push-review-checkhook">9.5 push 后自动 review-check（hook 实战）</h3>
+<p>PR-H4 后 <code>.claude/hooks/PostToolUse.sh</code> 在每次 <code>git push</code> 后注入
+"应主动拉 review_comments + check_runs 修 P0/P1"提醒。</p>
+<p><strong>跨会话经验</strong>：
+- CI 红时<strong>第一手是去 <code>get_comments</code> 拉 PR comment 里 exfil 的 gradle 日志</strong>
+- 单 commit push 后 60s 内 build 通常还在 queued，<strong>别在 push 后立刻报"全绿"</strong></p>
+<h3 id="96-pr-vs-prpr-5253">9.6 PR 流转的"分支 vs PR"错位（PR #52→#53 实战）</h3>
+<p>PR #52 合并后，在同一分支继续 push 5 个 commit 但没开新 PR，用户问"PR 怎么没看到"。</p>
+<p><strong>跨会话经验</strong>：一个分支 = 一个 PR。PR merge 后，下一组改动<strong>开新分支</strong>。</p>
+<h3 id="97-pr-53-p1">9.7 文档单一真相 + 自动同步检测（PR #53 P1 实战）</h3>
+<p><code>pr-reviewer</code> 发现 <code>docs/game_rules.md §2.3</code> 误写"随机首出"，但服务端是 ♠3
+先出。经典"文档自称权威但与代码漂移"。</p>
+<p><strong>沉淀</strong>：新 doc 自称"权威"前做一次"代码 grep 验证"；用户面文档与 game_rules.md
+<strong>必须同 commit 改</strong>。</p>
+<h3 id="98-ai-feature_spec-g36-g38">9.8 AI 接管 / 速度档位的设计取舍（feature_spec G36-G38 实战）</h3>
+<p>3 档预设（50/400/1000ms 单机；100/400/1000ms 多人）优于 slider：
+- UI 简单（radio button）、服务端 clamp 简单、玩家心理负担低
+- "默认 400ms"：比老 1000ms 缩短 60% 但仍可辨识 AI 决策过程</p>
+<p><strong>跨会话经验</strong>：当特性"看起来 slider 更灵活"时，先问"用户真的需要连续值？"
+——多数情况 3 档够用，且压缩边界情况测试矩阵。</p>
+<h3 id="99-harness-l0-l4-pr-h1h5-35-web">9.9 Harness L0-L4 体系搭建（PR-H1..H5 + #35 web 重构 实战）</h3>
+<blockquote>
+<p>与 9.1-9.8 同期推进的另一条主线：把"靠开发者记忆维护约束"系统化为
+"靠基础设施自动执行约束"。这条线产出 5 个 harness PR + 1 个 KMP 重构
+PR + 1 个部署拓扑修复 PR，全部已合并到 main。</p>
+</blockquote>
+<h4 id="991-l0-l4">9.9.1 五层架构（L0-L4）一览</h4>
+<svg viewBox="0 0 880 460" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="Harness L0-L4 五层架构">
+<g transform="translate(40 20)">
+  <rect width="800" height="76" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="16" fill="#dc2626">L0　记忆层</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">CLAUDE.md（主索引）+ docs/regressions.md（Bug 冷藏库）+ docs/playbooks/{fea</text>
+  <text x="20" y="68" font-size="12" fill="#1f2937">ture-development, bug-triage, ci-failure-triage, adversarial-revi</text>
+</g>
+<g transform="translate(40 108)">
+  <rect width="800" height="76" rx="10" fill="#fed7aa" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="16" fill="#ea580c">L1　权限 &amp; 钩子层</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">.claude/settings.json（readonly bash 自动放行）+ .claude/hooks/{Session</text>
+  <text x="20" y="68" font-size="12" fill="#1f2937">Start, PostToolUse, UserPromptSubmit}.sh + .githooks/{pre-push, c</text>
+</g>
+<g transform="translate(40 196)">
+  <rect width="800" height="76" rx="10" fill="#fef3c7" stroke="#a16207" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="16" fill="#a16207">L2　命令 &amp; 子代理</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">.claude/commands/{test-fast, ship-check, pre-commit-scan, trace-b</text>
+  <text x="20" y="68" font-size="12" fill="#1f2937">ug, review-pr}.md + .claude/agents/{protocol-syncer, tdd-scaffold</text>
+</g>
+<g transform="translate(40 284)">
+  <rect width="800" height="76" rx="10" fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="16" fill="#16a34a">L3　TDD 强制层</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">CardRulesTest（~30）+ ServerGameManagerTest（~25）+ GameMessageSerial</text>
+  <text x="20" y="68" font-size="12" fill="#1f2937">izationTest（协议 round-trip）+ CI tdd-gate job</text>
+</g>
+<g transform="translate(40 372)">
+  <rect width="800" height="76" rx="10" fill="#bfdbfe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="20" y="28" font-weight="700" font-size="16" fill="#2563eb">L4　跨 vendor 审查</text>
+  <text x="20" y="50" font-size="12" fill="#1f2937">Codex bot（自动每 PR）+ pr-reviewer subagent（Opus 4.7 独立 context）+ 季度第</text>
+  <text x="20" y="68" font-size="12" fill="#1f2937">二 vendor + 真机最后一关；4 关 PR 流程</text>
+</g>
+</svg>
+
+<h4 id="992-pr-h">9.9.2 PR-H 系列实战回顾</h4>
+<table>
+<thead>
+<tr>
+<th>PR</th>
+<th>范围</th>
+<th>实际产出</th>
+<th>检验数据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PR-H1 Bedrock</strong></td>
+<td>纯基础设施，不动 Kotlin</td>
+<td>settings.json / 3 个 hook / 4 个 slash command / 3 个 playbook</td>
+<td>新会话 SessionStart hook 立刻可见；commit-msg hook 缺署名确实拒绝</td>
+</tr>
+<tr>
+<td><strong>PR-H1.5 Deploy</strong></td>
+<td>部署 playbook + Caddy 拓扑</td>
+<td>install.sh + Caddy + systemd + web-deploy.md</td>
+<td>实战在 PR #41；双层防火墙踩坑 2 次（regressions #9）</td>
+</tr>
+<tr>
+<td><strong>PR-H2 TDD</strong></td>
+<td>关键路径测试 + CI tdd-gate</td>
+<td>CardRulesTest / ServerGameManagerTest / GameMessageSerializationTest；tdd-gate job；detekt 移除 continue-on-error</td>
+<td>tdd-gate 在 PR #53 真触发；改 CardRules 未改测试立刻红</td>
+</tr>
+<tr>
+<td><strong>PR-H3 Server 合并</strong></td>
+<td>服务端改子项目，删 Messages.kt</td>
+<td>settings.gradle 加 <code>:server</code>；删 server/Messages.kt（364 行）；ServerGameManager 委托 :shared；PROTOCOL_VERSION 握手</td>
+<td>约束 1/4 编译期消除；后续协议变更只改 :shared</td>
+</tr>
+<tr>
+<td><strong>PR-H4 Subagents</strong></td>
+<td>多 AI 角色化 + bug 修复入口</td>
+<td>protocol-syncer / tdd-scaffolder / trace-bug + adversarial-review playbook</td>
+<td>trace-bug 在 PR #46 实战生效</td>
+</tr>
+<tr>
+<td><strong>PR-H5 pr-reviewer</strong></td>
+<td>Opus 4.7 独立 context 评审</td>
+<td>pr-reviewer subagent + /review-pr</td>
+<td>PR #42/47/49/53 均找出 Codex 未发现的问题</td>
+</tr>
+</tbody>
+</table>
+<h4 id="993-pr-35-kmp-wasmjs-8">9.9.3 PR #35 KMP 重构 — wasmJs 工具链 8 层"剥洋葱"</h4>
+<p>PR #35 把 model/engine/network/ai 抽到 <code>:shared</code> KMP 模块，加 wasmJs target。
+CI 连续报 8 类不同的兼容性错误，必须按序逐层剥：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>错误信号</th>
+<th>根因</th>
+<th>修法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>assertNull</code> unresolved</td>
+<td>kotlin.test wasmJs 子集缺导入</td>
+<td>显式 <code>import kotlin.test.assertNull</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>coroutines 没 wasmJs variant</td>
+<td>1.7.3 不含 wasm</td>
+<td>升 <code>1.8.1</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>jvmTarget 不一致</td>
+<td>androidTarget 默认与 consumer 不齐</td>
+<td><code>kotlinOptions.jvmTarget = "1.8"</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>跨模块 smart-cast 失败</td>
+<td>Kotlin 不允许对跨模块 <code>var</code> smart-cast</td>
+<td>局部 <code>val</code> 快照</td>
+</tr>
+<tr>
+<td>5</td>
+<td>kotlinx-browser:0.1 要求 K2.0+</td>
+<td>当前 K1.9.24 不兼容</td>
+<td>改 <code>@JsFun</code> 直接 interop</td>
+</tr>
+<tr>
+<td>6</td>
+<td>serialization-json 没 wasmJs</td>
+<td>1.6.0 不含 wasm</td>
+<td>升 <code>1.6.3</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>compose.components.resources K2.0+</td>
+<td>同 #5</td>
+<td>移除（未用到）</td>
+</tr>
+<tr>
+<td>8</td>
+<td>FAIL_ON_PROJECT_REPOS 阻断 KGP NodeJsSetup</td>
+<td>KGP 需要 project-level 仓库</td>
+<td>移除该设置</td>
+</tr>
+</tbody>
+</table>
+<p><strong>跨会话经验</strong>：
+- wasmJs 兼容性是<strong>严格按 Kotlin 版本切片</strong>的，必须查 Maven Central 找首个含
+  <code>-wasm-js</code> 子产物的版本；错误信号顺序非常重要，上层掩盖下层
+- 沙箱拉不到 wasmJs 工具链时<strong>必须 push 跑 CI</strong> — CI exfil channel（§9.9.5）</p>
+<h4 id="994-android-url-regressions">9.9.4 双层防火墙 / Android URL 漂移（实战入 regressions）</h4>
+<ul>
+<li><strong>regressions #9</strong>：双层防火墙任一未放行 80/443 都 timeout，<strong>症状完全相同</strong>。
+  修法：install.sh 自动配 ufw + playbook §3c "分层自检 3 步"</li>
+<li><strong>regressions #13</strong>：PR #41 拓扑改 Caddy 反代，Web 用相对路径生效，
+  <strong>Android SERVER_URL 仍硬编码 <code>:8080</code></strong> → 联网失败</li>
+</ul>
+<p><strong>教训</strong>：拓扑大改必须扫所有客户端；SERVER_URL 是配置项不是常量。</p>
+<h4 id="995-ci-exfil-channel-4">9.9.5 CI exfil channel：把 4 分钟反馈变成可读日志</h4>
+<pre><code class="language-yaml">- name: Surface build error on failure
+  if: failure()
+  run: |
+    { echo &quot;## assembleDebug / wasmJs 失败&quot;
+      grep -nE &quot;^e: |^error:|FAILURE:|^&gt; Task .* FAILED&quot; build.log | head -80
+      tail -300 build.log
+    } &gt; comment.md
+    gh pr comment &quot;$PR_NUMBER&quot; --body-file comment.md
+</code></pre>
+<p><strong>跨会话经验</strong>：
+- 沙箱只能读 PR comment；<code>get_comments</code> 拉到 gradle stderr 等于"远程 SSH 到 CI runner"
+- <code>grep '^e:'</code> 抽硬错误（<code>^w:</code> 是警告），避免 warning 淹没真错误
+- 模式已写入 <code>docs/playbooks/ci-failure-triage.md</code> §5</p>
+<h4 id="996-harness">9.9.6 Harness 见效的可观察证据</h4>
+<p>以 PR #46（Android URL 漂移）为例，每一层都触发：</p>
+<ol>
+<li><strong>SessionStart hook</strong> 列最近 5 commit → 发现 PR #41 拓扑改造</li>
+<li><strong>PostToolUse hook</strong> 编辑 MainActivity.kt → 弹 TDD 提醒 + "扫 LobbyActivity 同源"</li>
+<li><strong>push hook</strong> 注入"主动拉 review/CI"提醒</li>
+<li><strong>Codex bot</strong> 30s 出审查（无 P0/P1）</li>
+<li><strong>/review-pr</strong> 独立审查："治标；根因是常量硬编码两份"→ 登记 follow-up</li>
+<li><strong>regressions.md #13</strong> 同 commit 写入，承载教训</li>
+<li><strong>playbook</strong> 追加"改部署拓扑前 grep 所有客户端 SERVER_URL"步骤</li>
+</ol>
+<p>每一关都有 hook / command / agent / test / doc 自动兜底——这就是 harness 与"靠记忆"的差距。</p>
+    </main>
+    <div class="footer">
+      由 <code>docs/build_html.py</code> 从 <code>docs/dev_summary.md</code> 渲染生成 ·
+      ASCII 架构图替换为 inline SVG · 单文件无外部依赖
+    </div>
+  </div>
+</body>
+</html>

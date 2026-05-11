@@ -81,7 +81,9 @@ AndroidAPP/                                    Kotlin Multiplatform monorepo
     ├── client_implementation_guide.md        实现新客户端（iOS / Desktop / CLI）的参考路径
     ├── settlement_verification.md            结算公式 + 15 验证用例（数学规约）
     ├── regressions.md                        历史 P0/P1 Bug 数据库
-    ├── dev_summary.md                        开发实践回顾（PR #1-#39 时期）
+    ├── dev_summary.md                        开发实践回顾（PR #1-#54 时期）
+    ├── dev_summary.html                      ↑ 渲染版（含 inline SVG 架构图，浏览器打开）
+    ├── build_html.py                         dev_summary.md → dev_summary.html 构建脚本
     └── playbooks/
         ├── adversarial-review.md             4 关 review 节奏
         ├── bug-triage.md                     "修了又坏"防火墙
