@@ -231,6 +231,17 @@ class AppViewModel {
     }
 
     fun connectServer() {
+        // 防双击：UI 在 16ms 内（一帧）才会重组，按钮从"连接服务器"变成"正在连接…"
+        // 有窗口。这一帧内用户若连点，每次都进 connectServer 撕掉前一次的连接
+        // 重来——表现为"点 3 次才能连上"。在已经 Connecting / Connected 时直接
+        // 返回，让按钮的 click 是幂等的。
+        val currentState = net?.connectionState?.value
+        if (currentState == com.communicationcard.game.web.net.WebSocketTransport.State.Connecting ||
+            currentState == com.communicationcard.game.web.net.WebSocketTransport.State.Connected
+        ) {
+            return
+        }
+
         net?.close()
         val sessionScope = newSessionScope()
 
