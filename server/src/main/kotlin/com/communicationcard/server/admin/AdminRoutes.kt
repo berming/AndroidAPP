@@ -13,7 +13,7 @@ import kotlinx.coroutines.runBlocking
  * 1. 从 application.conf 读 AdminConfig
  * 2. 打开 SQLite + 迁移
  * 3. 若 admin_users 空 → 用 ADMIN_INITIAL_USERNAME/PASSWORD 插入初始账号
- * 4. 装载 /admin-auth/* 路由（PR 2 起追加 /admin/api/*）
+ * 4. 装载 `/admin-auth/...` 路由（PR 2 起追加 `/admin/api/...`）
  *
  * Fail-fast 原则：
  * - admin.db.path 缺失 → 抛异常（不允许 admin 模块裸奔启动）

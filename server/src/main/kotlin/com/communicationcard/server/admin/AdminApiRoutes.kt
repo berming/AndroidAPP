@@ -9,7 +9,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
 /**
- * `/admin/api/*` 监控端点（PR 2）。
+ * `/admin/api/...` 监控端点（PR 2）。
  *
  * 6 个 GET 端点 + 1 个权限策略：所有路由都先调
  * [requirePermission]（`MONITOR_READ` 或 `GAME_HISTORY_READ`）。
