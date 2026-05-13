@@ -67,16 +67,17 @@ class AlertEngineTest {
                 return listOf(AlertCandidate(name, severity, message = "fire-$ticks"))
             }
         }
-        // 用 longArrayOf 的 LongArray 取代 arrayOf<Long>（后者是 Array<Long>，
-        // 在 Kotlin 1.9.24 下 `clock[0] += N` 解析不到 set operator —— LongArray
-        // 是原生数组，set/get 都按基本类型 Long 提供）
-        val clock = longArrayOf(1_000L)
+        // 用 1 元素 LongArray 包装可变时钟（lambda 闭包能读，外面能改）。
+        // 关键避坑：变量名不能叫 `clock` —— 它会与 AlertEngine 构造的命名参数
+        // `clock = ...` 撞名，Kotlin 1.9.24 在 lambda 闭包内解析 set operator 时
+        // 报 "No set method providing array access"
+        val clockMs = longArrayOf(1_000L)
         val engine = AlertEngine(
             serverCtx = serverCtx,
             store = store,
             authService = authService,
             rules = listOf(rule),
-            clock = { clock[0] },
+            clock = { clockMs[0] },
         )
 
         engine.runOnce()
@@ -84,8 +85,8 @@ class AlertEngineTest {
         engine.runOnce()
 
         assertEquals(1, store.countUnacked(), "cooldown 内重复 tick 应只入一条")
-        // 推进时钟跳过 cooldown
-        clock[0] += 60_001
+        // 推进时钟跳过 cooldown（显式 set 而非 += 防 1.9.24 quirks）
+        clockMs[0] = clockMs[0] + 60_001
         engine.runOnce()
         assertEquals(2, store.countUnacked())
     }
