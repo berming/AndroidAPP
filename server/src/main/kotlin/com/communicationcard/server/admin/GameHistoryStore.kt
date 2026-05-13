@@ -141,6 +141,56 @@ class GameHistoryStore(private val db: AdminDb) {
         GameDetailDto(summary, players)
     }
 
+    /**
+     * PR 5b 趋势统计：过去 N 天每天的游戏数 / 平均时长 / 真人局数。
+     *
+     * 用 SQLite 的 `date(epoch_ms/1000, 'unixepoch')` 把 epoch ms 截到 UTC 当天，
+     * 按天 GROUP BY。返回值含 N 天的所有日期（即便当天 0 局也补一行 0 计数），
+     * 方便前端直接喂图表 X 轴。
+     */
+    suspend fun trendByDay(days: Int): List<TrendPointDto> = db.withConnection { conn ->
+        val daysClamped = days.coerceIn(1, 90)
+        val zone = java.time.ZoneOffset.UTC
+        val today = java.time.LocalDate.now(zone)
+        val startOfTodayUtc = today.atStartOfDay(zone).toInstant().toEpochMilli()
+        val windowStart = startOfTodayUtc - (daysClamped - 1) * 24L * 3600 * 1000
+
+        // 查每天的聚合
+        val byDay = mutableMapOf<String, TrendPointDto>()
+        conn.prepareStatement(
+            """
+            SELECT date(started_at/1000, 'unixepoch') AS day,
+                   COUNT(*) AS cnt,
+                   AVG(duration_ms) AS avg_ms,
+                   SUM(CASE WHEN human_count = player_count THEN 1 ELSE 0 END) AS human_only
+            FROM games
+            WHERE started_at >= ?
+            GROUP BY day
+            ORDER BY day
+            """.trimIndent()
+        ).use { ps ->
+            ps.setLong(1, windowStart)
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    val day = rs.getString(1)
+                    byDay[day] = TrendPointDto(
+                        date = day,
+                        gameCount = rs.getInt(2),
+                        avgDurationSeconds = (rs.getDouble(3) / 1000).toLong(),
+                        humanGameCount = rs.getInt(4),
+                    )
+                }
+            }
+        }
+        // 补全 N 天（即使当天 0 局也要 0 行），用上方 `today` 重用
+        (0 until daysClamped).map { offset ->
+            val date = today.minusDays((daysClamped - 1 - offset).toLong()).toString()
+            byDay[date] ?: TrendPointDto(
+                date = date, gameCount = 0, avgDurationSeconds = 0, humanGameCount = 0,
+            )
+        }
+    }
+
     // === 内部 helpers ===
 
     private suspend fun insertOne(record: GameRecord) = db.tx { conn ->

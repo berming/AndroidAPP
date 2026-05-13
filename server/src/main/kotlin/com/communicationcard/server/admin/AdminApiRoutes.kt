@@ -85,6 +85,13 @@ fun Route.adminApiRoutes(ctx: AdminContext) {
             }
         }
 
+        // PR 5b: Dashboard 趋势图聚合
+        get("/stats/trend") {
+            call.requirePermission(ctx, AdminPermission.MONITOR_READ) ?: return@get
+            val days = call.request.queryParameters["days"]?.toIntOrNull() ?: 7
+            call.respond(ctx.historyStore.trendByDay(days))
+        }
+
         // PR 3: 告警 ----------------------------------------------------
 
         get("/alerts") {

@@ -1,16 +1,31 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
-import { monitorApi, type Overview } from '../api/monitor'
+import { monitorApi, type Overview, type TrendPoint } from '../api/monitor'
 import dayjs from 'dayjs'
+import VChart from 'vue-echarts'
+import { use as echartsUse } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { LineChart, BarChart } from 'echarts/charts'
+import {
+  TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent,
+} from 'echarts/components'
+
+echartsUse([
+  CanvasRenderer, LineChart, BarChart,
+  TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent,
+])
 
 const overview = ref<Overview | null>(null)
+const trend = ref<TrendPoint[]>([])
 const loading = ref(false)
 let pollTimer: number | undefined
 
 async function refresh() {
   loading.value = true
   try {
-    overview.value = await monitorApi.overview()
+    const [ov, tr] = await Promise.all([monitorApi.overview(), monitorApi.trend(7)])
+    overview.value = ov
+    trend.value = tr
   } finally {
     loading.value = false
   }
@@ -21,6 +36,37 @@ onMounted(() => {
   pollTimer = window.setInterval(refresh, 10_000)
 })
 onBeforeUnmount(() => { if (pollTimer) window.clearInterval(pollTimer) })
+
+const trendOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['总局数', '全人玩家局', '平均时长 (分钟)'], top: 0 },
+  grid: { left: '40', right: '40', top: 36, bottom: 24 },
+  xAxis: {
+    type: 'category',
+    data: trend.value.map((p) => p.date.slice(5)),  // MM-DD
+  },
+  yAxis: [
+    { type: 'value', name: '局数', minInterval: 1 },
+    { type: 'value', name: '分钟', position: 'right' },
+  ],
+  series: [
+    {
+      name: '总局数', type: 'bar', yAxisIndex: 0,
+      data: trend.value.map((p) => p.gameCount),
+      itemStyle: { color: '#409EFF' },
+    },
+    {
+      name: '全人玩家局', type: 'bar', yAxisIndex: 0,
+      data: trend.value.map((p) => p.humanGameCount),
+      itemStyle: { color: '#67C23A' },
+    },
+    {
+      name: '平均时长 (分钟)', type: 'line', yAxisIndex: 1, smooth: true,
+      data: trend.value.map((p) => Math.round(p.avgDurationSeconds / 60 * 10) / 10),
+      itemStyle: { color: '#E6A23C' },
+    },
+  ],
+}))
 
 const uptimeHuman = computed(() => {
   if (!overview.value) return '—'
@@ -96,6 +142,15 @@ const heapStatus = computed(() => {
         </el-card>
       </el-col>
     </el-row>
+
+    <el-row style="margin-top: 16px;">
+      <el-col :span="24">
+        <el-card>
+          <template #header>过去 7 天游戏趋势</template>
+          <v-chart class="trend-chart" :option="trendOption" autoresize />
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -104,4 +159,5 @@ const heapStatus = computed(() => {
 .page-title { margin: 0 0 16px; color: #303133; font-weight: 600; font-size: 18px; }
 .stat-sub { margin-top: 4px; color: #909399; font-size: 12px; }
 .info-row { display: flex; justify-content: space-between; padding: 6px 0; color: #606266; }
+.trend-chart { width: 100%; height: 320px; }
 </style>
