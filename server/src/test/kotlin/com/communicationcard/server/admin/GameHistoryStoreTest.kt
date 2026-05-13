@@ -1,7 +1,7 @@
 package com.communicationcard.server.admin
 
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -11,6 +11,16 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * GameHistoryStore 端到端：enqueue → Channel → IO 协程 → SQLite insert →
+ * 查询 API。
+ *
+ * **不使用 kotlinx.coroutines.test.runTest**：runTest 用 TestScope 的虚拟时钟，
+ * 不推进 Dispatchers.IO 上的真实协程，导致 `withTimeout(5_000) { while
+ * (store.countAll() < N) delay(20) }` 在虚拟 5s 内永远等不到 IO 协程完成 →
+ * `TimeoutCancellationException: Timed out after 5s of _virtual_ time`。
+ * 这里改用 `runBlocking` 走真实时钟。
+ */
 class GameHistoryStoreTest {
 
     private lateinit var db: AdminDb
@@ -24,19 +34,19 @@ class GameHistoryStoreTest {
 
     @AfterTest
     fun tearDown() {
-        // 不主动 stop — 用 runBlocking 反而拖慢测试套件；db.close() 关连接即可
+        runBlocking { store.stop() }
         db.close()
     }
 
     @Test
-    fun `enqueue then async insert ends up in games table`() = runTest {
+    fun `enqueue then async insert ends up in games table`() = runBlocking {
         db.runMigrations()
         store.start()
 
         store.enqueue(record("room-1", "AAAA", winnerTeam = "TEAM_A"))
         store.enqueue(record("room-2", "BBBB", winnerTeam = "TEAM_B"))
 
-        // 等待最多 5 秒 IO 协程消费 2 条
+        // 等待最多 5 秒 IO 协程消费 2 条（真实时钟）
         withTimeout(5_000) {
             while (store.countAll() < 2) delay(20)
         }
@@ -50,7 +60,7 @@ class GameHistoryStoreTest {
     }
 
     @Test
-    fun `listSummaries respects from-to time window`() = runTest {
+    fun `listSummaries respects from-to time window`() = runBlocking {
         db.runMigrations()
         store.start()
 
@@ -69,7 +79,7 @@ class GameHistoryStoreTest {
     }
 
     @Test
-    fun `countSince counts only games newer than threshold`() = runTest {
+    fun `countSince counts only games newer than threshold`() = runBlocking {
         db.runMigrations()
         store.start()
 
@@ -86,7 +96,7 @@ class GameHistoryStoreTest {
     }
 
     @Test
-    fun `findDetail returns players in seat order`() = runTest {
+    fun `findDetail returns players in seat order`() = runBlocking {
         db.runMigrations()
         store.start()
 
@@ -111,14 +121,14 @@ class GameHistoryStoreTest {
     }
 
     @Test
-    fun `findDetail returns null for unknown id`() = runTest {
+    fun `findDetail returns null for unknown id`() = runBlocking {
         db.runMigrations()
         store.start()
         assertNull(store.findDetail(999_999_999L))
     }
 
     @Test
-    fun `enqueue after stop is harmless`() = runTest {
+    fun `enqueue after stop is harmless`() = runBlocking {
         db.runMigrations()
         store.start()
         store.stop()
