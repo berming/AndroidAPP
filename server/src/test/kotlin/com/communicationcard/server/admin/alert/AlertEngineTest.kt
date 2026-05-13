@@ -6,7 +6,10 @@ import com.communicationcard.server.ServerGameManager
 import com.communicationcard.server.ServerRoomManager
 import com.communicationcard.server.admin.AdminAuthService
 import com.communicationcard.server.admin.AdminDb
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -113,6 +116,38 @@ class AlertEngineTest {
         // GOOD 仍然成功入库；BAD 异常被吞
         assertEquals(1, store.countUnacked())
         assertEquals("GOOD", store.listUnacked(1).first().rule)
+    }
+
+    @Test
+    fun `alertFlow emits AlertDto when rule fires successfully`() = runTest {
+        // PR 5a：SSE 推送通道。AlertEngine.runOnce 内 store.insertIfNotCoolingDown
+        // 返回非 null id → tryEmit(dto) 到 alertFlow；admin UI 的 SSE 端点订阅
+        val rule = object : AlertRule {
+            override val name = "TEST_FIRE"
+            override val severity = "INFO"
+            override val cooldownMs = 60_000L
+            override fun evaluate(ctx: ServerContext, nowMs: Long) =
+                listOf(AlertCandidate(name, severity, message = "sse hello"))
+        }
+        val engine = AlertEngine(
+            serverCtx = serverCtx,
+            store = store,
+            authService = authService,
+            rules = listOf(rule),
+        )
+
+        // 先把 collect 协程跑起来（注册订阅），然后才 emit；
+        // SharedFlow replay=0 + extraBuffer=64：subscribe 之后的 emit 收得到
+        val received = async { engine.alertFlow.first() }
+        yield()
+
+        engine.runOnce()
+
+        val dto = received.await()
+        assertEquals("TEST_FIRE", dto.rule)
+        assertEquals("INFO", dto.severity)
+        assertEquals("sse hello", dto.message)
+        assertTrue(dto.id > 0, "id 应是 SQLite AUTOINCREMENT 出来的正数")
     }
 
     @Test

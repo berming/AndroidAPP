@@ -648,6 +648,31 @@ class ServerGameManagerTest {
     }
 
     @Test
+    fun gameEventListener_defaultsToNull_settable_invokable() {
+        // PR 5d：admin GameHistoryStore 通过 gameEventListener 按 roomId 在内存
+        // 累积每手出牌事件；游戏结束时连同 GameRecord 写入 game_events 表。
+        assertNull(gm.gameEventListener)
+
+        val captured = mutableListOf<Pair<String, String>>()
+        gm.gameEventListener = { room, event ->
+            captured.add(room.roomId to event::class.simpleName.orEmpty())
+        }
+
+        val room = ServerRoom(
+            roomId = "room-evt", roomCode = "EVT0", roomName = "EvtTest",
+            hostId = "h", maxPlayers = 6,
+        )
+        gm.gameEventListener?.invoke(room, com.communicationcard.game.network.SerializedGameEvent.TurnStart(0))
+        gm.gameEventListener?.invoke(room, com.communicationcard.game.network.SerializedGameEvent.PlayerPassed(1))
+
+        assertEquals(2, captured.size)
+        assertEquals("room-evt" to "TurnStart", captured[0])
+        assertEquals("room-evt" to "PlayerPassed", captured[1])
+
+        gm.gameEventListener = null
+    }
+
+    @Test
     fun gameEndListener_contract_listenerCanReadStateWithoutAdditionalLock() = runTest {
         // PR 3 review feedback: gameEndListener 必须在锁内被调用，listener 内可以
         // 安全读 room.gameState / room.players（无需再 withRoomLock）。

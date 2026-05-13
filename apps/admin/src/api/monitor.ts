@@ -88,6 +88,13 @@ export interface SessionInfo {
   connectedSeconds: number
 }
 
+export interface TrendPoint {
+  date: string             // YYYY-MM-DD
+  gameCount: number
+  avgDurationSeconds: number
+  humanGameCount: number
+}
+
 export const monitorApi = {
   async overview(): Promise<Overview> {
     return (await http.get<Overview>('/admin/api/overview')).data
@@ -103,5 +110,8 @@ export const monitorApi = {
   },
   async sessions(): Promise<SessionInfo[]> {
     return (await http.get<SessionInfo[]>('/admin/api/sessions')).data
+  },
+  async trend(days = 7): Promise<TrendPoint[]> {
+    return (await http.get<TrendPoint[]>('/admin/api/stats/trend', { params: { days } })).data
   },
 }

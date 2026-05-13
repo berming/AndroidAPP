@@ -86,6 +86,9 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
             stmt.executeUpdate(SCHEMA_ALERTS)
             stmt.executeUpdate(INDEX_ALERTS_UNACK)
             stmt.executeUpdate(INDEX_ALERTS_RULE_RECENT)
+            // PR 5d: 逐手出牌事件（每局游戏内每一次 play/pass/round_won）
+            stmt.executeUpdate(SCHEMA_GAME_EVENTS)
+            stmt.executeUpdate(INDEX_GAME_EVENTS_GAME)
         }
     }
 
@@ -190,6 +193,22 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
 
         private const val INDEX_ALERTS_RULE_RECENT =
             "CREATE INDEX IF NOT EXISTS idx_alerts_rule_recent ON alerts(rule, room_id, created_at DESC)"
+
+        // PR 5d: 逐手出牌事件流。每局 ~50-200 行，与 games 1:N FK CASCADE
+        private val SCHEMA_GAME_EVENTS = """
+            CREATE TABLE IF NOT EXISTS game_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+                seq INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                UNIQUE (game_id, seq)
+            )
+        """.trimIndent()
+
+        private const val INDEX_GAME_EVENTS_GAME =
+            "CREATE INDEX IF NOT EXISTS idx_game_events_game ON game_events(game_id, seq)"
     }
 }
 

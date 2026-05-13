@@ -88,6 +88,15 @@ fun Application.installAdmin(serverCtx: ServerContext) {
         }
     }
 
+    // PR 5d: 把每手出牌 / pass / 回合结束等事件按 roomId 缓冲到 historyStore
+    serverCtx.gameManager.gameEventListener = { room, event ->
+        try {
+            historyStore.recordEvent(room.roomId, event)
+        } catch (e: Throwable) {
+            System.err.println("GameHistoryStore recordEvent failed (ignored): ${e.message}")
+        }
+    }
+
     routing {
         adminAuthRoutes(ctx)
         adminApiRoutes(ctx)

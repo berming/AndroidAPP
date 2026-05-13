@@ -185,6 +185,18 @@ data class GameDetailDto(
 //  PR 3 告警 DTO（/admin/api/alerts）
 // ====================================================================
 
+// ====================================================================
+//  PR 5b 趋势统计（/admin/api/stats/trend）
+// ====================================================================
+
+@Serializable
+data class TrendPointDto(
+    val date: String,             // YYYY-MM-DD（按 UTC 算）
+    val gameCount: Int,
+    val avgDurationSeconds: Long, // 平均局时长（秒）；可能为 0（当 day 内无数据）
+    val humanGameCount: Int,      // 这天里"全人玩家局"个数（humanCount = playerCount）
+)
+
 @Serializable
 data class AlertDto(
     val id: Long,

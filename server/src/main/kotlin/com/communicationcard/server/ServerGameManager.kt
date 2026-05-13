@@ -81,6 +81,16 @@ class ServerGameManager(
     var gameEndListener: ((ServerRoom, SerializedGameResult) -> Unit)? = null
 
     /**
+     * PR 5d：每个游戏内动作 / 事件触发时调用。admin 模块的 GameHistoryStore
+     * 用这个钩子按 roomId 在内存里累积事件，游戏结束时连同 GameRecord 一并
+     * 写入 game_events 表（FK 1:N → games）。
+     *
+     * 与 [gameEndListener] 同样契约：非 suspend、只能 immutable 拷贝 + trySend。
+     */
+    @Volatile
+    var gameEventListener: ((ServerRoom, SerializedGameEvent) -> Unit)? = null
+
+    /**
      * 当前 AI 出牌前的"思考"延迟（毫秒）。读 room/player 状态：
      * - 玩家被 AI 接管（isAISubstitute=true）→ 用 player.takeoverAiDelayMs（feature_spec G38）
      * - 否则（补位 AI）→ 用 room.serverAiDelayMs（feature_spec G37）
@@ -654,6 +664,10 @@ class ServerGameManager(
      * 广播动作结果给所有玩家（公共逻辑）
      */
     suspend fun broadcastActionResult(room: ServerRoom, result: ActionResult) {
+        // PR 5d: 在 broadcast 同时通知 admin gameEventListener。listener 契约
+        // 见 [gameEventListener] docstring（非 suspend、只允许 trySend 类操作）
+        val eventListener = gameEventListener
+
         // 1. 广播状态更新
         room.players.forEach { player ->
             val playerState = getStateForPlayer(room, player.seatIndex)
@@ -665,6 +679,7 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
+            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 3. 广播玩家走完事件（如有）
@@ -672,6 +687,7 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
+            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 4. 广播本轮结束事件（如有）
@@ -679,14 +695,17 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
+            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 4. 广播回合开始事件（除非游戏结束）
         if (result.gameResult == null) {
             val nextPlayerId = room.gameState?.currentPlayerIndex ?: 0
+            val turnStart = SerializedGameEvent.TurnStart(nextPlayerId)
             room.players.forEach { player ->
-                player.session?.send(GameEventMessage(SerializedGameEvent.TurnStart(nextPlayerId)))
+                player.session?.send(GameEventMessage(turnStart))
             }
+            try { eventListener?.invoke(room, turnStart) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 5. 广播游戏结束
