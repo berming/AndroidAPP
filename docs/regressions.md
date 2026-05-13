@@ -197,6 +197,18 @@
 
 ---
 
+## #15  Web 连接服务器需"连点 3 次"才生效
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | Lobby 屏第一次点"连接服务器"后看似无反应，需要再点 2-3 次才看到 Connected 状态 |
+| 根因 | `AppViewModel.connectServer()` 顶部无条件 `net?.close()` + `newSessionScope()`：用户在 UI 重组前（~16 ms 一帧）连点时，每次点击都把刚发起的 WS 撕掉新建，前面的连接尚未完成 onOpen 就被销毁，需要等用户停手后那次才生效 |
+| 修复 | commit `9a10adc`（PR #62）— `connectServer()` 开头判断 `net?.connectionState?.value`：在 `Connecting` / `Connected` 直接 return，让按钮的 click 是幂等的 |
+| 教训 | "破坏式重建"型 UI 入口必须自带幂等保护，仅靠按钮 visibility 控制不可靠——Compose 重组与 click event 不在同一帧。同类入口（goHome / startMultiplayer 等）也要审视 |
+| 防回归测试 | 暂无 unit test（涉及 JS WebSocket + Compose 重组时序）；行为靠手动验证：开 Lobby 屏快速连点 5 次"连接服务器" → 仍只发起一条连接，最终 Connected |
+
+---
+
 ## 防回归策略（PR-H2 起逐步落地）
 
 | 类别 | 落地点 |
