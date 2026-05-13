@@ -31,6 +31,7 @@ class AdminAuthRoutesTest {
     private fun makeContext(): AdminContext {
         val db = AdminDb(AdminDb.IN_MEMORY)
         val authService = AdminAuthService(db, sessionTtlSeconds = 3600)
+        val historyStore = GameHistoryStore(db)
         runBlocking {
             db.runMigrations()
             authService.bootstrapInitialAdmin("root", "correct-horse-battery-staple")
@@ -56,6 +57,8 @@ class AdminAuthRoutesTest {
                 initialPassword = "correct-horse-battery-staple",
             ),
             authService = authService,
+            historyStore = historyStore,
+            snapshotBuilder = SnapshotBuilder(serverCtx, historyStore),
         )
     }
 

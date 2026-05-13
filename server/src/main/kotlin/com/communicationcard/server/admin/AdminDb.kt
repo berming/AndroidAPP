@@ -77,6 +77,11 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
             stmt.executeUpdate(SCHEMA_ADMIN_SESSIONS)
             stmt.executeUpdate(INDEX_SESSIONS_ADMIN)
             stmt.executeUpdate(INDEX_SESSIONS_EXPIRES)
+            // PR 2: 历史游戏
+            stmt.executeUpdate(SCHEMA_GAMES)
+            stmt.executeUpdate(INDEX_GAMES_STARTED_AT)
+            stmt.executeUpdate(INDEX_GAMES_ROOM_CODE)
+            stmt.executeUpdate(SCHEMA_GAME_PLAYERS)
         }
     }
 
@@ -116,6 +121,49 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
 
         private const val INDEX_SESSIONS_EXPIRES =
             "CREATE INDEX IF NOT EXISTS idx_sessions_expires ON admin_sessions(expires_at)"
+
+        // PR 2 — 历史游戏 + 座位详情
+        private val SCHEMA_GAMES = """
+            CREATE TABLE IF NOT EXISTS games (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_id TEXT NOT NULL,
+                room_code TEXT NOT NULL,
+                started_at INTEGER NOT NULL,
+                ended_at INTEGER NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                player_count INTEGER NOT NULL,
+                human_count INTEGER NOT NULL,
+                ai_count INTEGER NOT NULL,
+                winner_team TEXT NOT NULL,
+                trigger TEXT NOT NULL,
+                team_a_score INTEGER NOT NULL,
+                team_b_score INTEGER NOT NULL,
+                final_version INTEGER NOT NULL
+            )
+        """.trimIndent()
+
+        private const val INDEX_GAMES_STARTED_AT =
+            "CREATE INDEX IF NOT EXISTS idx_games_started_at ON games(started_at DESC)"
+
+        private const val INDEX_GAMES_ROOM_CODE =
+            "CREATE INDEX IF NOT EXISTS idx_games_room_code ON games(room_code)"
+
+        private val SCHEMA_GAME_PLAYERS = """
+            CREATE TABLE IF NOT EXISTS game_players (
+                game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+                seat_index INTEGER NOT NULL,
+                player_id_masked TEXT NOT NULL,
+                name TEXT NOT NULL,
+                team TEXT NOT NULL,
+                is_ai INTEGER NOT NULL,
+                was_substituted INTEGER NOT NULL,
+                finished INTEGER NOT NULL,
+                finish_order INTEGER NOT NULL,
+                collected_score INTEGER NOT NULL,
+                final_hand_size INTEGER NOT NULL,
+                PRIMARY KEY (game_id, seat_index)
+            )
+        """.trimIndent()
     }
 }
 

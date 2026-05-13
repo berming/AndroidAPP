@@ -48,6 +48,35 @@ class ServerGameManager(
         roomMutexes.getOrPut(room.roomId) { Mutex() }
 
     /**
+     * 暴露给 admin 模块 [com.communicationcard.server.admin.SnapshotBuilder] 用：
+     * 在 admin 路由处理路径内拿一份房间的 immutable snapshot。
+     *
+     * 该函数复用同一把 [mutexFor] 锁，因此在 admin 路由短暂持锁期间，
+     * 游戏关键路径（[handleAction]）会被阻塞——但 snapshot 构造是
+     * O(players × hand size) 纳秒级，可接受。
+     *
+     * 严格约束（CLAUDE.md 约束 9）：调用方 block 内**不得**做 IO / 网络发送 /
+     * SQLite 写；只允许做 defensive copy。
+     */
+    internal suspend fun <T> withRoomLock(room: ServerRoom, block: suspend () -> T): T =
+        mutexFor(room).withLock { block() }
+
+    /**
+     * 游戏结束钩子（在 [broadcastActionResult] 触发 `gameResult` 那一刻调用）。
+     *
+     * admin 模块的 GameHistoryStore 在 [com.communicationcard.server.admin.installAdmin]
+     * 里把 listener 设进来；监听到游戏结束就 [GameRecord.capture] + 异步入 SQLite。
+     *
+     * 设计原则（CLAUDE.md 约束 9）：
+     * - 调用方实现**必须**是非 suspend 函数（避免阻塞 broadcast 协程）
+     * - listener 内允许做 immutable snapshot 构造 + `Channel.trySend`
+     *   （UNLIMITED capacity 不会阻塞）
+     * - 不允许同步 IO / SQLite 写
+     */
+    @Volatile
+    var gameEndListener: ((ServerRoom, SerializedGameResult) -> Unit)? = null
+
+    /**
      * 当前 AI 出牌前的"思考"延迟（毫秒）。读 room/player 状态：
      * - 玩家被 AI 接管（isAISubstitute=true）→ 用 player.takeoverAiDelayMs（feature_spec G38）
      * - 否则（补位 AI）→ 用 room.serverAiDelayMs（feature_spec G37）
@@ -655,6 +684,15 @@ class ServerGameManager(
 
         // 5. 广播游戏结束
         result.gameResult?.let { gameResult ->
+            // PR 2 admin 监控：先把 record 捕获给 listener（在 status=FINISHED 和
+            // room 删除之前；listener 内部读 room.players + room.gameState 拍快照
+            // 后 Channel.trySend 异步入库，非阻塞）
+            try {
+                gameEndListener?.invoke(room, gameResult)
+            } catch (e: Throwable) {
+                System.err.println("gameEndListener throw (ignored): ${e.message}")
+            }
+
             room.status = RoomStatus.FINISHED
             stopTurnTimer(room)
             room.players.forEach { player ->
@@ -913,7 +951,9 @@ class ServerGameState(
     val finishOrder: MutableList<Int>,
     var version: Long,
     // 每个玩家累计已收分（赢得回合获得的分数总和）
-    val playerScores: MutableMap<Int, Int> = mutableMapOf()
+    val playerScores: MutableMap<Int, Int> = mutableMapOf(),
+    // PR 2: 本局开始时间（epoch ms）。admin GameHistoryStore 入库时记录 duration_ms
+    val startedAtEpochMs: Long = System.currentTimeMillis(),
 )
 
 /**

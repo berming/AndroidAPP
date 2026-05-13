@@ -27,6 +27,7 @@ fun Application.installAdmin(serverCtx: ServerContext) {
 
     val db = AdminDb(config.dbPath)
     val authService = AdminAuthService(db, sessionTtlSeconds = config.sessionTtlSeconds)
+    val historyStore = GameHistoryStore(db)
 
     // 同步迁移 + bootstrap：服务启动必须等表准备好再开放路由
     runBlocking {
@@ -57,20 +58,37 @@ fun Application.installAdmin(serverCtx: ServerContext) {
         }
     }
 
+    historyStore.start()
+
+    val snapshotBuilder = SnapshotBuilder(serverCtx, historyStore)
     val ctx = AdminContext(
         serverCtx = serverCtx,
         db = db,
         config = config,
         authService = authService,
+        historyStore = historyStore,
+        snapshotBuilder = snapshotBuilder,
     )
+
+    // 把"游戏结束 → 异步入库"挂到 gameManager
+    serverCtx.gameManager.gameEndListener = { room, result ->
+        try {
+            historyStore.enqueue(GameRecord.capture(room, result))
+        } catch (e: Throwable) {
+            System.err.println("GameHistoryStore capture failed (ignored): ${e.message}")
+        }
+    }
 
     routing {
         adminAuthRoutes(ctx)
-        // PR 2+ 起追加：adminApiRoutes(ctx)
+        adminApiRoutes(ctx)
     }
 
-    // 关闭钩子：让 SQLite 有机会 checkpoint WAL
+    // 关闭钩子：停 history 协程 + 让 SQLite 有机会 checkpoint WAL
     environment.monitor.subscribe(io.ktor.server.application.ApplicationStopping) {
+        runBlocking {
+            try { historyStore.stop() } catch (_: Throwable) { /* ignore */ }
+        }
         try { db.close() } catch (_: Throwable) { /* ignore */ }
     }
 }

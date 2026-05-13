@@ -1,5 +1,9 @@
 package com.communicationcard.server
 
+import com.communicationcard.game.network.SerializedGameResult
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -544,5 +548,80 @@ class ServerGameManagerTest {
             gm.shouldYieldToHumanPlayer(player),
             "Codex P2: 玩家在延迟期内取消托管时，AI 必须让出控制权（feature_spec G34/G35）"
         )
+    }
+
+    // ============================================================
+    //  PR 2 (admin 后台 · 监控) 新增的 internal API 覆盖
+    // ============================================================
+
+    @Test
+    fun withRoomLock_serializesConcurrentCalls() = runTest {
+        // admin SnapshotBuilder 用 withRoomLock 取房间 snapshot；与同房间内的
+        // handleAction 共享同一把 mutex。验证：两个并发协程进入同一房间的
+        // withRoomLock 时被串行化（counter 不出现读写竞争）。
+        val room = ServerRoom(
+            roomId = "test-room",
+            roomCode = "ABCD",
+            roomName = "TestRoom",
+            hostId = "host",
+            maxPlayers = 6,
+        )
+        var counter = 0
+        val a = async {
+            gm.withRoomLock(room) {
+                val seen = counter
+                delay(5)  // 假装做点事，给 b 一个抢占窗口
+                counter = seen + 1
+                seen
+            }
+        }
+        val b = async {
+            gm.withRoomLock(room) {
+                val seen = counter
+                delay(5)
+                counter = seen + 1
+                seen
+            }
+        }
+        val aSeen = a.await()
+        val bSeen = b.await()
+        // 若两个 block 真的串行，看到的 counter 起点会不同（0 / 1）；并发则可能都看到 0
+        assertEquals(setOf(0, 1), setOf(aSeen, bSeen))
+        assertEquals(2, counter, "串行化后 counter 应该恰好 +2")
+    }
+
+    @Test
+    fun gameEndListener_defaultsToNull() {
+        // PR 2：gameEndListener 默认 null，installAdmin 才会设入；
+        // 没装 admin 模块时（生产 enableAdmin=false 或运行单机测试）也不能 NPE
+        assertNull(gm.gameEndListener)
+    }
+
+    @Test
+    fun gameEndListener_settable_and_invokable() {
+        // PR 2：admin 模块通过 listener 接收 game-end 事件后构建 GameRecord
+        // 异步入库。验证 setter / 直接 invoke 都正常
+        val captured = mutableListOf<Pair<String, String>>()
+        gm.gameEndListener = { room, result ->
+            captured.add(room.roomId to result.winner.orEmpty())
+        }
+
+        val room = ServerRoom(
+            roomId = "room-x", roomCode = "ZZZZ", roomName = "Z",
+            hostId = "h", maxPlayers = 6,
+        )
+        val result = SerializedGameResult(
+            winner = "TEAM_A",
+            teamAScore = 250,
+            teamBScore = 10,
+            trigger = "TEAM_ALL_FINISHED",
+        )
+        gm.gameEndListener?.invoke(room, result)
+
+        assertEquals(1, captured.size)
+        assertEquals("room-x" to "TEAM_A", captured.first())
+
+        // tearDown：避免影响其他 test
+        gm.gameEndListener = null
     }
 }

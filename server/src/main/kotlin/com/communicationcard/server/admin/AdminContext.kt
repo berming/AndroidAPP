@@ -20,4 +20,6 @@ data class AdminContext(
     val db: AdminDb,
     val config: AdminConfig,
     val authService: AdminAuthService,
+    val historyStore: GameHistoryStore,
+    val snapshotBuilder: SnapshotBuilder,
 )
