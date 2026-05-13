@@ -1,13 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PR 5c：JSON 结构化日志。
+  服务端日志通过 SLF4J → Logback → LogstashEncoder 输出单行 JSON 到 stdout，
+  systemd 转发到 /var/log/communication-card/server.log。每行示例：
+    {"@timestamp":"...","level":"INFO","logger_name":"...","message":"..."}
+  运维消费：
+    sudo tail -f /var/log/communication-card/server.log | jq '...'
+
+  注意：服务端老代码用 println 而非 SLF4J（GameSession / ServerGameManager 等），
+  那些日志仍是裸文本。逐步迁移到 LoggerFactory.getLogger() 后会自动落 JSON。
+-->
 <configuration>
-    <!-- stdout / stderr 由 systemd unit 转发到 /var/log/communication-card/server.log -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- 字段重命名为运维通用 schema（与 ELK / Loki 默认 schema 对齐）-->
+            <fieldNames>
+                <timestamp>@timestamp</timestamp>
+                <message>message</message>
+                <level>level</level>
+                <thread>thread</thread>
+                <logger>logger</logger>
+            </fieldNames>
+            <!-- 可选 MDC 字段：handler 可调 MDC.put("roomId", "...") 把字段
+                 自动塞进每行 JSON。后续 game-flow 迁移 SLF4J 时用 -->
+            <includeMdcKeyName>roomId</includeMdcKeyName>
+            <includeMdcKeyName>playerId</includeMdcKeyName>
+            <includeMdcKeyName>adminId</includeMdcKeyName>
         </encoder>
     </appender>
 
-    <!-- Ktor / Netty 自己的日志降一级，避免 INFO 噪音淹没业务日志 -->
+    <!-- Ktor / Netty 自身的日志降一级，避免 INFO 噪音淹没业务日志 -->
     <logger name="io.netty" level="WARN"/>
     <logger name="io.ktor" level="INFO"/>
 

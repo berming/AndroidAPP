@@ -41,6 +41,9 @@ dependencies {
 
     // Logging
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
+    // PR 5c：JSON 结构化日志（logstash-logback-encoder）；admin 模块 + Ktor 自身的
+    // SLF4J 日志输出为单行 JSON，方便 jq / Loki / ELK 等聚合工具消费
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
 
     // PR 1: admin 后台依赖
     // SQLite：admin_users / admin_sessions / 后续 games / game_players / alerts 全部落库
