@@ -7,6 +7,7 @@ on:
     paths:
       # 只有这些文件变更才有意义重新部署
       - 'apps/web/**'
+      - 'apps/admin/**'
       - 'shared/**'
       - 'server/**'
       - 'deploy/**'
@@ -42,6 +43,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # admin SPA 用 npm，缓存以 apps/admin/package-lock.json 为 key
+          cache: 'npm'
+          cache-dependency-path: apps/admin/package-lock.json
+
       - name: Cache Gradle Dependencies
         uses: actions/cache@v4
         with:
@@ -59,11 +68,19 @@ jobs:
         run: |
           ./gradlew :apps:web:wasmJsBrowserDistribution :server:installDist --no-daemon
 
+      - name: Build admin SPA
+        working-directory: apps/admin
+        run: |
+          npm ci
+          npm run build
+
       - name: Verify build output
         run: |
           test -f apps/web/build/dist/wasmJs/productionExecutable/index.html
+          test -f apps/admin/dist/index.html
           test -f server/build/install/server/bin/server
           ls -lh apps/web/build/dist/wasmJs/productionExecutable
+          ls -lh apps/admin/dist
           ls -lh server/build/install/server/bin
 
       - name: Set up SSH agent
@@ -86,6 +103,15 @@ jobs:
           rsync -avz --delete \
             apps/web/build/dist/wasmJs/productionExecutable/ \
             "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST:/var/www/communication-card-web/"
+
+      - name: Rsync admin SPA dist
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+        run: |
+          rsync -avz --delete \
+            apps/admin/dist/ \
+            "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST:/var/www/communication-card-admin/"
 
       - name: Rsync server installDist
         env:

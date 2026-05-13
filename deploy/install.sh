@@ -16,6 +16,8 @@ fi
 
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/berming/AndroidAPP/main}"
 WEB_DIR="/var/www/communication-card-web"
+# admin SPA 静态文件目录（PR 4）
+ADMIN_WEB_DIR="/var/www/communication-card-admin"
 SERVER_DIR="/opt/communication-card/server"
 LOG_DIR="/var/log/communication-card"
 # admin 后台 SQLite 数据目录（PR 0 起预留；PR 1 admin_users / PR 2 games 表入库）
@@ -43,8 +45,8 @@ apt-get install -y openjdk-17-jre-headless
 step "2/7 创建部署用户与目录"
 id -u "$DEPLOY_USER" >/dev/null 2>&1 || \
     useradd --system --create-home --shell /bin/bash "$DEPLOY_USER"
-mkdir -p "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
-chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
+mkdir -p "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
 chmod 750 "$LIB_DIR"
 
 step "3/7 部署 Caddyfile"

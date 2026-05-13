@@ -231,19 +231,63 @@ jobs:
           retention-days: 7
 
   # ============================================================
+  # admin SPA 构建 + 产物大小 sanity check（PR 4 引入）。
+  # 与 :apps:android / :apps:web 解耦：用 Node 20 + npm 而不是 Gradle。
+  # ============================================================
+  admin-build:
+    name: Build admin SPA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/admin/package-lock.json
+
+      - name: Install + build
+        working-directory: apps/admin
+        run: |
+          npm ci
+          npm run build
+
+      - name: Verify build output
+        run: |
+          test -f apps/admin/dist/index.html
+          ls -lh apps/admin/dist
+          # 防 Element Plus 全量打包回归：dist 总大小 > 5 MB 视为异常
+          size_bytes=$(du -sb apps/admin/dist | cut -f1)
+          echo "dist size: $size_bytes bytes ($(du -sh apps/admin/dist | cut -f1))"
+          if [ "$size_bytes" -gt $((5 * 1024 * 1024)) ]; then
+            echo "❌ apps/admin/dist 超过 5 MB —— 检查 Element Plus 是否退化成全量加载"
+            exit 1
+          fi
+
+      - name: Upload admin dist
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: communication-card-admin
+          path: apps/admin/dist
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ============================================================
   # 同步 PR 描述里"CI 绿"那一行的勾选状态。
   #
   # 只动这一格 —— 其他三关（Codex / Claude /review / 真机）按设计仍是
   # 人工勾，CI 不替它们打钩，避免把 4 关流程退化成单点守门。
   #
-  # 触发：tdd-gate + build 都跑完即触发（success 或 failure 都来）。
+  # 触发：tdd-gate + build + admin-build 都跑完即触发（success 或 failure 都来）。
   # 写入：success → `- [x] **CI 绿**`；其他 → `- [ ] **CI 绿**`（回滚）。
   # 幂等：内容已是目标态时不写。
   # ============================================================
   update-ci-checkbox:
     name: Sync PR description "CI 绿" checkbox
     runs-on: ubuntu-latest
-    needs: [tdd-gate, build]
+    needs: [tdd-gate, build, admin-build]
     # `always()` 让 needs 失败/跳过时也能执行（用来把勾恢复回未选）；
     # 仅 PR 事件需要更新描述（push 到 main 时没 PR 可改）。
     if: always() && github.event_name == 'pull_request'
@@ -255,6 +299,7 @@ jobs:
         env:
           TDD_GATE_RESULT: ${{ needs.tdd-gate.result }}
           BUILD_RESULT: ${{ needs.build.result }}
+          ADMIN_BUILD_RESULT: ${{ needs.admin-build.result }}
         with:
           script: |
             const pr = context.payload.pull_request;
@@ -263,7 +308,8 @@ jobs:
             const TICKED = '- [x] **CI 绿**';
             const allGreen =
               process.env.TDD_GATE_RESULT === 'success' &&
-              process.env.BUILD_RESULT === 'success';
+              process.env.BUILD_RESULT === 'success' &&
+              process.env.ADMIN_BUILD_RESULT === 'success';
             const target = allGreen ? TICKED : UNTICKED;
             const other  = allGreen ? UNTICKED : TICKED;
             if (!body.includes(other) && !body.includes(target)) {

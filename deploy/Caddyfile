@@ -19,6 +19,24 @@ bermin.cn {
         reverse_proxy 127.0.0.1:8080
     }
 
+    # Admin REST API：/admin/api/* 和 /admin-auth/* → Ktor。
+    # 必须在 handle_path /admin/* 之前，否则 SPA 静态文件兜底会吞掉 API 请求。
+    @adminApi {
+        path /admin/api/* /admin-auth/*
+    }
+    handle @adminApi {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # Admin SPA：剥前缀 /admin 后从 /var/www/communication-card-admin/ 提供。
+    # try_files {path} /index.html → Vue Router history mode 兜底
+    handle_path /admin/* {
+        root * /var/www/communication-card-admin
+        encode gzip zstd
+        try_files {path} /index.html
+        file_server
+    }
+
     handle {
         root * /var/www/communication-card-web
         encode gzip zstd
