@@ -47,6 +47,12 @@ class AdminApiRoutesTest {
             sessions = ConcurrentHashMap<String, GameSession>(),
             startedAtEpochMs = System.currentTimeMillis() - 60_000,
         )
+        val alertStore = com.communicationcard.server.admin.alert.AlertStore(db)
+        val alertEngine = com.communicationcard.server.admin.alert.AlertEngine(
+            serverCtx = serverCtx,
+            store = alertStore,
+            authService = authService,
+        )
         return AdminContext(
             serverCtx = serverCtx,
             db = db,
@@ -61,6 +67,8 @@ class AdminApiRoutesTest {
             authService = authService,
             historyStore = historyStore,
             snapshotBuilder = SnapshotBuilder(serverCtx, historyStore),
+            alertStore = alertStore,
+            alertEngine = alertEngine,
         )
     }
 
@@ -187,6 +195,93 @@ class AdminApiRoutesTest {
 
         val resp = httpClient.get("/admin/api/games/99999") { cookie(ADMIN_COOKIE_NAME, token) }
         assertEquals(HttpStatusCode.NotFound, resp.status)
+    }
+
+    // === PR 3 alerts endpoints ===
+
+    @Test
+    fun `GET alerts with empty store returns empty list`() = testApplication {
+        val ctx = makeContext()
+        application {
+            install(ContentNegotiation) { json() }
+            routing {
+                adminAuthRoutes(ctx)
+                adminApiRoutes(ctx)
+            }
+        }
+        val httpClient = createClient { install(ClientContentNegotiation) { json() } }
+        val token = login(httpClient)
+
+        val resp = httpClient.get("/admin/api/alerts?unack=true") { cookie(ADMIN_COOKIE_NAME, token) }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        val list: List<AlertDto> = resp.body()
+        assertEquals(0, list.size)
+    }
+
+    @Test
+    fun `POST ack on non-existent alert returns 404`() = testApplication {
+        val ctx = makeContext()
+        application {
+            install(ContentNegotiation) { json() }
+            routing {
+                adminAuthRoutes(ctx)
+                adminApiRoutes(ctx)
+            }
+        }
+        val httpClient = createClient { install(ClientContentNegotiation) { json() } }
+        val token = login(httpClient)
+
+        val resp = httpClient.post("/admin/api/alerts/999/ack") { cookie(ADMIN_COOKIE_NAME, token) }
+        assertEquals(HttpStatusCode.NotFound, resp.status)
+    }
+
+    @Test
+    fun `GET alerts then POST ack flow toggles row visibility`() = testApplication {
+        val ctx = makeContext()
+        application {
+            install(ContentNegotiation) { json() }
+            routing {
+                adminAuthRoutes(ctx)
+                adminApiRoutes(ctx)
+            }
+        }
+        val httpClient = createClient { install(ClientContentNegotiation) { json() } }
+        val token = login(httpClient)
+
+        // 直接插一条 alert（绕过 engine）
+        runBlocking {
+            ctx.alertStore.insertIfNotCoolingDown(
+                candidate = com.communicationcard.server.admin.alert.AlertCandidate(
+                    rule = "ROOM_STUCK",
+                    severity = "WARN",
+                    roomId = "test-room",
+                    message = "test stuck",
+                ),
+                cooldownMs = 60_000,
+                nowMs = System.currentTimeMillis(),
+            )
+        }
+
+        var resp = httpClient.get("/admin/api/alerts?unack=true") { cookie(ADMIN_COOKIE_NAME, token) }
+        assertEquals(HttpStatusCode.OK, resp.status)
+        val list: List<AlertDto> = resp.body()
+        assertEquals(1, list.size)
+        assertEquals("ROOM_STUCK", list[0].rule)
+
+        // ack
+        val ackResp = httpClient.post("/admin/api/alerts/${list[0].id}/ack") { cookie(ADMIN_COOKIE_NAME, token) }
+        assertEquals(HttpStatusCode.NoContent, ackResp.status)
+
+        // 再查 unack 应该空
+        resp = httpClient.get("/admin/api/alerts?unack=true") { cookie(ADMIN_COOKIE_NAME, token) }
+        val empty: List<AlertDto> = resp.body()
+        assertEquals(0, empty.size)
+
+        // listRecent（不带 unack）仍能看到 acked 行
+        val recentResp = httpClient.get("/admin/api/alerts") { cookie(ADMIN_COOKIE_NAME, token) }
+        val recent: List<AlertDto> = recentResp.body()
+        assertEquals(1, recent.size)
+        assertEquals("root", recent[0].ackedBy)
     }
 
     @Test

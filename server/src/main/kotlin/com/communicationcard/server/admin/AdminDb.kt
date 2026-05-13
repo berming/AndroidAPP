@@ -82,6 +82,10 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
             stmt.executeUpdate(INDEX_GAMES_STARTED_AT)
             stmt.executeUpdate(INDEX_GAMES_ROOM_CODE)
             stmt.executeUpdate(SCHEMA_GAME_PLAYERS)
+            // PR 3: 告警
+            stmt.executeUpdate(SCHEMA_ALERTS)
+            stmt.executeUpdate(INDEX_ALERTS_UNACK)
+            stmt.executeUpdate(INDEX_ALERTS_RULE_RECENT)
         }
     }
 
@@ -164,6 +168,28 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
                 PRIMARY KEY (game_id, seat_index)
             )
         """.trimIndent()
+
+        // PR 3: 告警
+        private val SCHEMA_ALERTS = """
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                room_id TEXT,
+                player_id_masked TEXT,
+                message TEXT NOT NULL,
+                payload TEXT,
+                created_at INTEGER NOT NULL,
+                acked_at INTEGER,
+                acked_by INTEGER REFERENCES admin_users(id)
+            )
+        """.trimIndent()
+
+        private const val INDEX_ALERTS_UNACK =
+            "CREATE INDEX IF NOT EXISTS idx_alerts_unack ON alerts(acked_at, created_at DESC)"
+
+        private const val INDEX_ALERTS_RULE_RECENT =
+            "CREATE INDEX IF NOT EXISTS idx_alerts_rule_recent ON alerts(rule, room_id, created_at DESC)"
     }
 }
 

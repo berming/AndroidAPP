@@ -44,6 +44,12 @@ class AdminAuthRoutesTest {
             sessions = ConcurrentHashMap<String, GameSession>(),
             startedAtEpochMs = 0L,
         )
+        val alertStore = com.communicationcard.server.admin.alert.AlertStore(db)
+        val alertEngine = com.communicationcard.server.admin.alert.AlertEngine(
+            serverCtx = serverCtx,
+            store = alertStore,
+            authService = authService,
+        )
         return AdminContext(
             serverCtx = serverCtx,
             db = db,
@@ -59,6 +65,8 @@ class AdminAuthRoutesTest {
             authService = authService,
             historyStore = historyStore,
             snapshotBuilder = SnapshotBuilder(serverCtx, historyStore),
+            alertStore = alertStore,
+            alertEngine = alertEngine,
         )
     }
 

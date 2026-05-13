@@ -598,6 +598,28 @@ class ServerGameManagerTest {
     }
 
     @Test
+    fun serverGameState_lastActionAt_initializesToCurrentTime() {
+        // PR 3: ROOM_STUCK 告警依赖 lastActionAt。新 game state 创建时该字段
+        // 应该是当下；后续 handleAction 成功路径会持续刷新。
+        val before = System.currentTimeMillis()
+        val state = ServerGameState(
+            phase = "PLAYING",
+            currentPlayerIndex = 0,
+            hands = mutableMapOf(),
+            lastPlayedGroup = null,
+            lastPlayerId = null,
+            consecutivePasses = 0,
+            currentRoundScore = 0,
+            teamAScore = 0,
+            teamBScore = 0,
+            finishOrder = mutableListOf(),
+            version = 0,
+        )
+        val after = System.currentTimeMillis()
+        assertTrue(state.lastActionAt in before..after, "lastActionAt 默认应当是构造时刻")
+    }
+
+    @Test
     fun gameEndListener_settable_and_invokable() {
         // PR 2：admin 模块通过 listener 接收 game-end 事件后构建 GameRecord
         // 异步入库。验证 setter / 直接 invoke 都正常

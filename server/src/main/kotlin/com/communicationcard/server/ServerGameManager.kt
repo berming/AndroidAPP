@@ -255,6 +255,7 @@ class ServerGameManager(
         // 移动到下一个玩家
         moveToNextPlayer(room)
         state.version++
+        state.lastActionAt = System.currentTimeMillis()  // PR 3: ROOM_STUCK 告警基准
 
         // 重置回合计时器
         resetTurnTimer(room)
@@ -312,6 +313,7 @@ class ServerGameManager(
         }
 
         state.version++
+        state.lastActionAt = System.currentTimeMillis()  // PR 3: ROOM_STUCK 告警基准
 
         // 重置回合计时器
         resetTurnTimer(room)
@@ -614,6 +616,7 @@ class ServerGameManager(
                 forceAdvance = true
                 moveToNextPlayer(room)
                 state.version++
+                state.lastActionAt = System.currentTimeMillis()  // PR 3: force-advance 也算 unstuck
                 resetTurnTimer(room)
             }
         }
@@ -954,6 +957,11 @@ class ServerGameState(
     val playerScores: MutableMap<Int, Int> = mutableMapOf(),
     // PR 2: 本局开始时间（epoch ms）。admin GameHistoryStore 入库时记录 duration_ms
     val startedAtEpochMs: Long = System.currentTimeMillis(),
+    // PR 3: 最近一次玩家动作的时间（epoch ms）。admin AlertRule.ROOM_STUCK 检查
+    // (now - lastActionAt > 5 min) 触发"房间卡死"告警。
+    // 每次 handleAction 成功路径会刷新；handleAction 失败 / 自动 AI 接管 不刷新——
+    // AI 卡了也算卡。
+    @Volatile var lastActionAt: Long = System.currentTimeMillis(),
 )
 
 /**
