@@ -67,7 +67,10 @@ class AlertEngineTest {
                 return listOf(AlertCandidate(name, severity, message = "fire-$ticks"))
             }
         }
-        val clock = arrayOf(1_000L)
+        // 用 longArrayOf 的 LongArray 取代 arrayOf<Long>（后者是 Array<Long>，
+        // 在 Kotlin 1.9.24 下 `clock[0] += N` 解析不到 set operator —— LongArray
+        // 是原生数组，set/get 都按基本类型 Long 提供）
+        val clock = longArrayOf(1_000L)
         val engine = AlertEngine(
             serverCtx = serverCtx,
             store = store,
