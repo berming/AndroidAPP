@@ -162,6 +162,6 @@ fun Route.adminApiRoutes(ctx: AdminContext) {
     }
 }
 
-private val SSE_CONTENT_TYPE = ContentType.parse("text/event-stream").withCharset(Charsets.UTF_8)
+private val SSE_CONTENT_TYPE = ContentType.parse("text/event-stream")
 private val SSE_JSON = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 private const val HEARTBEAT_INTERVAL_MS: Long = 25_000L
