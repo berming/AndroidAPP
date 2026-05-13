@@ -96,12 +96,76 @@ jobs:
 
       # 共享模块测试（含 SettlementCalculatorTest 15 用例 + CardRulesTest）
       - name: Run shared module tests (commonTest)
-        run: ./gradlew :shared:jvmTest
+        run: |
+          set -o pipefail
+          ./gradlew :shared:jvmTest --info --stacktrace 2>&1 \
+            | tee sharedJvmTest.log
+
+      - name: Surface :shared:jvmTest error on failure
+        if: failure() && hashFiles('sharedJvmTest.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## ❌ :shared:jvmTest 失败"
+            echo ""
+            echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
+            echo ""
+            echo '```'
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED|What went wrong|Could not resolve|^Caused by:" sharedJvmTest.log \
+              | head -80 || echo "(no Kotlin error lines found)"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>末 300 行 gradle 输出 — 点击展开</summary>"
+            echo ""
+            echo '```'
+            tail -300 sharedJvmTest.log
+            echo '```'
+            echo "</details>"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-sharedJvmTest.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-sharedJvmTest.md \
+              || echo "PR comment failed; summary still written"
+          fi
 
       # 服务端单元测试（含 ServerGameManagerTest）
       # PR-H3 起 server 是 :server 子项目，不再需要 working-directory。
       - name: Run server unit tests
-        run: ./gradlew :server:test
+        run: |
+          set -o pipefail
+          ./gradlew :server:test --info --stacktrace 2>&1 \
+            | tee serverTest.log
+
+      - name: Surface :server:test error on failure
+        if: failure() && hashFiles('serverTest.log') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## ❌ :server:test 失败"
+            echo ""
+            echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
+            echo ""
+            echo '```'
+            grep -nE "^e: |^w: |^error:|FAILURE:|^> Task .* FAILED|What went wrong|Could not resolve|^Caused by:" serverTest.log \
+              | head -80 || echo "(no Kotlin error lines found)"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "<details><summary>末 300 行 gradle 输出 — 点击展开</summary>"
+            echo ""
+            echo '```'
+            tail -300 serverTest.log
+            echo '```'
+            echo "</details>"
+          } | tee -a "$GITHUB_STEP_SUMMARY" > comment-serverTest.md
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body-file comment-serverTest.md \
+              || echo "PR comment failed; summary still written"
+          fi
 
       # Detekt 静态扫描；目前用 continue-on-error 软失败（待生成 baseline 后改回硬关）
       - name: Detekt static analysis
