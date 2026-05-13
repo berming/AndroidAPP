@@ -21,7 +21,7 @@ Environment="SERVER_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/communication-card
+ReadWritePaths=/var/log/communication-card /var/lib/communication-card
 ProtectHome=true
 
 StandardOutput=append:/var/log/communication-card/server.log

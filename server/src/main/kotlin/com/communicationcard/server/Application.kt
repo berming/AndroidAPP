@@ -2,9 +2,12 @@ package com.communicationcard.server
 
 import com.communicationcard.game.network.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -21,56 +24,93 @@ private const val ERR_PROTOCOL_VERSION_MISMATCH = 4001
 fun main() {
     println("=== Starting Server ===")
 
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-        println("=== Configuring Server ===")
-
-        install(WebSockets) {
-            pingPeriod = Duration.ofSeconds(15)
-            timeout = Duration.ofSeconds(60)
-            maxFrameSize = Long.MAX_VALUE
-            masking = false
-        }
-
-        println("=== WebSockets installed ===")
-
-        val roomManager = ServerRoomManager()
-        val gameManager = ServerGameManager(roomManager)
-        val sessions = ConcurrentHashMap<String, GameSession>()
-
-        routing {
-            get("/") {
-                println("=== GET / received ===")
-                call.respondText("OK", ContentType.Text.Plain)
-            }
-
-            get("/health") {
-                println("=== GET /health received ===")
-                call.respondText("Healthy", ContentType.Text.Plain)
-            }
-
-            webSocket("/game") {
-                val sessionId = UUID.randomUUID().toString()
-                println("=== WebSocket /game connected: $sessionId ===")
-
-                val session = GameSession(sessionId, this)
-                sessions[sessionId] = session
-
-                try {
-                    handleSession(session, roomManager, gameManager, sessions)
-                } catch (e: ClosedReceiveChannelException) {
-                    println("=== WebSocket closed: $sessionId (${e.message}) ===")
-                } catch (e: Exception) {
-                    println("=== WebSocket error: ${e.message} ===")
-                    e.printStackTrace()
-                } finally {
-                    handleDisconnect(session, roomManager, gameManager, sessions)
-                }
-            }
-        }
-
-        println("=== Routing configured ===")
-        println("=== Server ready on port 8080 ===")
+    // bind 127.0.0.1：外网仅走 Caddy 反代，不直接暴露 :8080（纵深防御）
+    embeddedServer(Netty, port = 8080, host = "127.0.0.1") {
+        gameModule()
     }.start(wait = true)
+}
+
+/**
+ * 装配游戏服务端的所有路由 + 插件。
+ *
+ * 提取为 `Application` 扩展函数（而不是 `embeddedServer { ... }` 内的 inline lambda）
+ * 是 PR 0 的重构目标：
+ * - 后续 admin 模块（PR 1）需要拿到 [ServerContext] 引用挂自己的路由
+ * - testApplication 的 `application { gameModule() }` 用法
+ */
+fun Application.gameModule() {
+    println("=== Configuring Server ===")
+
+    install(WebSockets) {
+        pingPeriod = Duration.ofSeconds(15)
+        timeout = Duration.ofSeconds(60)
+        maxFrameSize = Long.MAX_VALUE
+        masking = false
+    }
+    println("=== WebSockets installed ===")
+
+    // JSON 序列化：admin REST 接口（PR 2+）用 @Serializable DTO 自动序列化
+    install(ContentNegotiation) {
+        json()
+    }
+
+    // 未捕获异常兜底：避免协程异常冒泡导致 500 空响应
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            System.err.println("Unhandled exception on ${call.request.uri}: ${cause.message}")
+            cause.printStackTrace()
+            call.respondText(
+                text = "Internal Server Error",
+                contentType = ContentType.Text.Plain,
+                status = HttpStatusCode.InternalServerError,
+            )
+        }
+    }
+
+    val roomManager = ServerRoomManager()
+    val gameManager = ServerGameManager(roomManager)
+    val sessions = ConcurrentHashMap<String, GameSession>()
+
+    @Suppress("UNUSED_VARIABLE")
+    val serverContext = ServerContext(
+        roomManager = roomManager,
+        gameManager = gameManager,
+        sessions = sessions,
+        startedAtEpochMs = System.currentTimeMillis(),
+    )
+    // PR 1 起会用 `installAdmin(serverContext)` 装载 /admin-auth/* + /admin/api/*
+
+    routing {
+        get("/") {
+            call.respondText("OK", ContentType.Text.Plain)
+        }
+
+        get("/health") {
+            call.respondText("Healthy", ContentType.Text.Plain)
+        }
+
+        webSocket("/game") {
+            val sessionId = UUID.randomUUID().toString()
+            println("=== WebSocket /game connected: $sessionId ===")
+
+            val session = GameSession(sessionId, this)
+            sessions[sessionId] = session
+
+            try {
+                handleSession(session, roomManager, gameManager, sessions)
+            } catch (e: ClosedReceiveChannelException) {
+                println("=== WebSocket closed: $sessionId (${e.message}) ===")
+            } catch (e: Exception) {
+                println("=== WebSocket error: ${e.message} ===")
+                e.printStackTrace()
+            } finally {
+                handleDisconnect(session, roomManager, gameManager, sessions)
+            }
+        }
+    }
+
+    println("=== Routing configured ===")
+    println("=== Server ready on port 8080 ===")
 }
 
 private suspend fun handleSession(
