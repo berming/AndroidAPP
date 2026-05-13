@@ -81,7 +81,7 @@ fun Application.gameModule(enableAdmin: Boolean = true) {
 
     // Admin 后台（PR 1+）：SQLite 持久化 + bcrypt + session cookie 鉴权 +
     // /admin-auth/{login,logout,me,change-password}（PR 2 起追加 /admin/api/*）。
-    // testApplication 跑测试时可以通过 `application { gameModule(installAdmin = false) }`
+    // testApplication 跑测试时可以通过 `application { gameModule(enableAdmin = false) }`
     // 关闭，避免每个测试都要建 SQLite。
     if (enableAdmin) installAdmin(serverContext)
 

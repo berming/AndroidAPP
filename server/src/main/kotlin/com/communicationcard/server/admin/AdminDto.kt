@@ -182,6 +182,24 @@ data class GameDetailDto(
 )
 
 // ====================================================================
+//  PR 3 告警 DTO（/admin/api/alerts）
+// ====================================================================
+
+@Serializable
+data class AlertDto(
+    val id: Long,
+    val rule: String,
+    val severity: String,                 // "INFO" | "WARN" | "ERROR"
+    val roomId: String?,
+    val playerIdMasked: String?,
+    val message: String,
+    val payload: Map<String, String>?,    // 诊断详情；可空（jsonDecode 失败时）
+    val createdAt: String,                // ISO-8601
+    val ackedAt: String?,                 // ISO-8601；为 null 表示未处理
+    val ackedBy: String?,                 // ack 操作者 admin username（LEFT JOIN）
+)
+
+// ====================================================================
 //  脱敏工具：UUID 取 prefix。AI_N 保留原样（运维需要快速识别 AI）
 // ====================================================================
 

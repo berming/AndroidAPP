@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useAuthStore } from './stores/auth'
-
-const auth = useAuthStore()
-
-// 启动时尝试拉一次 /me：cookie 已有 → 直接进站；没 cookie → 401 触发拦截器
-// 跳 login。这样浏览器 F5 后无需重新登录（cookie 仍有效时）
-onMounted(async () => {
-  await auth.fetchMe()
-})
+// /me 已在 main.ts 的 bootstrap() 里 await 拉取过，router 才注册 + mount。
+// 此组件不再做 onMounted fetchMe（之前的实现有 race：beforeEach 在 fetchMe
+// 之前跑，valid cookie 也被当未登录踢回 /login，pr-reviewer P1）。
 </script>
 
 <template>

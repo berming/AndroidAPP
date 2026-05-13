@@ -646,4 +646,42 @@ class ServerGameManagerTest {
         // tearDown：避免影响其他 test
         gm.gameEndListener = null
     }
+
+    @Test
+    fun gameEndListener_contract_listenerCanReadStateWithoutAdditionalLock() = runTest {
+        // PR 3 review feedback: gameEndListener 必须在锁内被调用，listener 内可以
+        // 安全读 room.gameState / room.players（无需再 withRoomLock）。
+        //
+        // 这个测试模拟 "broadcastActionResult 在锁内调 listener" 的契约——
+        // 在 withRoomLock 内 invoke listener；listener 读 room 字段成功；
+        // 没有重入死锁（因为 listener 没再调 withRoomLock）。
+        val room = ServerRoom(
+            roomId = "room-contract", roomCode = "CTRC", roomName = "Contract",
+            hostId = "h", maxPlayers = 6,
+        )
+        room.players.add(
+            ServerPlayer(
+                id = "p1", name = "Alice", session = null, isReady = true,
+                isAI = false, seatIndex = 0, team = "TEAM_A",
+            )
+        )
+
+        var readPlayers: Int = -1
+        gm.gameEndListener = { r, _ ->
+            // listener 在锁内被调用——直接读 r.players 安全（无需再上锁）
+            readPlayers = r.players.size
+        }
+
+        gm.withRoomLock(room) {
+            gm.gameEndListener?.invoke(room, SerializedGameResult(
+                winner = "TEAM_A",
+                teamAScore = 200,
+                teamBScore = 0,
+                trigger = "TEAM_ALL_FINISHED",
+            ))
+        }
+
+        assertEquals(1, readPlayers, "listener 应该能在锁内读 room.players")
+        gm.gameEndListener = null
+    }
 }

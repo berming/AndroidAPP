@@ -67,11 +67,15 @@ class ServerGameManager(
      * admin 模块的 GameHistoryStore 在 [com.communicationcard.server.admin.installAdmin]
      * 里把 listener 设进来；监听到游戏结束就 [GameRecord.capture] + 异步入 SQLite。
      *
-     * 设计原则（CLAUDE.md 约束 9）：
-     * - 调用方实现**必须**是非 suspend 函数（避免阻塞 broadcast 协程）
-     * - listener 内允许做 immutable snapshot 构造 + `Channel.trySend`
-     *   （UNLIMITED capacity 不会阻塞）
-     * - 不允许同步 IO / SQLite 写
+     * 设计契约（违反任一条都会出 P0 bug）：
+     * - **在锁内**被调用（broadcastActionResult 用 mutexFor(room).withLock 包了
+     *   listener 调用），所以 listener 实现可以安全读 room.gameState / room.players
+     * - listener body **必须是非 suspend** 函数，**只允许** immutable 值拷贝 +
+     *   `Channel.trySend`（UNLIMITED capacity 不阻塞）
+     * - **绝不允许** IO / SQLite 写 / 网络发送（CLAUDE.md 约束 9）
+     * - **绝不允许** 递归调 [withRoomLock]：kotlinx [Mutex] 非可重入，会死锁
+     *   （已知 listener 实现 = [com.communicationcard.server.admin.GameHistoryStore.enqueue]
+     *   走 Channel.trySend，不重入锁，安全）
      */
     @Volatile
     var gameEndListener: ((ServerRoom, SerializedGameResult) -> Unit)? = null
@@ -687,11 +691,15 @@ class ServerGameManager(
 
         // 5. 广播游戏结束
         result.gameResult?.let { gameResult ->
-            // PR 2 admin 监控：先把 record 捕获给 listener（在 status=FINISHED 和
-            // room 删除之前；listener 内部读 room.players + room.gameState 拍快照
-            // 后 Channel.trySend 异步入库，非阻塞）
+            // PR 2 admin 监控：拍 GameRecord 必须在锁内（防 finishOrder / hands /
+            // playerScores 的 MutableMap/MutableList 与 handleDisconnect /
+            // handlePlayerLeave 并发读时 ConcurrentModificationException）。
+            // listener 的契约：在锁内被调用，内部只做 immutable 值拷贝 + 锁外
+            // Channel.trySend，**绝不**做 IO / 网络发送（CLAUDE.md 约束 9）。
             try {
-                gameEndListener?.invoke(room, gameResult)
+                mutexFor(room).withLock {
+                    gameEndListener?.invoke(room, gameResult)
+                }
             } catch (e: Throwable) {
                 System.err.println("gameEndListener throw (ignored): ${e.message}")
             }
