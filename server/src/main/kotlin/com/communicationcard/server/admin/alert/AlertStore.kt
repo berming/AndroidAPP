@@ -2,6 +2,7 @@ package com.communicationcard.server.admin.alert
 
 import com.communicationcard.server.admin.AdminDb
 import com.communicationcard.server.admin.AlertDto
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.sql.Connection
