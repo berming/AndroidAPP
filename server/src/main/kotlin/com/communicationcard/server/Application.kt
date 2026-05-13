@@ -1,6 +1,7 @@
 package com.communicationcard.server
 
 import com.communicationcard.game.network.*
+import com.communicationcard.server.admin.installAdmin
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
@@ -38,7 +39,7 @@ fun main() {
  * - 后续 admin 模块（PR 1）需要拿到 [ServerContext] 引用挂自己的路由
  * - testApplication 的 `application { gameModule() }` 用法
  */
-fun Application.gameModule() {
+fun Application.gameModule(enableAdmin: Boolean = true) {
     println("=== Configuring Server ===")
 
     install(WebSockets) {
@@ -71,14 +72,18 @@ fun Application.gameModule() {
     val gameManager = ServerGameManager(roomManager)
     val sessions = ConcurrentHashMap<String, GameSession>()
 
-    @Suppress("UNUSED_VARIABLE")
     val serverContext = ServerContext(
         roomManager = roomManager,
         gameManager = gameManager,
         sessions = sessions,
         startedAtEpochMs = System.currentTimeMillis(),
     )
-    // PR 1 起会用 `installAdmin(serverContext)` 装载 /admin-auth/* + /admin/api/*
+
+    // Admin 后台（PR 1+）：SQLite 持久化 + bcrypt + session cookie 鉴权 +
+    // /admin-auth/{login,logout,me,change-password}（PR 2 起追加 /admin/api/*）。
+    // testApplication 跑测试时可以通过 `application { gameModule(installAdmin = false) }`
+    // 关闭，避免每个测试都要建 SQLite。
+    if (enableAdmin) installAdmin(serverContext)
 
     routing {
         get("/") {

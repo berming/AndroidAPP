@@ -18,7 +18,7 @@ class ApplicationBootstrapTest {
 
     @Test
     fun `root endpoint returns 200 OK`() = testApplication {
-        application { gameModule() }
+        application { gameModule(enableAdmin = false) }
         val response = client.get("/")
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals("OK", response.bodyAsText())
@@ -26,7 +26,7 @@ class ApplicationBootstrapTest {
 
     @Test
     fun `health endpoint returns 200 Healthy`() = testApplication {
-        application { gameModule() }
+        application { gameModule(enableAdmin = false) }
         val response = client.get("/health")
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals("Healthy", response.bodyAsText())
@@ -34,7 +34,7 @@ class ApplicationBootstrapTest {
 
     @Test
     fun `unknown route returns 404 not 500`() = testApplication {
-        application { gameModule() }
+        application { gameModule(enableAdmin = false) }
         val response = client.get("/this-route-does-not-exist")
         // 404 (而不是 500) 证明 StatusPages 装好后没把 NotFound 当 exception 吞掉
         assertEquals(HttpStatusCode.NotFound, response.status)

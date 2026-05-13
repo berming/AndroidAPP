@@ -1,0 +1,82 @@
+package com.communicationcard.server.admin
+
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.request.userAgent
+import io.ktor.server.response.respond
+import io.ktor.util.AttributeKey
+
+/**
+ * Admin 鉴权"中间件"——手写 cookie 读取 + 表校验，不依赖 Ktor `Sessions` /
+ * `Authentication` plugin。
+ *
+ * 用法（在路由 handler 顶部）：
+ * ```
+ * get("/admin/api/overview") {
+ *     val user = call.requirePermission(ctx, AdminPermission.MONITOR_READ) ?: return@get
+ *     // ...
+ * }
+ * ```
+ *
+ * 设计取舍：
+ * - 不用 Ktor `install(Authentication)`：那适合多 provider 场景，单一 cookie
+ *   用途反而绕弯
+ * - 401 / 403 直接 `call.respond` 返回；调用方 `return@handler` 终止
+ * - `call.attributes` 缓存当次请求的 AdminUser，避免一个 handler 内多次查库
+ */
+
+const val ADMIN_COOKIE_NAME = "cardsAdminSession"
+
+val ADMIN_USER_ATTR_KEY = AttributeKey<AdminUser>("AdminUser")
+
+/**
+ * 取当前请求的 admin cookie token；未登录时为 null。
+ */
+fun ApplicationCall.adminToken(): String? = request.cookies[ADMIN_COOKIE_NAME]
+
+/**
+ * 取当次请求已校验通过的 AdminUser（前提：handler 之前已调过 [requireAdmin]）。
+ */
+fun ApplicationCall.currentAdmin(): AdminUser? =
+    attributes.getOrNull(ADMIN_USER_ATTR_KEY)
+
+/**
+ * 校验登录状态；返回 AdminUser 或 null（已响应 401）。
+ */
+suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
+    attributes.getOrNull(ADMIN_USER_ATTR_KEY)?.let { return it }
+    val token = adminToken()
+    val user = ctx.authService.validate(token)
+    if (user == null) {
+        respond(HttpStatusCode.Unauthorized, ErrorResponse("未登录或会话已过期"))
+        return null
+    }
+    attributes.put(ADMIN_USER_ATTR_KEY, user)
+    return user
+}
+
+/**
+ * 校验登录 + 权限位；缺权限返回 403（并响应）。
+ */
+suspend fun ApplicationCall.requirePermission(
+    ctx: AdminContext,
+    permission: AdminPermission,
+): AdminUser? {
+    val user = requireAdmin(ctx) ?: return null
+    if (!user.role.hasPermission(permission)) {
+        respond(HttpStatusCode.Forbidden, ErrorResponse("权限不足: 需要 $permission"))
+        return null
+    }
+    return user
+}
+
+/**
+ * 从请求里推断客户端 user-agent / IP，用于 session 行的审计列。
+ * IP 优先读 `X-Forwarded-For`（Caddy 反代会塞），否则用 remoteHost。
+ */
+fun ApplicationCall.clientAuditFields(): Pair<String?, String?> {
+    val ua = request.userAgent()
+    val xff = request.headers["X-Forwarded-For"]?.split(",")?.firstOrNull()?.trim()
+    val ip = xff?.takeIf { it.isNotBlank() } ?: request.local.remoteHost
+    return ua to ip
+}

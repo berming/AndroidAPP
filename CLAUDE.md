@@ -123,6 +123,55 @@
   当前固定 4 副。扩展到 6/8/10/12 副需先在 `:shared/Deck.kt` 把 `reset(deckCount)`
   参数化、补 `commonTest`，再放到 UI（详见 `docs/feature_spec.md` §2.7）
 
+### 约束 9：admin 端点必须 lock-safe，绝不在 mutex 内做 IO
+
+**适用范围**：`/admin-auth/*` 和 `/admin/api/*` 下的所有路由（PR 1 起；PR 2
+监控 + PR 3 告警 + PR 5 历史等都遵守此约束）。
+
+- admin 路由的处理路径**不得**在 `mutexFor(room).withLock { ... }` 内做：
+  - 文件 IO / SQLite 写入 / 网络发送
+  - JSON 序列化 / DTO 渲染（toList / toMap 也尽量在锁外）
+- 允许的两种模式：
+  - **(a) 短暂持锁取 immutable snapshot**：进锁 → `RoomSnapshot` data class
+    defensive copy → 出锁 → 渲染 JSON。参考 PR 2 的 `SnapshotBuilder`
+  - **(b) 完全 lock-free 读取 `ConcurrentHashMap`**：`rooms.values.toList()`
+    / `roomsByCode.entries.toList()` 等弱一致快照后再处理（适合 overview 这种
+    粗粒度查询）
+- 写 SQLite 走 `AdminDb.withConnection`：内部已经 `Mutex + Dispatchers.IO`
+  序列化；admin 调用方**不要**再嵌套 `mutexFor`
+
+**禁忌示例**：
+```kotlin
+// ❌ 反例：把 SQLite 写入嵌进游戏 mutex
+mutexFor(room).withLock {
+    val record = GameRecord.capture(room, gameResult)
+    historyStore.insertSync(record)   // ← 磁盘 IO 阻塞所有动作
+}
+
+// ✓ 正例：锁内只构造 immutable record，锁外 enqueue 异步入库
+val record = mutexFor(room).withLock { GameRecord.capture(room, gameResult) }
+historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
+```
+
+**教训**：admin 路由属于"运维"层，慢的运维查询绝不能阻塞游戏关键路径；同时
+admin 读取必须看到一致的房间状态（不可在并发写中迭代裸 MutableMap）。
+
+### 约束 10：admin DTO 必须脱敏，绝不暴露手牌或完整 UUID
+
+任何 admin 模块的 `@Serializable` DTO（含 `/admin/api/*` 响应 + 历史
+持久化表行）：
+
+- `playerId` / `sessionId` MUST 截断为前 8 hex + `...`（如 `fa8c91d2...`）；
+  保留 `AI_N` 形式的 AI id 原样
+- `hands` / `card` 等真实牌面 MUST NOT 出现；只允许 `handSize`（牌的数量）
+- `password_hash` / session token / 任何密钥字段 MUST NOT 序列化进任何返回 DTO
+- 玩家姓名 `playerName` 可以原样保留（运维需要靠名字定位玩家）
+- IP / user-agent 仅出现在 admin_sessions 行（自己人审计用），**不**进面向
+  前端的 DTO
+
+**教训**：admin 是"运维"层，任何完整 UUID / 真实牌面泄漏都会让运维变成
+上帝模式。把约束写在协议层比写在 review checklist 更可靠。
+
 ---
 
 ## 三、关键路径强制 TDD
