@@ -648,6 +648,34 @@ class ServerGameManagerTest {
     }
 
     @Test
+    fun broadcastActionResult_doesNotCallGameEventListener() = runTest {
+        // PR 5d + Codex P2: listener 在锁内、按动作顺序触发；broadcast 阶段（锁外）
+        // **不**再调用 listener，否则两个并发 action 的 session.send suspend 会
+        // 让后到的 action 抢先调 listener 导致 game_events.seq 与实际顺序倒置
+        var calls = 0
+        gm.gameEventListener = { _, _ -> calls++ }
+
+        val room = ServerRoom(
+            roomId = "room-noevt", roomCode = "NOEV", roomName = "BroadcastTest",
+            hostId = "h", maxPlayers = 6,
+        )
+        // ActionResult 含一个 event：调 broadcastActionResult 应**不**触发 listener
+        val result = ActionResult(
+            success = true,
+            error = null,
+            event = com.communicationcard.game.network.SerializedGameEvent.PlayerPassed(0),
+            gameResult = null,
+            roundEndEvent = null,
+            finishEvent = null,
+        )
+        gm.broadcastActionResult(room, result)
+
+        assertEquals(0, calls, "broadcastActionResult 不应再调用 gameEventListener" +
+            "（已搬到 handlePlayCards/handlePass 锁内）")
+        gm.gameEventListener = null
+    }
+
+    @Test
     fun gameEventListener_defaultsToNull_settable_invokable() {
         // PR 5d：admin GameHistoryStore 通过 gameEventListener 按 roomId 在内存
         // 累积每手出牌事件；游戏结束时连同 GameRecord 写入 game_events 表。
