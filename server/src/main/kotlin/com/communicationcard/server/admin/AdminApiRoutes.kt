@@ -92,6 +92,14 @@ fun Route.adminApiRoutes(ctx: AdminContext) {
             call.respond(ctx.historyStore.trendByDay(days))
         }
 
+        // PR 5d: 单局逐手出牌事件流（按 seq 排序，最早在前）
+        get("/games/{id}/events") {
+            call.requirePermission(ctx, AdminPermission.GAME_HISTORY_READ) ?: return@get
+            val id = call.parameters["id"]?.toLongOrNull()
+                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("id 不是数字"))
+            call.respond(ctx.historyStore.listEvents(id))
+        }
+
         // PR 3: 告警 ----------------------------------------------------
 
         get("/alerts") {

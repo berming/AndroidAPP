@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { gamesApi, type GameSummary, type GameDetail } from '../api/games'
+import { gamesApi, type GameSummary, type GameDetail, type GameEvent } from '../api/games'
 import dayjs from 'dayjs'
 
 const games = ref<GameSummary[]>([])
 const loading = ref(false)
 const detailOpen = ref(false)
 const detail = ref<GameDetail | null>(null)
+const events = ref<GameEvent[]>([])
+const eventsLoading = ref(false)
+const activeTab = ref<'players' | 'events'>('players')
 
 async function refresh() {
   loading.value = true
@@ -18,11 +21,28 @@ async function refresh() {
 }
 
 async function openDetail(g: GameSummary) {
+  activeTab.value = 'players'
   detail.value = await gamesApi.detail(g.id)
   detailOpen.value = true
+  // 异步拉事件（详情先弹）
+  eventsLoading.value = true
+  events.value = []
+  try {
+    events.value = await gamesApi.events(g.id)
+  } finally {
+    eventsLoading.value = false
+  }
 }
 
 onMounted(() => refresh())
+
+function formatPayload(p: unknown): string {
+  try {
+    return JSON.stringify(p)
+  } catch (_e) {
+    return String(p)
+  }
+}
 
 function fmtDuration(ms: number): string {
   const sec = Math.floor(ms / 1000)
@@ -87,25 +107,49 @@ function fmtDuration(ms: number): string {
           <el-descriptions-item label="触发">{{ detail.summary.trigger }}</el-descriptions-item>
         </el-descriptions>
 
-        <h3 style="margin-top: 16px;">玩家</h3>
-        <el-table :data="detail.players" stripe>
-          <el-table-column prop="seatIndex" label="座位" width="60" />
-          <el-table-column prop="name" label="姓名" />
-          <el-table-column prop="playerIdMasked" label="ID" width="140" />
-          <el-table-column prop="team" label="队伍" width="80" />
-          <el-table-column label="角色" width="80">
-            <template #default="{ row }">
-              <el-tag v-if="row.isAI" type="info">AI</el-tag>
-              <el-tag v-else-if="row.wasSubstituted" type="warning">托管</el-tag>
-              <el-tag v-else type="success">真人</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="名次" width="80">
-            <template #default="{ row }">{{ row.finished ? `第 ${row.finishOrder} 名` : '未走完' }}</template>
-          </el-table-column>
-          <el-table-column prop="collectedScore" label="收分" width="80" />
-          <el-table-column prop="finalHandSize" label="剩牌" width="80" />
-        </el-table>
+        <el-tabs v-model="activeTab" style="margin-top: 16px;">
+          <el-tab-pane label="玩家" name="players">
+            <el-table :data="detail.players" stripe>
+              <el-table-column prop="seatIndex" label="座位" width="60" />
+              <el-table-column prop="name" label="姓名" />
+              <el-table-column prop="playerIdMasked" label="ID" width="140" />
+              <el-table-column prop="team" label="队伍" width="80" />
+              <el-table-column label="角色" width="80">
+                <template #default="{ row }">
+                  <el-tag v-if="row.isAI" type="info">AI</el-tag>
+                  <el-tag v-else-if="row.wasSubstituted" type="warning">托管</el-tag>
+                  <el-tag v-else type="success">真人</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="名次" width="80">
+                <template #default="{ row }">{{ row.finished ? `第 ${row.finishOrder} 名` : '未走完' }}</template>
+              </el-table-column>
+              <el-table-column prop="collectedScore" label="收分" width="80" />
+              <el-table-column prop="finalHandSize" label="剩牌" width="80" />
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane :label="`事件 (${events.length})`" name="events">
+            <el-empty v-if="!eventsLoading && events.length === 0" description="本局无事件记录" />
+            <el-table v-else :data="events" stripe v-loading="eventsLoading" max-height="500">
+              <el-table-column prop="seq" label="#" width="60" />
+              <el-table-column prop="eventType" label="类型" width="140">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.eventType === 'round_won' ? 'success' : row.eventType === 'player_passed' ? 'info' : ''">
+                    {{ row.eventType }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="payload">
+                <template #default="{ row }">
+                  <code style="font-size: 12px;">{{ formatPayload(row.payload) }}</code>
+                </template>
+              </el-table-column>
+              <el-table-column label="时间" width="120">
+                <template #default="{ row }">{{ dayjs(row.createdAt).format('HH:mm:ss') }}</template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </el-drawer>
   </div>
