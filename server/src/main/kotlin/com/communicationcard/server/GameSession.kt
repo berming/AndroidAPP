@@ -17,6 +17,8 @@ class GameSession(
     var playerName: String = ""
     var seatIndex: Int = -1
 
+    val connectedAt: Long = System.currentTimeMillis()
+
     private val isActive = AtomicBoolean(true)
 
     fun isConnected(): Boolean = isActive.get() && webSocketSession.isActive

@@ -16,8 +16,12 @@ fi
 
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/berming/AndroidAPP/main}"
 WEB_DIR="/var/www/communication-card-web"
+# admin SPA 静态文件目录（PR 4）
+ADMIN_WEB_DIR="/var/www/communication-card-admin"
 SERVER_DIR="/opt/communication-card/server"
 LOG_DIR="/var/log/communication-card"
+# admin 后台 SQLite 数据目录（PR 0 起预留；PR 1 admin_users / PR 2 games 表入库）
+LIB_DIR="/var/lib/communication-card"
 DEPLOY_USER="cards"
 
 step() { echo ""; echo "==> $*"; }
@@ -41,8 +45,9 @@ apt-get install -y openjdk-17-jre-headless
 step "2/7 创建部署用户与目录"
 id -u "$DEPLOY_USER" >/dev/null 2>&1 || \
     useradd --system --create-home --shell /bin/bash "$DEPLOY_USER"
-mkdir -p "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR"
-chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$SERVER_DIR" "$LOG_DIR"
+mkdir -p "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
+chmod 750 "$LIB_DIR"
 
 step "3/7 部署 Caddyfile"
 curl -fsSL "$REPO_RAW/deploy/Caddyfile" -o /etc/caddy/Caddyfile
@@ -55,6 +60,36 @@ curl -fsSL "$REPO_RAW/deploy/communication-card-server.service" \
 systemctl daemon-reload
 systemctl enable communication-card-server.service
 # 等首次部署落 server/bin/server 后再启动；现在不 start
+
+# Admin 后台环境变量文件：首次安装生成一个**强随机**初始密码，写入
+# /etc/communication-card/server.env（root:cards 600 权限；只有服务进程能读）。
+# 服务端首次启动检测到 admin_users 表为空 → 用这个密码创建 SUPER_ADMIN 账号。
+ENV_DIR=/etc/communication-card
+ENV_FILE="$ENV_DIR/server.env"
+mkdir -p "$ENV_DIR"
+chown root:"$DEPLOY_USER" "$ENV_DIR"
+chmod 750 "$ENV_DIR"
+if [[ ! -f "$ENV_FILE" ]]; then
+    INIT_PASS=$(openssl rand -base64 24 | tr -d '\n' | tr -d '/=+' | head -c 24)
+    cat > "$ENV_FILE" <<EOF
+# Admin 后台环境变量（install.sh 生成；切勿提交进 git）。
+ADMIN_COOKIE_SECURE=true
+ADMIN_COOKIE_DOMAIN=bermin.cn
+ADMIN_INITIAL_USERNAME=root
+ADMIN_INITIAL_PASSWORD=$INIT_PASS
+EOF
+    chown root:"$DEPLOY_USER" "$ENV_FILE"
+    chmod 640 "$ENV_FILE"
+    echo ""
+    echo "    🔑 已生成初始 admin 账号 (root) 及随机密码。"
+    echo "       首次登录后请进 admin UI 改密 → 然后编辑 $ENV_FILE 删掉 ADMIN_INITIAL_PASSWORD 行。"
+    echo "       初始密码（请保管好）："
+    echo ""
+    echo "         $INIT_PASS"
+    echo ""
+else
+    echo "    ℹ️  $ENV_FILE 已存在，保留不动。"
+fi
 
 step "5/7 配置 ufw 防火墙（host 层；腾讯云安全组是另一层，需在控制台单独配）"
 # 历史教训（已发生 2 次）：仅配腾讯云安全组而漏 ufw，或反之，导致公网 timeout。

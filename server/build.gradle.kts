@@ -42,9 +42,17 @@ dependencies {
     // Logging
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
 
+    // PR 1: admin 后台依赖
+    // SQLite：admin_users / admin_sessions / 后续 games / game_players / alerts 全部落库
+    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+    // bcrypt：密码哈希。jbcrypt 0.4 是稳定版本，无传递依赖
+    implementation("org.mindrot:jbcrypt:0.4")
+
     // Testing
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 
 tasks.withType<JavaCompile> {

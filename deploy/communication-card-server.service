@@ -13,6 +13,10 @@ ExecStart=/opt/communication-card/server/bin/server
 Restart=on-failure
 RestartSec=3
 
+# Admin 后台环境变量（ADMIN_TOKEN 已废弃；现用 ADMIN_INITIAL_PASSWORD 引导账号）
+# 前缀 `-` 表示文件缺失也允许启动；缺这个文件时管理员账号无法登录但游戏不影响
+EnvironmentFile=-/etc/communication-card/server.env
+
 # JVM 调优：Gradle application plugin 生成的 bin/server 启动脚本读 SERVER_OPTS
 # （脚本里是 `<APP_BASE_NAME>_OPTS`，本应用名为 server），不读 JAVA_OPTS。
 Environment="SERVER_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
@@ -21,7 +25,7 @@ Environment="SERVER_OPTS=-Xms256m -Xmx1g -XX:+UseG1GC"
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/communication-card
+ReadWritePaths=/var/log/communication-card /var/lib/communication-card
 ProtectHome=true
 
 StandardOutput=append:/var/log/communication-card/server.log

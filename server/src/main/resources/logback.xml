@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- stdout / stderr 由 systemd unit 转发到 /var/log/communication-card/server.log -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Ktor / Netty 自己的日志降一级，避免 INFO 噪音淹没业务日志 -->
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.ktor" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>

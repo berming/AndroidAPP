@@ -1,6 +1,7 @@
 package com.communicationcard.server
 
 import com.communicationcard.game.network.*
+import java.util.EnumMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
@@ -288,6 +289,29 @@ class ServerRoomManager {
     fun getRoomSessions(roomId: String): List<GameSession> {
         val room = rooms[roomId] ?: return emptyList()
         return room.players.mapNotNull { it.session }
+    }
+
+    // ============================================================
+    //  PR 2 (admin 后台) 暴露给 SnapshotBuilder 的弱一致快照接口。
+    //  全部 lock-free：直接读 ConcurrentHashMap.values，纳秒级。
+    //  允许"读到刚删的房间"或"漏读刚加的房间"——admin 监控可接受此误差。
+    // ============================================================
+
+    /**
+     * 当前所有房间（不区分状态）；调用方自行 filter。
+     */
+    internal fun allRoomsSnapshot(): List<ServerRoom> = rooms.values.toList()
+
+    /**
+     * 按 [RoomStatus] 分组的房间计数。`/admin/api/overview` 用。
+     */
+    internal fun snapshotCounts(): Map<RoomStatus, Int> {
+        val counts = EnumMap<RoomStatus, Int>(RoomStatus::class.java)
+        RoomStatus.values().forEach { counts[it] = 0 }
+        for (room in rooms.values) {
+            counts.merge(room.status, 1, Int::plus)
+        }
+        return counts
     }
 
     private fun findNextSeat(room: ServerRoom): Int {

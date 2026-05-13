@@ -1,0 +1,28 @@
+{
+  "name": "communication-card-admin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "沟通牌 admin 后台 SPA（Vue 3 + Element Plus）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "echo 'lint skipped (no ESLint config yet)' && exit 0"
+  },
+  "dependencies": {
+    "vue": "^3.4.31",
+    "vue-router": "^4.4.0",
+    "pinia": "^2.2.0",
+    "element-plus": "^2.7.6",
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.7.2",
+    "dayjs": "^1.11.11"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.5",
+    "typescript": "~5.4.5",
+    "vite": "^5.3.1",
+    "vue-tsc": "^2.0.21"
+  }
+}
