@@ -567,11 +567,11 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 
 | 指标 | 数值 |
 |------|------|
-| 人工总投入时间 | ~50 小时（需求 + 反馈 + 真机测试，含两个会话）|
-| AI 等效工作时间 | ~500 小时（按工程师正常速度估算）|
+| 人工总投入时间 | ~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）|
+| AI 等效工作时间 | ~600 小时（按工程师正常速度估算）|
 | **提速比** | **约 10 倍** |
-| 代码提交（非 merge）| 约 170 次 |
-| 从"单机 Android"到"双端 + 服务端 + Harness"| 有效开发 18 天 |
+| 代码提交（非 merge）| 约 250 次 |
+| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 19 天 |
 | 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
 | → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
@@ -685,31 +685,31 @@ override fun onOpen(ws: WebSocket, response: Response) {
    - wasmJs / Android 构建必须 push 才知道对不对
    - **原则**：把 gradle stderr exfil 到 PR comment，让 AI 能读 CI 日志
 
-### 交付成果（全程）
+### 交付成果（PR #1–#62 全程）
 
 | 指标 | 数值 |
 |------|------|
-| 合并 PR 数 | 54 个 (#1–#54) |
-| 非 merge commit 数 | 约 170 次 |
-| 修复问题 | ~128 个 |
-| 客户端 | Android (XML) + Web (CMP/wasmJs) |
-| 共享模块 | `:shared` KMP（消灭约束 1/4）|
+| 合并 PR 数 | **62 个**（#1–#62）|
+| 非 merge commit 数 | 约 250 次 |
+| 修复问题 | **~162 个**（其中 Codex 精确审计 25，详见 §四）|
+| 客户端 | Android (XML) + Web (CMP/wasmJs) + **Admin SPA (Vue 3 / Element Plus)** |
+| 共享模块 | `:shared` KMP（消灭约束 1/4） |
+| 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
 | Harness 基础设施 | L0–L4 五层，PR-H1~H5 落地 |
-| 自动化测试 | ~70 个（CardRules + Settlement + ServerGameManager + 协议 round-trip）|
-| 部署 | Caddy + systemd + GitHub Actions auto-deploy |
+| 自动化测试 | **186 个 @Test**（跨 14 个 *Test.kt；详见 §八 8.2 后段）|
+| 部署 | Caddy（80/443 + 自动 HTTPS）+ `/admin/` 子路径 + systemd + GitHub Actions auto-deploy |
 
 ### 后续建议行动
 
-1. ✅ **自动化集成测试**：PR-H2 落地 — `CardRulesTest.kt`（~30 用例）+
-   `ServerGameManagerTest.kt`（~25 用例）+ CI tdd-gate 硬关
+1. ✅ **自动化集成测试**：PR-H2 落地 — `CardRulesTest.kt` 33 + `ServerGameManagerTest.kt` 48 + `SettlementCalculatorTest.kt` 18 + admin 76 + 其他 11 = **186 用例**；CI tdd-gate 硬关
 2. ✅ **共享规则层**：PR #35 + PR-H3 落地 — `:shared` KMP；约束 1/4 编译期消除
-3. ⚪ **监控告警**：上线 `force-advance` 计数指标，触发即告警排查（暂未规划）
-4. ⚪ **弱网测试**：集成限速工具，系统化回归重连场景（暂未规划）
-5. ✅ **协议版本号**：PR-H3 落地 — `PROTOCOL_VERSION = 3`，握手时校验
-6. ⚪ **SERVER_URL 集中化**（regressions #13 follow-up）：抽到 BuildConfig /
-   资源文件，避免下次拓扑变更再漏改某端
-7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md`
-   路径扩展，目前无规划
+3. ✅ **监控告警**：PR #61 / 3 落地 — `AlertEngine` 10s 周期 + 3 条内置规则（ROOM_STUCK / JVM_HEAP_HIGH / DISCONNECT_RATIO_HIGH）+ SSE 实时推送（PR #62 / 5a）
+4. ✅ **协议版本号**：PR-H3 落地 — `PROTOCOL_VERSION = 3`，握手时校验
+5. ⚪ **弱网测试**：集成限速工具，系统化回归重连场景（暂未规划）
+6. ⚪ **SERVER_URL 集中化**（regressions #13 follow-up）：抽到 BuildConfig / 资源文件，避免下次拓扑变更再漏改某端
+7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md` 路径扩展，目前无规划
+8. ⚪ **逐手出牌 step-through 回放 UI**：PR #62 / 5d 已铺 `game_events` 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件
+9. ⚪ **玩家账号系统**：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做
 
 ---
 
@@ -787,10 +787,10 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 > - 联网版**已纳入工作流**：每次 PR push 跑 `:shared:jvmTest + :server:test`，
 >   detekt + assembleDebug + wasmJsBrowserDistribution；admin SPA 加 admin-build job
 >
-> 这不是"加了测试 = 没有 bug"。PR #62 的 4 次 CI 修复（嵌套块注释 / runTest 虚拟
-> 时钟 / 命名撞名 / withCharset import）就是有测试也会被工具链 quirks 卡。但测试
-> + tdd-gate 把"代码改动可以在不被发现的情况下溜过"的概率降到接近零，bug 改前
-> 一定会先被测试或 CI 暴露——这正是"联网版反复出问题"时期最缺的反馈环。
+> 这不是"加了测试 = 没有 bug"——PR #62 自己就跑了 4 次 CI 修复（详见
+> §九 9.11-9.14 各小节）。但测试 + tdd-gate 把"代码改动可以在不被发现的情况下
+> 溜过"的概率降到接近零，bug 改前一定会先被测试或 CI 暴露——这正是"联网版反复
+> 出问题"时期最缺的反馈环。
 
 ### 8.3 多 Claude 协同的天花板
 
@@ -1115,27 +1115,23 @@ CI 连续报 8 类不同的兼容性错误，必须按序逐层剥：
 
 ### 9.10 大型新模块的"PR 0 ~ PR N + 优化收尾"分段（admin 后台 PR #61–62 实战）
 
-**场景**：从零搭服务端 admin 后台 + Vue SPA。约 3,000 prod LOC + 1,000 test LOC，
-若一次 commit ship，diff 几千行 review 几乎不可能。
+> 完整的 9 段 PR 拆分 + 各段 LOC 表见 **§二 "Admin 后台路线图"**。本节只提炼
+> **经验性**结论，不再重复列拆分。
 
-**做法**：plan 阶段先把 9 段功能写明白，**全部 commit 在同一分支**但分开 commit
-（PR 0 → PR 1 → PR 2 → PR 3 → PR 4 → PR 5a → PR 5b → PR 5c → PR 5d）。最终
-打包为 2 个 GitHub PR：#61（MVP 1–4）+ #62（PR 5 优化收尾），review 拆成 2 次。
+**核心做法**：plan 先行（`/root/.claude/plans/...` 600+ 行设计稿，含 SQL schema /
+Vue 文件树 / Caddy 路由 / CI 加 Node setup 全部预先文档化）→ 9 段 commit 同一
+分支但分开提交 → 最终打包为 2 个 GitHub PR（#61 MVP / #62 优化收尾）。
 
-**每段 commit 的范围**：
-- PR 0：**纯基础设施**（host 绑定 / 插件 install / resources 文件），不引入任何 admin 业务代码 → review 焦点 = "有没有破坏现有游戏路径"
-- PR 1：地基依赖 + 鉴权骨架；功能"看得见"的只是 `/admin-auth/login` 路由
-- PR 2-5：每段功能模块化叠加，每个 commit 都能独立"运维有用"
-- 优化（PR 5a-d）：基础功能上线后再补，靠 backlog 优先级排队
-
-**plan 文件**：`/root/.claude/plans/glistening-whistling-donut.md` 600+ 行的设计稿，
-**所有决策（含 SQL schema、Vue 文件树、Caddy 配置、CI 加 Node setup）都先文档化**。
-单看每段 PR 看不出全貌；plan 看完之后再回头审 PR 1，思路清晰。
-
-**教训**：
-- "1 commit = 1 个独立 ship-able 单元"，即便最终合到同一 PR，review 体验也跟单大 commit 完全不同
-- plan 先行：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 + Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警"，再编码 → 比"先写后改"少 ~30% 返工
-- 每段 PR 推完都自动跑 4 次 CI 修复回路（Kotlin 嵌套块注释 / `arrayOf<Long> +=` / `runTest` 虚拟时钟 / `withCharset` 未 import），都靠 `:server:test` 的 `tee + Surface-on-failure` 把日志 exfil 到 PR 评论才能在沙箱里读到错误
+**3 条提炼出的经验**：
+- **1 commit = 1 个独立 ship-able 单元**：即便最终合到同一 PR，review 体验也跟
+  单一大 commit 完全不同——PR 0 review 焦点是"有没有破坏现有游戏路径"，与 PR 1
+  的"鉴权骨架"完全不混
+- **plan 先行省 ~30% 返工**：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 +
+  Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警" 再编码——明显
+  比"先写后改"省事
+- **CI 修复回路占非平凡时间**：PR #61-62 推完后跑了 4 次 CI 修复（详见
+  9.11 / 9.12 / 9.13 / 9.14 各小节），都靠 `:server:test` 的
+  `tee + Surface-on-failure` 把日志 exfil 到 PR 评论才能在沙箱里读到错误
 
 ---
 

@@ -220,14 +220,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </li>
 <li><a href="#_23">第七章：工程经验与后续建议</a><ul>
 <li><a href="#_24">核心经验</a></li>
-<li><a href="#_25">交付成果（全程）</a></li>
-<li><a href="#_26">后续建议行动</a></li>
+<li><a href="#pr-162_1">交付成果（PR #1–#62 全程）</a></li>
+<li><a href="#_25">后续建议行动</a></li>
 </ul>
 </li>
 <li><a href="#ai-claude">第八章：AI 质量改进路径——多 Claude 模型协同</a><ul>
 <li><a href="#81-ai-bug">8.1 反思：为什么 AI 写的代码 Bug 不少？</a><ul>
 <li><a href="#bug">生成阶段必然有 Bug 的结构性原因</a></li>
-<li><a href="#_27">多轮自审仍能发现新问题的原因</a></li>
+<li><a href="#_26">多轮自审仍能发现新问题的原因</a></li>
 </ul>
 </li>
 <li><a href="#82-claude">8.2 多 Claude 模型协同</a></li>
@@ -2003,11 +2003,11 @@ PR / regressions.md 跟进。</p>
 <tbody>
 <tr>
 <td>人工总投入时间</td>
-<td>~50 小时（需求 + 反馈 + 真机测试，含两个会话）</td>
+<td>~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）</td>
 </tr>
 <tr>
 <td>AI 等效工作时间</td>
-<td>~500 小时（按工程师正常速度估算）</td>
+<td>~600 小时（按工程师正常速度估算）</td>
 </tr>
 <tr>
 <td><strong>提速比</strong></td>
@@ -2015,11 +2015,11 @@ PR / regressions.md 跟进。</p>
 </tr>
 <tr>
 <td>代码提交（非 merge）</td>
-<td>约 170 次</td>
+<td>约 250 次</td>
 </tr>
 <tr>
-<td>从"单机 Android"到"双端 + 服务端 + Harness"</td>
-<td>有效开发 18 天</td>
+<td>从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"</td>
+<td>有效开发 19 天</td>
 </tr>
 <tr>
 <td>单次修复成功率</td>
@@ -2215,7 +2215,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <li>wasmJs / Android 构建必须 push 才知道对不对</li>
 <li><strong>原则</strong>：把 gradle stderr exfil 到 PR comment，让 AI 能读 CI 日志</li>
 </ol>
-<h3 id="_25">交付成果（全程）</h3>
+<h3 id="pr-162_1">交付成果（PR #1–#62 全程）</h3>
 <table>
 <thead>
 <tr>
@@ -2226,23 +2226,27 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <tbody>
 <tr>
 <td>合并 PR 数</td>
-<td>54 个 (#1–#54)</td>
+<td><strong>62 个</strong>（#1–#62）</td>
 </tr>
 <tr>
 <td>非 merge commit 数</td>
-<td>约 170 次</td>
+<td>约 250 次</td>
 </tr>
 <tr>
 <td>修复问题</td>
-<td>~128 个</td>
+<td><strong>~162 个</strong>（其中 Codex 精确审计 25，详见 §四）</td>
 </tr>
 <tr>
 <td>客户端</td>
-<td>Android (XML) + Web (CMP/wasmJs)</td>
+<td>Android (XML) + Web (CMP/wasmJs) + <strong>Admin SPA (Vue 3 / Element Plus)</strong></td>
 </tr>
 <tr>
 <td>共享模块</td>
 <td><code>:shared</code> KMP（消灭约束 1/4）</td>
+</tr>
+<tr>
+<td>服务端</td>
+<td>Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）</td>
 </tr>
 <tr>
 <td>Harness 基础设施</td>
@@ -2250,26 +2254,25 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </tr>
 <tr>
 <td>自动化测试</td>
-<td>~70 个（CardRules + Settlement + ServerGameManager + 协议 round-trip）</td>
+<td><strong>186 个 @Test</strong>（跨 14 个 *Test.kt；详见 §八 8.2 后段）</td>
 </tr>
 <tr>
 <td>部署</td>
-<td>Caddy + systemd + GitHub Actions auto-deploy</td>
+<td>Caddy（80/443 + 自动 HTTPS）+ <code>/admin/</code> 子路径 + systemd + GitHub Actions auto-deploy</td>
 </tr>
 </tbody>
 </table>
-<h3 id="_26">后续建议行动</h3>
+<h3 id="_25">后续建议行动</h3>
 <ol>
-<li>✅ <strong>自动化集成测试</strong>：PR-H2 落地 — <code>CardRulesTest.kt</code>（~30 用例）+
-   <code>ServerGameManagerTest.kt</code>（~25 用例）+ CI tdd-gate 硬关</li>
+<li>✅ <strong>自动化集成测试</strong>：PR-H2 落地 — <code>CardRulesTest.kt</code> 33 + <code>ServerGameManagerTest.kt</code> 48 + <code>SettlementCalculatorTest.kt</code> 18 + admin 76 + 其他 11 = <strong>186 用例</strong>；CI tdd-gate 硬关</li>
 <li>✅ <strong>共享规则层</strong>：PR #35 + PR-H3 落地 — <code>:shared</code> KMP；约束 1/4 编译期消除</li>
-<li>⚪ <strong>监控告警</strong>：上线 <code>force-advance</code> 计数指标，触发即告警排查（暂未规划）</li>
-<li>⚪ <strong>弱网测试</strong>：集成限速工具，系统化回归重连场景（暂未规划）</li>
+<li>✅ <strong>监控告警</strong>：PR #61 / 3 落地 — <code>AlertEngine</code> 10s 周期 + 3 条内置规则（ROOM_STUCK / JVM_HEAP_HIGH / DISCONNECT_RATIO_HIGH）+ SSE 实时推送（PR #62 / 5a）</li>
 <li>✅ <strong>协议版本号</strong>：PR-H3 落地 — <code>PROTOCOL_VERSION = 3</code>，握手时校验</li>
-<li>⚪ <strong>SERVER_URL 集中化</strong>（regressions #13 follow-up）：抽到 BuildConfig /
-   资源文件，避免下次拓扑变更再漏改某端</li>
-<li>⚪ <strong>iOS / Desktop targets</strong>：KMP 骨架已就绪，按 <code>docs/client_implementation_guide.md</code>
-   路径扩展，目前无规划</li>
+<li>⚪ <strong>弱网测试</strong>：集成限速工具，系统化回归重连场景（暂未规划）</li>
+<li>⚪ <strong>SERVER_URL 集中化</strong>（regressions #13 follow-up）：抽到 BuildConfig / 资源文件，避免下次拓扑变更再漏改某端</li>
+<li>⚪ <strong>iOS / Desktop targets</strong>：KMP 骨架已就绪，按 <code>docs/client_implementation_guide.md</code> 路径扩展，目前无规划</li>
+<li>⚪ <strong>逐手出牌 step-through 回放 UI</strong>：PR #62 / 5d 已铺 <code>game_events</code> 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件</li>
+<li>⚪ <strong>玩家账号系统</strong>：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做</li>
 </ol>
 <hr>
 <h2 id="ai-claude">第八章：AI 质量改进路径——多 Claude 模型协同</h2>
@@ -2311,7 +2314,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </tr>
 </tbody>
 </table>
-<h4 id="_27">多轮自审仍能发现新问题的原因</h4>
+<h4 id="_26">多轮自审仍能发现新问题的原因</h4>
 <table>
 <thead>
 <tr>
@@ -2425,10 +2428,10 @@ reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这
   未同改直接红
 - 联网版</em><em>已纳入工作流</em>*：每次 PR push 跑 <code>:shared:jvmTest + :server:test</code>，
   detekt + assembleDebug + wasmJsBrowserDistribution；admin SPA 加 admin-build job</p>
-<p>这不是"加了测试 = 没有 bug"。PR #62 的 4 次 CI 修复（嵌套块注释 / runTest 虚拟
-时钟 / 命名撞名 / withCharset import）就是有测试也会被工具链 quirks 卡。但测试
-+ tdd-gate 把"代码改动可以在不被发现的情况下溜过"的概率降到接近零，bug 改前
-一定会先被测试或 CI 暴露——这正是"联网版反复出问题"时期最缺的反馈环。</p>
+<p>这不是"加了测试 = 没有 bug"——PR #62 自己就跑了 4 次 CI 修复（详见
+§九 9.11-9.14 各小节）。但测试 + tdd-gate 把"代码改动可以在不被发现的情况下
+溜过"的概率降到接近零，bug 改前一定会先被测试或 CI 暴露——这正是"联网版反复
+出问题"时期最缺的反馈环。</p>
 </blockquote>
 <h3 id="83-claude">8.3 多 Claude 协同的天花板</h3>
 <p>要诚实说：<strong>多 Claude 协同有用，但有结构性上限。</strong></p>
@@ -2942,23 +2945,23 @@ CI 连续报 8 类不同的兼容性错误，必须按序逐层剥：</p>
 <p>每一关都有 hook / command / agent / test / doc 自动兜底——这就是 harness 与"靠记忆"的差距。</p>
 <hr>
 <h3 id="910-pr-0-pr-n-admin-pr-6162">9.10 大型新模块的"PR 0 ~ PR N + 优化收尾"分段（admin 后台 PR #61–62 实战）</h3>
-<p><strong>场景</strong>：从零搭服务端 admin 后台 + Vue SPA。约 3,000 prod LOC + 1,000 test LOC，
-若一次 commit ship，diff 几千行 review 几乎不可能。</p>
-<p><strong>做法</strong>：plan 阶段先把 9 段功能写明白，<strong>全部 commit 在同一分支</strong>但分开 commit
-（PR 0 → PR 1 → PR 2 → PR 3 → PR 4 → PR 5a → PR 5b → PR 5c → PR 5d）。最终
-打包为 2 个 GitHub PR：#61（MVP 1–4）+ #62（PR 5 优化收尾），review 拆成 2 次。</p>
-<p><strong>每段 commit 的范围</strong>：
-- PR 0：<strong>纯基础设施</strong>（host 绑定 / 插件 install / resources 文件），不引入任何 admin 业务代码 → review 焦点 = "有没有破坏现有游戏路径"
-- PR 1：地基依赖 + 鉴权骨架；功能"看得见"的只是 <code>/admin-auth/login</code> 路由
-- PR 2-5：每段功能模块化叠加，每个 commit 都能独立"运维有用"
-- 优化（PR 5a-d）：基础功能上线后再补，靠 backlog 优先级排队</p>
-<p><strong>plan 文件</strong>：<code>/root/.claude/plans/glistening-whistling-donut.md</code> 600+ 行的设计稿，
-<strong>所有决策（含 SQL schema、Vue 文件树、Caddy 配置、CI 加 Node setup）都先文档化</strong>。
-单看每段 PR 看不出全貌；plan 看完之后再回头审 PR 1，思路清晰。</p>
-<p><strong>教训</strong>：
-- "1 commit = 1 个独立 ship-able 单元"，即便最终合到同一 PR，review 体验也跟单大 commit 完全不同
-- plan 先行：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 + Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警"，再编码 → 比"先写后改"少 ~30% 返工
-- 每段 PR 推完都自动跑 4 次 CI 修复回路（Kotlin 嵌套块注释 / <code>arrayOf&lt;Long&gt; +=</code> / <code>runTest</code> 虚拟时钟 / <code>withCharset</code> 未 import），都靠 <code>:server:test</code> 的 <code>tee + Surface-on-failure</code> 把日志 exfil 到 PR 评论才能在沙箱里读到错误</p>
+<blockquote>
+<p>完整的 9 段 PR 拆分 + 各段 LOC 表见 <strong>§二 "Admin 后台路线图"</strong>。本节只提炼
+<strong>经验性</strong>结论，不再重复列拆分。</p>
+</blockquote>
+<p><strong>核心做法</strong>：plan 先行（<code>/root/.claude/plans/...</code> 600+ 行设计稿，含 SQL schema /
+Vue 文件树 / Caddy 路由 / CI 加 Node setup 全部预先文档化）→ 9 段 commit 同一
+分支但分开提交 → 最终打包为 2 个 GitHub PR（#61 MVP / #62 优化收尾）。</p>
+<p><strong>3 条提炼出的经验</strong>：
+- <strong>1 commit = 1 个独立 ship-able 单元</strong>：即便最终合到同一 PR，review 体验也跟
+  单一大 commit 完全不同——PR 0 review 焦点是"有没有破坏现有游戏路径"，与 PR 1
+  的"鉴权骨架"完全不混
+- <strong>plan 先行省 ~30% 返工</strong>：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 +
+  Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警" 再编码——明显
+  比"先写后改"省事
+- <strong>CI 修复回路占非平凡时间</strong>：PR #61-62 推完后跑了 4 次 CI 修复（详见
+  9.11 / 9.12 / 9.13 / 9.14 各小节），都靠 <code>:server:test</code> 的
+  <code>tee + Surface-on-failure</code> 把日志 exfil 到 PR 评论才能在沙箱里读到错误</p>
 <hr>
 <h3 id="911-kotlin-pr-61-ci">9.11 Kotlin 嵌套块注释陷阱（PR #61 CI 修复实战）</h3>
 <p><strong>症状</strong>：<code>:server:compileKotlin</code> 报 <code>Unclosed comment at AdminApiRoutes.kt:104:1</code>，
