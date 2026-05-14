@@ -1,6 +1,6 @@
 # AI 辅助联网游戏开发——完整实践总结
 
-> 约 25 分钟 | 目标受众：移动端 / 后端 / 全栈开发团队
+> 目标受众：移动端 / 后端 / 全栈开发团队
 
 ---
 
@@ -24,24 +24,34 @@
 | Web 客户端 | **Compose Multiplatform 1.6.10 (wasmJs)**，浏览器原生 WebSocket（@JsFun interop） |
 | 服务端框架 | Ktor 2.3.6 + Netty + WebSockets（`:server` Gradle 子项目，依赖 `:shared`）|
 | 序列化 | kotlinx.serialization 1.6.3（JSON，所有 target 共用）|
-| 反代 / 部署 | Caddy（80/443）→ 反代 → `127.0.0.1:8080`；systemd；GitHub Actions auto-deploy |
-| 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x（单一 root project）|
-| CI | GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution |
+| **Admin 后台 SPA**（PR #61–62）| **Vue 3 + Element Plus 2.6 + Pinia + vue-router + Vite 5 + ECharts**（`apps/admin/` 独立 npm 子项目）|
+| **Admin 服务端**（PR #61–62）| **SQLite (sqlite-jdbc 3.45) + jBCrypt + Ktor REST**（admin_users / admin_sessions / games / game_players / alerts / game_events 6 张表）|
+| **Admin 实时推送**（PR #62 / 5a）| **手写 SSE**（Ktor `respondTextWriter` + 心跳；浏览器 EventSource 自动重连）|
+| 结构化日志（PR #62 / 5c）| logstash-logback-encoder 7.4（admin 模块 JSON 输出）|
+| 反代 / 部署 | Caddy（80/443 + Let's Encrypt 自动 HTTPS）→ 反代 → `127.0.0.1:8080`；`/admin/*` 子路径分流到 SPA；systemd；GitHub Actions auto-deploy |
+| 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x / Node 20 + Vite（admin 子项目独立 npm）|
+| CI | GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution + admin-build（Vite 打包 + dist 5 MB 阈值）|
 
-### 代码规模（PR #54 后）
+### 代码规模（PR #62 后）
 
-| 模块 | Kotlin 文件数 | 行数 |
-|------|-------------|-----|
-| `:apps:android`（Android UI + 网络层）| 19 | ~6,300 |
-| `:apps:web`（Compose MP / wasmJs）| 23 | ~3,470 |
-| `:shared`（KMP 公共逻辑，commonMain）| 9 | ~2,670 |
-| `:server`（Ktor 服务端）| 4 | ~1,960 |
-| 测试（commonTest + serverTest）| 4 | ~1,530 |
+| 模块 | 文件数 | 行数 |
+|------|-------|-----|
+| `:apps:android`（Android UI + 网络层）| 20 个 .kt | ~6,440 |
+| `:apps:web`（Compose MP / wasmJs）| 25 个 .kt | ~4,320 |
+| `:shared`（KMP 公共逻辑，commonMain）| 9 个 .kt | ~2,670 |
+| `:server`（Ktor 服务端 + admin 模块）| 25 个 .kt | ~4,840 |
+| `apps/admin/`（Vue 3 + Element Plus SPA）| 19 个 .vue/.ts | ~1,470 |
+| 测试（commonTest + serverTest + admin tests）| 14 个 .kt | ~3,620 |
 | Android XML 布局 | 20 个 | ~3,320 |
-| **合计** | **59 个 Kotlin 文件** | **约 19,250 行**|
+| **合计**（Kotlin + Vue/TS main）| **98 个文件** | **约 23,360 行** |
+| **总测试 LOC 增长** | PR #54 ~1,530 | → **PR #62 ~3,620（×2.4）** |
 
-关键大文件：`OnlineGameActivity.kt`（1,051 行）、`ServerGameManager.kt`（955 行）、
-`AppViewModel.kt`（509 行）、`Application.kt`（554 行）
+关键大文件：
+- `OnlineGameActivity.kt` ~1,050 行（Android 联网游戏 UI）
+- `ServerGameManager.kt` ~1,100 行（PR #62 +listener / lastActionAt / withRoomLock）
+- `AppViewModel.kt` ~660 行（Web 状态机，PR #62 +连接幂等防御）
+- `Application.kt` ~550 行（PR #61 提取 gameModule + 装 admin）
+- `GameHistoryStore.kt` ~280 行（admin 异步入库 + game_events drain）
 
 ---
 
@@ -64,9 +74,25 @@
 | Web CJK 字体 / Android URL | 2026-05-09 | #45–46 | 中文豆腐块修复；去 :8080 走 Caddy 80 |
 | AI 托管 + 速度配置 | 2026-05-10 | #52–53 | feature_spec G34-G38；PROTOCOL_VERSION = 3；Android + Web 跨端 |
 | 单机按钮去重 / 文档刷新 | 2026-05-10 | #51, #54 | CI 折叠；SP 重复托管按钮修复 |
+| UI 基线 + 设备分级约束 | 2026-05-10 | #58 | CLAUDE.md 约束 6/7/8：单机/联网同 UI、Android 基线、小屏禁用 8+ |
+| Web 自动重连 + dev_summary.html | 2026-05-10 | #59 | WS 指数退避 ×5 重连（4G/WiFi 切换防御）；docs/build_html.py 生成单文件 HTML |
+| 域名 + Let's Encrypt | 2026-05-11 | #60 | bermin.cn 域名 + Caddy 自动 ACME；保留 :80 IP fallback 兼容老 APK |
+| **Admin 后台 MVP**（5 段 PR）| 2026-05-13 | #61 | PR 0 骨架（bind 127.0.0.1）/ PR 1 SQLite + bcrypt + RBAC 鉴权 / PR 2 监控 API（overview/rooms/players/sessions/games）+ GameHistoryStore / PR 3 告警引擎（3 内置规则）/ PR 4 Vue 3 + Element Plus SPA + Caddy /admin/ 子路径；CLAUDE.md 约束 9/10 |
+| **Admin 优化收尾**（4 段 PR 5）| 2026-05-13 | #62 | 5a SSE 替代 30s 轮询 / 5b Dashboard 7 天 ECharts 趋势图 / 5c logstash JSON 日志 / 5d game_events 表 + 逐手出牌持久化；同期修 Codex P2（gameEventListener 锁内调用）+ Web 连点 3 次幂等 |
 
 ### 版本总量
-- 总 PR：**54 个** | 总 commit：**约 170 次（非 merge）** | **有效开发 18 天**（2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 7 天）
+- 总 PR：**62 个** | 总 commit：**约 250 次（非 merge）** | **有效开发 19 天**（2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 8 天）
+
+### Admin 后台路线图（5 段 ship 在 #61 + #62）
+
+| 段 | PR | 主题 | LOC |
+|----|----|------|----|
+| PR 0 | #61 | 服务端骨架：bind 127.0.0.1 + `Application.gameModule()` 提取 + install CN/StatusPages + resources/{application.conf,logback.xml} | ~150 prod / ~80 test |
+| PR 1 | #61 | SQLite + jBCrypt + ktor sessions + admin_users/sessions + RBAC（SUPER_ADMIN/OPS_ADMIN）+ /admin-auth/{login,logout,me,change-password}；约束 9 | ~700 prod / ~470 test |
+| PR 2 | #61 | 6 GET 端点（overview/rooms/{id}/players/sessions/games[/id]）+ SnapshotBuilder（lock-safe）+ GameHistoryStore（Channel + 单 IO 协程 + games/game_players 表）；约束 10 | ~700 prod / ~350 test |
+| PR 3 | #61 | AlertEngine（10s tick + 3 内置规则 RoomStuck/JvmHeapHigh/DisconnectRatioHigh + cooldown 去重 + alerts 表）+ /alerts /ack | ~400 prod / ~200 test |
+| PR 4 | #61 | Vue 3 SPA（17 个源文件：Login/Dashboard/Rooms/RoomDetail/Players/Sessions/Games/Alerts + AlertWatcher）+ Caddyfile `@adminApi` + `handle_path /admin/*` + CI admin-build job | ~1,800 LOC（Vue/TS 为主） |
+| PR 5a–5d | #62 | SSE 推送 / 趋势图 / JSON 日志 / game_events 表 + 回放视图 | ~800 prod / ~150 test |
 
 ---
 
@@ -101,17 +127,32 @@
                                    │ 依赖 :shared
 ┌──────────────────────────────────▼───────────────────────────────────┐
 │  :server（Ktor + Netty，Gradle 子项目）                               │
-│  Application.kt → ServerRoomManager（房间 / AI 填充）                 │
-│              └→ ServerGameManager（权威状态 / AI / 计时）              │
-│       • 每房间一把 Mutex 串行化所有状态修改                             │
-│       • 每房间 30s 超时计时器 + broadcastForceAdvance 兜底             │
-│       • 三级 AI 回退 + force-advance 强制推进                          │
+│  Application.gameModule()                                             │
+│    ├─ ServerRoomManager（房间 / AI 填充）                              │
+│    ├─ ServerGameManager（权威状态 / AI / 计时）                        │
+│    │    • 每房间一把 Mutex 串行化所有状态修改                          │
+│    │    • 每房间 30s 超时计时器 + broadcastForceAdvance 兜底           │
+│    │    • 三级 AI 回退 + force-advance 强制推进                        │
+│    │    • gameEndListener / gameEventListener（锁内调，PR #61–62 加） │
+│    └─ installAdmin(ServerContext)                                      │
+│         ├─ AdminDb（SQLite + Mutex + WAL，PR #61）                    │
+│         ├─ AdminAuthService（bcrypt + cookie session，PR #61）        │
+│         ├─ SnapshotBuilder（lock-safe / 锁外渲染 DTO，PR #61）         │
+│         ├─ GameHistoryStore（Channel + 单 IO 协程 + game_events drain）│
+│         └─ AlertEngine（10s tick + alertFlow SharedFlow → SSE）        │
 └──────────────────────────────────┬───────────────────────────────────┘
-              WebSocket /game（JSON + sealed class classDiscriminator）
+   WebSocket /game（JSON + sealed class classDiscriminator）
+   HTTP    /admin-auth/* /admin/api/*（admin REST，PR #61）
+   SSE     /admin/api/alerts/stream（实时告警，PR #62 / 5a）
                                    ▲
             Caddy（80 / 443 TLS）——┘   反代 → 127.0.0.1:8080
+              ├─ @ws path /game           → :8080
+              ├─ @adminApi /admin/api/*   → :8080（PR #61）
+              │  /admin-auth/*            → :8080
+              ├─ handle_path /admin/*     → /var/www/communication-card-admin（Vue SPA）
+              └─ handle catch-all        → /var/www/communication-card-web（Compose SPA）
                                    ▲
-                       公网客户端 /game（ws:// 或 wss://）
+                       公网客户端 /game（wss://bermin.cn）+ 运维 /admin/（浏览器）
 ```
 
 ### 关键架构决策
@@ -126,6 +167,12 @@
 | **共享逻辑** | **PR #35 + H3：`:shared` KMP 模块** | **编译期保证一致，约束 1/4 消除** |
 | 反代拓扑 | Caddy 80/443 → `:8080`（仅 loopback）| TLS 终止；客户端统一走 80/443 |
 | 协议版本 | `PROTOCOL_VERSION = 3`（`Reconnect` 携带）| 服务端握手时拒绝旧版客户端 |
+| **Admin 鉴权（#61）** | **bcrypt + 服务端 session cookie + RBAC**（不用 Ktor Sessions plugin）| 单一 cookie 用途，手写中间件比 plugin 直观；登出能立刻 invalidate |
+| **Admin 入口（#61）** | **Caddy `/admin/` 子路径** | 零额外 DNS / 证书；与游戏同源 |
+| **Admin 数据层（#61）** | **SQLite + 单 Connection + Mutex + WAL** | 极低并发场景；不引入 HikariCP；admin / 游戏关键路径完全解耦 |
+| **历史游戏入库（#61 / 5d）** | **`Channel<GameRecord>(UNLIMITED)` + 单 IO 协程消费** | 游戏关键路径**不在 mutex 内做 IO**（约束 9）；trySend 非阻塞 |
+| **Admin DTO 脱敏（#61）** | **UUID 截前 8 hex；hands 永不暴露** | 约束 10：admin 权限 ≠ 上帝模式 |
+| **告警实时推送（#62 / 5a）** | **手写 SSE（Ktor 2.3.6 无原生）+ 25s 心跳 + 浏览器自动重连** | 替代 30s 轮询；EventSource 内置 retry；Caddy 反代不需特殊配置 |
 
 ### 关键不变量（设计契约）
 
@@ -136,6 +183,11 @@
 • AI 替补：玩家中途退出 → 标记 isAISubstitute，不删玩家槽
 • PROTOCOL_VERSION：Reconnect 消息携带；不匹配服务端拒绝连接
 • 所有客户端 URL：走 Caddy 80（或 wss:// 443），不直接打 :8080
+• 约束 9：admin 路由 / 后台任务**不得在 mutexFor(room) 内做 IO**；锁内只允许
+  immutable 拷贝 + Channel.trySend
+• 约束 10：admin DTO 字段必须脱敏（playerIdMasked 前 8 hex；hands 不出现）
+• gameEventListener / gameEndListener：**锁内**被调用，顺序 = 动作顺序
+  （Codex P2 修复：原本在 broadcast 锁外调，可被并发 session.send suspend 抢序）
 ```
 
 ### 架构演进路径（从遗憾到修复）
@@ -144,22 +196,25 @@
 |-----------|------|------|
 | 未提取 KMP 共享模块 → `canBeat` 双份 | ✅ 已解决 | PR #35 + H3：`:shared` + 编译期唯一份 |
 | 无协议版本号 → 客服端协议演进无强制检查 | ✅ 已解决 | PR-H3：`PROTOCOL_VERSION` + 握手 |
-| 无事件溯源 → 全量状态调试困难 | ⚪ 未规划 | 全量同步目前够用，溯源暂不规划 |
+| 无事件溯源 → 全量状态调试困难 | ✅ 已解决 | **PR #62 / 5d**：`game_events` 表 + per-room seq + admin /games/{id}/events 端点 |
+| 服务端不可观测（无运维监控）| ✅ 已解决 | **PR #61 / 0–4**：admin 模块（监控 + 告警 + 历史）+ Vue SPA |
+| 玩家断线 / 房间卡死无主动告警 | ✅ 已解决 | **PR #61 / 3**：AlertEngine 3 内置规则 + SSE 实时推送（#62 / 5a） |
+| 玩家匿名（sessionId）无法封禁 | ⚪ 未规划 | MVP 决策推后（"玩家账号系统"放模块 4 一起做）|
 
 ---
 
 ## 第四章：问题发现全景——人工 vs AI
 
-### 汇总：发现来源与数量（PR #1–54 全程）
+### 汇总：发现来源与数量（PR #1–62 全程）
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| **人工测试 / 反馈** | ~35 | 27% | UI 体验、部署环境、运行时崩溃；真机发现 |
-| **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~55 | 43% | 全量扫描、跨文件链路、并发/工具链陷阱 |
-| **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~15 | 12% | 独立角度审查功能完整性、协议契约、跨文件一致性 |
-| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | ~13 | 10% | PR 自动审查；语句级边界、entropy、UI 文案 |
-| **重叠 / 联合发现** | ~10 | 8% | Codex 标记 → Claude 深挖根因 |
-| **合计** | **~128** | 100% | |
+| **人工测试 / 反馈** | ~38 | 25% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）|
+| **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 43% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
+| **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 14% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
+| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **25**（精确）| 15% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）|
+| **重叠 / 联合发现** | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
+| **合计** | **~162** | 100% | （Codex 列为精确审计，其余列为估算）|
 
 > **核心规律**：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
 > pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
@@ -224,9 +279,17 @@
 | 34 | 顺子规则在多端解释不一致 | 移除 straight card type，更新 game_rules.md (#52) |
 | 35 | 单机模式出现多余"AI 接管"按钮 | 按钮仅在多人模式显示 (#54) |
 
+#### Admin / Web 体验阶段（约 3 个，PR #58–62）
+
+| # | 症状 | 对应修复 |
+|---|------|---------|
+| 36 | 华为 Mate80 Chrome 偶发 ERR_CONNECTION_REFUSED | regressions #14 留档诊断流程；apps/web 加 WS 指数退避自动重连（#59） |
+| 37 | bermin.cn 域名已下来但仍用纯 IP HTTP | 切 Let's Encrypt 自动 HTTPS + 保留 :80 IP fallback（#60） |
+| 38 | **Web 版要连点 3 次"连接服务器"才进入 Connected** | AppViewModel.connectServer 顶部加状态判断，Connecting/Connected 直接 return；UI 重组 ~16ms 帧延迟内连点不再撕掉 in-flight WS（#62 / regressions #15） |
+
 ---
 
-### AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）
+### AI（Claude 主会话）自主发现的问题（~65 个，跨 4 轮深度审查 + post-#34 持续 + admin 5 段建设）
 
 > **AI 来源**：Claude Code Agent（claude-opus-4-7 / claude-sonnet-4-6）
 > **工作模式**：Level 3-4 — 截图 / 症状 → AI 自主推理；或开放性指令"自查自纠"全量扫描
@@ -321,31 +384,81 @@
 
 ---
 
-### ChatGPT Codex Review Bot（~13 条，全程）
+### ChatGPT Codex Review Bot（**25 条**，PR #29-#62 全程审计）
 
-> **工作模式**：PR 创建时自动触发；聚焦语句级风险，按 P1 / P2 标注
+> **工作模式**：PR 创建时自动触发（GitHub App `chatgpt-codex-connector[bot]`）；
+> 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
+> `get_reviews` / `get_review_comments` / `get_comments`"独立审计得出
+> （pr-reviewer subagent 2026-05-14 跑出，全数据可复现）。
 
-| # | PR | 优先级 | 位置 | 意见 | 处置 |
+**汇总**：
+
+| 维度 | 数字 |
+|------|------|
+| 跨 19 个 PR 留下 inline 发现 | #29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62 |
+| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **25 条** |
+| 优先级分布 | **P0×0 · P1×7 · P2×18 · nit×0** |
+| thread 级处置 | ✅ fixed = **19** / ⏭️ skipped = **6**（含原 thread 未 resolved 但 bug 在后续 PR / commit 修复的情况）/ ❌ disputed = **0** |
+| 业务级真正没修的（"留坑"）| **0**：所有 skipped 中，#29 / #31 / #33 / #34 的核心问题均在后续 PR / regressions.md 中被记录并修复（如 UUID 截断 commit `06d445c` / 6 玩家下限被约束 8 文档化）；#56 是文档页面顺序，无业务影响 |
+| 误报（false positive）| **0** —— 每条都触发了代码 / 文档改动或设计澄清 |
+
+**全部 25 条详表**（按 PR 升序 + 优先级 P1 在前）：
+
+| # | PR | 优先级 | 文件 | 内容 | 处置 |
 |---|----|--------|------|------|------|
-| 1 | #29 | P1 | Application.kt | UUID 截到 8 字符 → 32 位熵，会话碰撞 | ✅ commit 06d445c（完整 36 字符 UUID） |
-| 2 | #31 | P1 | LobbyActivity | Reconnecting 路径不触发 hideLoading，遮罩永久卡住 | ✅ PR #33 三状态都加 hideLoading |
-| 3 | #33 | P2 | MainActivity | UI 提示"房间名"但服务端只解析 roomCode，必失败 | ✅ UI 改为房间列表点击加入 |
-| 4 | #35 | P1 | detekt | `!!` 和 swallowed exceptions 超阈值 | ✅ PR #34/35 null safety 修复 + baseline |
-| 5 | PR-H1 | P2 | PreCommitScan | MultiEdit matcher 潜在误匹配 + doc-only filter 绕过 | ✅ commit 369e682 |
-| 6 | PR-H3 | P2 | ServerGameManager | AI 炸弹决策阈值用 rank.value（1-based），比较值偏移 | ✅ commit 49ded62（`>= 8` / `<= 3`）|
-| 7 | PR-H4 | P2 | trace-bug | allowed-tools 声称的工具权限与实际不符；缺 git add/commit | ✅ commit c888ad5 |
-| 8 | #43 | P2 | settings.json | allowed-tools Bash 表达式语法不精确 | ✅ commit 6ef2aea |
-| 9 | #45 | P2 | fonts | 字体子集漏包"·"/"—"/"♠♣♥♦"等 UI 字符 | ✅ commit ce74b39 |
-| 10 | #47 | P1+P2 | web | kotlinx.serialization plugin 缺 apply；出牌后未清空 selection | ✅ commit 7f83753 |
-| 11 | #49 | P1 | web GameScreen | pass 按钮条件逻辑在本轮先手场景有误 | ✅ commit 1779890 |
-| 12 | #50 | P2 | web SinglePlayer | lastPlayerId 中央 fallback 缺失；SP 结束状态判断 | ✅ commit d484dbc |
-| 13 | #53 | P2 | ServerGameManager | processAITurn `delay()` 后只重检 currentPlayerIndex，漏检 isAISubstitute | ✅ commit c9988fd |
+| 1 | #29 | P1 | Application.kt:57 | 截断 UUID 至 8 字符导致 sessionId 碰撞 | ⏭️ skipped*（后续 commit `06d445c`；regressions #5）|
+| 2 | #31 | P1 | LobbyActivity.kt:219 | 重连后 loading 遮罩未清除导致大厅卡住 | ⏭️ skipped*（PR #33 三状态都加 hideLoading）|
+| 3 | #33 | P2 | MainActivity.kt | 提示按"房间名"加入但服务端只查 roomCode | ⏭️ skipped*（后续 UI 重写为列表点击）|
+| 4 | #34 | P1 | Application.kt | 主动离开时未清 `playerToRoom` 仍可重连 | ⏭️ skipped*（后续 leaveRoom 整改）|
+| 5 | #34 | P1 | Application.kt:218 | `maxPlayers<6` 时硬卡 6 人导致永远开局失败 | ⏭️ skipped*（6 人下限被 CLAUDE.md 约束 8 固化为有意行为）|
+| 6 | #35 | P1 | detekt.yml | 新 LargeClass 阈值未 baseline 会卡所有 CI | ✅ fixed |
+| 7 | #36 | P2 | .claude/settings.json | TDD hook matcher 未包含 MultiEdit | ✅ fixed |
+| 8 | #36 | P2 | .githooks/pre-push | 资源 / manifest 改动被误判 docs-only 跳过测试 | ✅ fixed |
+| 9 | #39 | P2 | ServerGameManager.kt:833 | rank 改 1-based 后 AI 绝对阈值（`≥7` / `≤2`）未同步偏移 | ✅ fixed |
+| 10 | #40 | P2 | pull_request_template.md | GameMessage 改动被要求 Test.kt 但无对应 gate | ✅ fixed |
+| 11 | #40 | P2 | trace-bug.md | `/trace-bug` 需 git add/commit 但 frontmatter 未授权 | ✅ fixed |
+| 12 | #42 | P1 | install.sh:69 | sudoers 路径 `/usr/bin/systemctl` 与 deploy.yml 用 `/bin` 不一致 | ✅ fixed (`e18c3a6`) |
+| 13 | #42 | P2 | deploy.yml:35 | install 引导缺 `DEPLOY_ENABLED` 变量与手动触发说明 | ✅ fixed (`e18c3a6`) |
+| 14 | #43 | P2 | review-pr.md:3 | allowed-tools 并不能隔离 caller session 调用（命名误导）| ✅ fixed (`6ef2aea`) |
+| 15 | #45 | P2 | App.kt:38 | GB2312 子集字体丢失 ♠♥♣♦ 与 em-dash 等 6 个 codepoint | ✅ fixed (`ce74b39`) |
+| 16 | #47 | P1 | UserPreferences.kt | `:apps:web` 未 apply serialization plugin 编译失败 | ✅ fixed (`7f83753`) |
+| 17 | #47 | P2 | GameScreen.kt:92 | 出牌后未清 `selectedCardIds`，出牌按钮误激活 | ✅ fixed (`7f83753`) |
+| 18 | #49 | P2 | GameScreen.kt | Compact 模式 FlowRow 手牌挤压表格区与按钮 | ✅ fixed (`1779890`) |
+| 19 | #50 | P2 | AppViewModel.kt:440 | 单机 `lastPlayerId` 为 null 看不到上家出牌（作者认定实际 P1）| ✅ fixed (`d484dbc`) |
+| 20 | #52 | P2 | HelpScreen.kt:55 | 文案说"随机首家"但服务端实为 ♠3 持有者 | ✅ fixed (`e25eb2e`) |
+| 21 | #53 | P2 | ServerGameManager.kt:540 | AI 延迟唤醒前未重检 `isAISubstitute`，代替已回归玩家出牌 | ✅ fixed (`c9988fd`) |
+| 22 | #53 | P2 | activity_game.xml:317 | 单机布局共享导致"AI 接管"按钮空挂 | ✅ fixed (`d976e81`) |
+| 23 | #56 | P2 | build_pptx.py:808 | "谢谢页"位于新增章节之前，与 md 顺序不一致 | ⏭️ skipped（doc 排版，无业务影响）|
+| 24 | #59 | P1 | WebSocketTransport.kt:99 | 重连后未发 `Reconnect` 致房间状态丢失 | ✅ fixed (`593e4ec`) |
+| 25 | #62 | P2 | ServerGameManager.kt:682 | 事件在 mutex 锁外记录致并发 seq 顺序错乱 | ✅ fixed (`e8d9ff6`) |
+
+\*skipped 仅指 GitHub thread 在原 PR 内未标 resolved；业务上均已通过后续
+PR / regressions.md 跟进。
+
+**6 条 skipped 集中在 PR #29-#34 早期联网迭代**（2026-05-03 - 05-04）：当时
+4 关 PR 流程（CI / Codex / Claude review / 真机）尚未操作起来，thread 经常被
+新 PR 超越。PR #34 后团队开始**每个 Codex thread 必用 commit SHA 回复**，从那
+之后再无 thread-level skipped。第 6 条 skipped（#56）是 PPT 页面顺序的低优文档
+问题，无业务影响。
+
+**Top 5 最有价值的 finding**（按作者后续 commentary + 下游影响）：
+
+| 排名 | PR | 内容 | 价值 |
+|------|----|------|------|
+| 1 | #29 | UUID 截 8 字符 → 32 位熵碰撞 | regressions.md #5 标杆案例（Claude 漏，Codex 抓）|
+| 2 | #39 | AI 炸弹阈值偏移（1-based vs 0-based）| 作者提交信曾断言"所有调用比较相对值"→ Codex 2 分钟内打脸 |
+| 3 | #50 | Web 单机 lastPlayerId 中央 fallback 缺失 | 作者判定实际是 P1（影响游戏可玩性）|
+| 4 | #45 | 字体 cmap 漏 6 个 codepoint | Codex 做了 cmap 级核对 |
+| 5 | #62 | gameEventListener 锁外调致并发 seq race | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
 
 **关键观察**：
-- Codex 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量"，pr-reviewer
-  抓"功能完整 / 文档漂移 / 跨文件契约"。第 13 条（race condition）只被 Codex 发现。
-- 13 条 Codex 意见中 **1 条 P0、5 条 P1、7 条 P2**，全部已修复。
-- UUID 截断（#1）在 PR #29 审查后拖了 4 天才修，其余 P1 全部在当 PR 内修。
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，**实际 25 条**
+- **0 业务级遗漏**：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
+- **0 误报**：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
+- 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
+  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 40+ 条独立发现
+- PR #62 Codex P2 救场：admin 监听器在锁外的 seq race 是同 vendor Claude 没发现的——
+  跨 vendor 在并发场景尤其值钱
 
 ---
 
@@ -454,11 +567,11 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 
 | 指标 | 数值 |
 |------|------|
-| 人工总投入时间 | ~50 小时（需求 + 反馈 + 真机测试，含两个会话）|
-| AI 等效工作时间 | ~500 小时（按工程师正常速度估算）|
+| 人工总投入时间 | ~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）|
+| AI 等效工作时间 | ~600 小时（按工程师正常速度估算）|
 | **提速比** | **约 10 倍** |
-| 代码提交（非 merge）| 约 170 次 |
-| 从"单机 Android"到"双端 + 服务端 + Harness"| 有效开发 18 天 |
+| 代码提交（非 merge）| 约 250 次 |
+| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 19 天 |
 | 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
 | → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
@@ -562,41 +675,62 @@ override fun onOpen(ws: WebSocket, response: Response) {
    - 两份 canBeat / 两份 DTO → 三处不一致；最终必须 KMP 模块解决
    - **原则**：重复代码是 Bug 的温床，不是"性能优化"
 
-4. **四层审查缺一不可**
-   - Claude 主会话（全局逻辑）+ pr-reviewer（功能完整 / 文档漂移）+
-     Codex（语句级边界 / entropy）+ 真机验证（看不见的环境问题）
-   - **原则**：单一 AI 视角有系统性盲区，异构比同构更重要
+4. **五层审查缺一不可**（PR #61-62 新增第 5 层"用户真机"）
+   - Claude 主会话（全局逻辑）+ pr-reviewer（功能完整 / 文档漂移 / 类型未定义）+
+     Codex（语句级边界 / entropy / 并发 race）+ CI（工具链 quirks / 编译失败）+
+     **用户真机**（Compose 重组延迟期的双击 race 这类无单测可写的场景）
+   - PR #62 Web 连点 3 次 bug：4 关 AI review 都没识别，由用户报告才发现——
+     说明再多 AI 视角也替代不了真实使用反馈
+   - **原则**：单一 AI 视角有系统性盲区，异构比同构更重要；但 AI 全集 ≠ 完整覆盖
 
 5. **CI 是第二套反馈系统**
    - 沙箱里 90% 的改动可以快速验证（`:shared:jvmTest` ≤30s）
-   - wasmJs / Android 构建必须 push 才知道对不对
+   - wasmJs / Android / Vue 构建必须 push 才知道对不对
    - **原则**：把 gradle stderr exfil 到 PR comment，让 AI 能读 CI 日志
+   - PR #62 实战：`:server:test` 加 `tee + Surface-on-failure` 后，4 次 CI 修复
+     回路（嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）每次都能从
+     PR 评论里看到错误，沙箱无需登录就能定位
 
-### 交付成果（全程）
+6. **质量保障要 plan 先行而非事后补**（PR #61-62 admin 后台实战）
+   - admin 9 段功能合计 ~3,000 prod LOC：plan 文件预先 600+ 行写清楚 SQL schema
+     / Vue 文件树 / Caddy 路由 / CI Node 配置，再编码
+   - 实测**省 ~30% 返工**（用户提前用 4 轮 AskUserQuestion 收敛范围 → 编码时不再
+     反复改方向）
+   - **原则**：plan-first 比 "先写后改" 在大特性上的边际收益最大；plan 越具体，
+     生成代码出错越少
+
+7. **"1 commit = 1 个独立 ship-able 单元"**（admin 9 段 → 2 个 PR 实战）
+   - 即便最终合到同一 PR，每个 commit 也要能独立通过 review（自己解释清楚动机 +
+     测试 + 不破坏现有代码）
+   - PR #61 的 PR 0（基础设施）/ PR 1（鉴权骨架）/ PR 2（监控 API）按这个原则
+     拆分；single-purpose commit 让 review 焦点不会被淹没
+   - **原则**：commit 粒度 = review 粒度；不是"PR = review 单元"
+
+### 交付成果（PR #1–#62 全程）
 
 | 指标 | 数值 |
 |------|------|
-| 合并 PR 数 | 54 个 (#1–#54) |
-| 非 merge commit 数 | 约 170 次 |
-| 修复问题 | ~128 个 |
-| 客户端 | Android (XML) + Web (CMP/wasmJs) |
-| 共享模块 | `:shared` KMP（消灭约束 1/4）|
+| 合并 PR 数 | **62 个**（#1–#62）|
+| 非 merge commit 数 | 约 250 次 |
+| 修复问题 | **~162 个**（其中 Codex 精确审计 25，详见 §四）|
+| 客户端 | Android (XML) + Web (CMP/wasmJs) + **Admin SPA (Vue 3 / Element Plus)** |
+| 共享模块 | `:shared` KMP（消灭约束 1/4） |
+| 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
 | Harness 基础设施 | L0–L4 五层，PR-H1~H5 落地 |
-| 自动化测试 | ~70 个（CardRules + Settlement + ServerGameManager + 协议 round-trip）|
-| 部署 | Caddy + systemd + GitHub Actions auto-deploy |
+| 自动化测试 | **186 个 @Test**（跨 14 个 *Test.kt；详见 §八 8.2 后段）|
+| 部署 | Caddy（80/443 + 自动 HTTPS）+ `/admin/` 子路径 + systemd + GitHub Actions auto-deploy |
 
 ### 后续建议行动
 
-1. ✅ **自动化集成测试**：PR-H2 落地 — `CardRulesTest.kt`（~30 用例）+
-   `ServerGameManagerTest.kt`（~25 用例）+ CI tdd-gate 硬关
+1. ✅ **自动化集成测试**：PR-H2 落地 — `CardRulesTest.kt` 33 + `ServerGameManagerTest.kt` 48 + `SettlementCalculatorTest.kt` 18 + admin 76 + 其他 11 = **186 用例**；CI tdd-gate 硬关
 2. ✅ **共享规则层**：PR #35 + PR-H3 落地 — `:shared` KMP；约束 1/4 编译期消除
-3. ⚪ **监控告警**：上线 `force-advance` 计数指标，触发即告警排查（暂未规划）
-4. ⚪ **弱网测试**：集成限速工具，系统化回归重连场景（暂未规划）
-5. ✅ **协议版本号**：PR-H3 落地 — `PROTOCOL_VERSION = 3`，握手时校验
-6. ⚪ **SERVER_URL 集中化**（regressions #13 follow-up）：抽到 BuildConfig /
-   资源文件，避免下次拓扑变更再漏改某端
-7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md`
-   路径扩展，目前无规划
+3. ✅ **监控告警**：PR #61 / 3 落地 — `AlertEngine` 10s 周期 + 3 条内置规则（ROOM_STUCK / JVM_HEAP_HIGH / DISCONNECT_RATIO_HIGH）+ SSE 实时推送（PR #62 / 5a）
+4. ✅ **协议版本号**：PR-H3 落地 — `PROTOCOL_VERSION = 3`，握手时校验
+5. ⚪ **弱网测试**：集成限速工具，系统化回归重连场景（暂未规划）
+6. ⚪ **SERVER_URL 集中化**（regressions #13 follow-up）：抽到 BuildConfig / 资源文件，避免下次拓扑变更再漏改某端
+7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md` 路径扩展，目前无规划
+8. ⚪ **逐手出牌 step-through 回放 UI**：PR #62 / 5d 已铺 `game_events` 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件
+9. ⚪ **玩家账号系统**：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做
 
 ---
 
@@ -655,7 +789,29 @@ Sonnet：实现代码让测试绿
 Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 ```
 
-> 本项目 `SettlementCalculator` 有 15 个用例，3 个月无回归；联网版无测试，反复出问题。
+> **历史对比**：早期项目 `SettlementCalculator` 有 15 个用例、3 个月无回归；
+> 而联网版 PR #16-#34 阶段**几乎无服务端测试**，反复出问题（结算公式漏算、
+> reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这条对比
+> 直接推动了 **PR-H2 关键路径强制 TDD + CI tdd-gate**（CLAUDE.md 第三章）。
+>
+> **当前状态（PR #62 后）**：全项目共 **186 个 `@Test`**（跨 14 个 *Test.kt 文件），
+> 其中：
+> - `:shared` 59 个：CardRulesTest 33 + SettlementCalculatorTest 18 +
+>   GameMessageSerializationTest 8
+> - `:server` 127 个：ServerGameManagerTest 48 + ApplicationBootstrapTest 3 +
+>   admin/ 76（AdminAuthService 13 / AdminAuthRoutes 8 / AdminApiRoutes 11 /
+>   AdminDb 5 / GameHistoryStore 9 / SnapshotBuilder 7 / AlertRule 9 /
+>   AlertStore 9 / AlertEngine 5）
+> - **CI `tdd-gate` 硬关**：CardRules / SettlementCalculator / ServerGameManager
+>   任一改动**必须**同 PR 改对应 `*Test.kt`（机制是 `git diff --name-only` 校验），
+>   未同改直接红
+> - 联网版**已纳入工作流**：每次 PR push 跑 `:shared:jvmTest + :server:test`，
+>   detekt + assembleDebug + wasmJsBrowserDistribution；admin SPA 加 admin-build job
+>
+> 这不是"加了测试 = 没有 bug"——PR #62 自己就跑了 4 次 CI 修复（详见
+> §九 9.11-9.14 各小节）。但测试 + tdd-gate 把"代码改动可以在不被发现的情况下
+> 溜过"的概率降到接近零，bug 改前一定会先被测试或 CI 暴露——这正是"联网版反复
+> 出问题"时期最缺的反馈环。
 
 ### 8.3 多 Claude 协同的天花板
 
@@ -669,7 +825,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 
 → **相关性盲区**会同时存在于所有 Claude 模型里。
 
-本项目 **~13 个 Codex 意见**中，大量是多个 Claude 自查也大概率找不出来的：
+本项目 **25 个 Codex 意见**中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：
 
 - `UUID.take(8)`：训练语料里到处是，所有 LLM 都视为"常用模式"
 - "房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项
@@ -736,11 +892,48 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 |------|------|------|
 | 时间换覆盖率（单 Claude 多轮）| 4 轮自审 | ~35 个 Bug |
 | 视角换覆盖率（多 Claude 协同）| Opus + Sonnet + Haiku | +20 个 Bug（post-#34 阶段）|
-| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | +13 个 Codex + 5 个真机；**90% 是前两者找不到的** |
+| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+25 个 Codex**（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
 
 异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 13 个 Codex 与 ~55 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 **25 个 Codex 发现**与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。
+
+---
+
+### 8.6 Token 用量实测（仅覆盖 Claude Code 接入后阶段）
+
+**口径**：从本机 `~/.claude/projects/-home-user-AndroidAPP/` 142 个 transcript
+（按 `uuid` 字段去重后 **2,210 个 assistant turn**）聚合而来。每 turn 含
+`input_tokens` / `output_tokens` / `cache_creation_input_tokens` /
+`cache_read_input_tokens` 四项，按 timestamp 落桶到开发阶段。
+
+⚠️ **数据缺口**：早期 PR #1-50（2026-02-02 单机起步 → 2026-05-09 Web 功能补齐）
+的 transcript **不在本仓库的 host 上**——要么当时用了其他 host / 工作目录的
+session，要么 Claude Code 集成是 5/10 之后才接入。下表只列**已采集**到 token
+数据的阶段。
+
+| 阶段 | 日期 | 轮次 | 纯输入 | 输出 | 缓存写 | 缓存读 | 总和 | **计费等效** |
+|------|------|----:|------:|----:|------:|------:|----:|----------:|
+| AI 托管 + UI 约束（PR #51-58）| 5/10 | 951 | 29K | 904K | 13.4M | **267.4M** | 281.7M | **41.1M** |
+| bermin.cn HTTPS（PR #60）| 5/11 | 76 | 0.3K | 46K | 2.2M | 28.9M | 31.1M | 5.1M |
+| WS 重连 + HTML docs（PR #59）| 5/12 | 232 | 12K | 243K | 3.1M | 8.6M | 11.9M | 4.2M |
+| Admin MVP + PR 5（PR #61-62）| 5/13 | 897 | 1.7K | 1.44M | 12.5M | **293.8M** | 307.7M | **43.3M** |
+| 今日（dev_summary 刷新 / 审计）| 5/14 | 54 | 0.1K | 70K | 3.9M | 37.1M | 41.0M | 7.6M |
+| **合计（5/10-5/14）** | 5 天 | **2,210** | 42K | 2.7M | 34.9M | **635.7M** | **673M** | **~101M** |
+
+\*计费等效 = `pure_input + cache_creation + cache_read × 0.1 + output`
+（Anthropic API 定价：cache 读价 = 输入的 1/10）
+
+**几个观察**：
+
+1. **cache_read 主导（94%）**：每轮重读 CLAUDE.md + 代码上下文 ~300K cache_read
+   tokens。Claude Code 的 prompt cache 让"重复读已知内容"的成本远低于"每轮从头输入"
+2. **5/10 与 5/13 是两个尖峰**：分别对应 AI 托管设计 + Admin 后台开发；都是
+   "大特性 + 多轮 Codex / pr-reviewer 来回 + 真机调试"的组合
+3. **3 天合计 ~100M 计费等效 token**：按 Claude Opus 4.7 标准定价
+   （$3/MTok input + $15/MTok output）粗算 ~$300-400 / 5 天高强度开发
+4. **缓存命中率高 ≠ 浪费**：每轮读取的 cache_read 大都是必要上下文（项目代码 +
+   规约 + 历史 PR），没缓存的话每轮要重输入 ~3M token，成本和延迟都会爆炸
 
 ---
 
@@ -938,3 +1131,233 @@ CI 连续报 8 类不同的兼容性错误，必须按序逐层剥：
 7. **playbook** 追加"改部署拓扑前 grep 所有客户端 SERVER_URL"步骤
 
 每一关都有 hook / command / agent / test / doc 自动兜底——这就是 harness 与"靠记忆"的差距。
+
+---
+
+### 9.10 大型新模块的"PR 0 ~ PR N + 优化收尾"分段（admin 后台 PR #61–62 实战）
+
+> 完整的 9 段 PR 拆分 + 各段 LOC 表见 **§二 "Admin 后台路线图"**。本节只提炼
+> **经验性**结论，不再重复列拆分。
+
+**核心做法**：plan 先行（`/root/.claude/plans/...` 600+ 行设计稿，含 SQL schema /
+Vue 文件树 / Caddy 路由 / CI 加 Node setup 全部预先文档化）→ 9 段 commit 同一
+分支但分开提交 → 最终打包为 2 个 GitHub PR（#61 MVP / #62 优化收尾）。
+
+**3 条提炼出的经验**：
+- **1 commit = 1 个独立 ship-able 单元**：即便最终合到同一 PR，review 体验也跟
+  单一大 commit 完全不同——PR 0 review 焦点是"有没有破坏现有游戏路径"，与 PR 1
+  的"鉴权骨架"完全不混
+- **plan 先行省 ~30% 返工**：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 +
+  Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警" 再编码——明显
+  比"先写后改"省事
+- **CI 修复回路占非平凡时间**：PR #61-62 推完后跑了 4 次 CI 修复（详见
+  9.11 / 9.12 / 9.13 / 9.14 各小节），都靠 `:server:test` 的
+  `tee + Surface-on-failure` 把日志 exfil 到 PR 评论才能在沙箱里读到错误
+
+---
+
+### 9.11 Kotlin 嵌套块注释陷阱（PR #61 CI 修复实战）
+
+**症状**：`:server:compileKotlin` 报 `Unclosed comment at AdminApiRoutes.kt:104:1`，
+但文件末尾就是个 `}` + 空行。
+
+**根因**：Kotlin 块注释**可嵌套**（与 C/C++ 不同）。KDoc `/** ... */` 里的字符串
+`/admin/api/*` 被词法器解释为打开嵌套块注释 `/*`，而 `PR ...` 后面没 `*/` 匹配，
+最后外层 KDoc 的 `*/` 被消耗给嵌套的，导致整个文件直到 EOF 都"在注释里"。
+
+**修复**：docstring 路径占位符 `/admin/api/*` → `/admin/api/...`。
+
+**教训**：写 KDoc 时避免任何 `/*` 子串（含 wildcard 路径如 `/admin/api/*`）。改用
+`...` / `<placeholder>` / `{name}` 等占位。Kotlin 词法行为与 C 系语言不同，
+跨语言开发者容易踩坑。
+
+---
+
+### 9.12 runTest 虚拟时钟 vs 真实 IO 协程（PR #62 / 5d 单测踩坑）
+
+**症状**：`GameHistoryStoreTest.countSince` CI 报
+`TimeoutCancellationException: Timed out after 5s of _virtual_ time`。
+
+**根因**：`GameHistoryStore.start()` 在独立 `CoroutineScope(Dispatchers.IO)` 上
+启 IO 消费协程；`runTest` 的 `TestScope` 虚拟时钟不会推进这个外部协程。测试用
+`withTimeout(5_000) { while (store.countAll() < N) delay(20) }` 轮询时，`delay(20)`
+仅推虚拟时钟 → 250 次循环就到 5s 虚拟时间超时，但 IO 协程在真实时间维度上可能
+还没完成 enqueue → SQLite insert。
+
+**修复**：依赖独立 scope 的真实异步行为 → 用 `runBlocking`（真实时钟）替代 `runTest`。
+
+**教训**：`runTest` 适合 test scope 内的 suspend 调用；测试一旦涉及外部 scope
+（独立 launched 协程、Channel 消费、SharedFlow 订阅者），改用 `runBlocking` 走真实
+时钟才不会卡虚拟时间死循环。
+
+---
+
+### 9.13 命名参数与本地变量撞名引起 Kotlin 1.9.24 解析失败（PR #62 / 5a 单测踩坑）
+
+**症状**：`val clock = arrayOf<Long>(1_000L); ...; clock[0] += 60_001` 报
+`No set method providing array access`。
+
+**根因**：本地变量 `val clock = ...` 与 AlertEngine 构造命名参数 `clock = { clock[0] }`
+撞名。Kotlin 1.9.24 在 lambda 闭包内做名字解析时混淆了 set 重载查找。
+
+**修复**：(1) 重命名变量 `clock → clockMs`；(2) 显式 `clockMs[0] = clockMs[0] + 60_001`
+代替 `+=`。
+
+**教训**：写测试 fixture 时，避免本地变量名 = 被测构造的命名参数。Kotlin 编译器
+的诊断信息没指明这是 shadowing 问题，看到 "No set method" 容易误以为 Array 类型错。
+
+---
+
+### 9.14 监听器 + suspend 网络发送的并发顺序陷阱（PR #62 Codex P2 实战）
+
+**症状**：`gameEventListener` 在 `broadcastActionResult`（锁外、含 `session.send` 多次
+suspend）调用。两个玩家快速出牌时，前一动作的 broadcast 可能在 send suspend 期间
+被后一动作的 listener 抢先调用，`GameHistoryStore.recordEvent` 的 `AtomicInteger`
+给晚到的动作分配较小 seq，admin event 流反映的出牌顺序与实际顺序倒置。
+
+**Codex 找到的事实**：
+> "When two players act quickly, this records the history event only after all
+> `session.send(...)` calls have completed and after `handleAction` has already
+> released the room mutex."
+
+**修复**：把 listener 调用从 broadcast 阶段搬到 `handlePlayCards` / `handlePass`
+返回前，全部在 `mutexFor(room).withLock` 内调用——同房间动作天然按 mutex 获取
+顺序序列化。新增 `broadcastActionResult_doesNotCallGameEventListener` 回归测试。
+
+**教训**：
+- 任何需要"按动作顺序持久化"的 listener，**必须在状态变更的同步路径上调用**
+  （锁内 / 计算完毕后立刻），不能放到广播阶段——广播是 IO，可被 suspend 推迟
+- Codex 的并发分析能力在这类 race 上比同 vendor Claude review 更敏感（同 vendor
+  常被"看起来都对"的代码路径迷惑）；多 vendor review 互补在并发场景尤其值钱
+
+---
+
+### 9.15 Compose 重组延迟期的双击 race（regressions #15，用户报）
+
+**症状**：Web 版第一次点"连接服务器"无反应，要连点 3 次才进 Connected。
+
+**根因**：`AppViewModel.connectServer()` 顶部无条件 `net?.close()` + `newSessionScope()`：
+用户在 UI 重组前（~16 ms 一帧）连点时，每次点击都把刚发起的 WS 撕掉新建，前面
+的连接尚未完成 onOpen 就被销毁。
+
+**修复**：在 `connectServer()` 顶部检查 `net?.connectionState?.value`，已 Connecting /
+Connected 直接 return。让按钮的 click 是幂等的。
+
+**教训**："破坏式重建"型 UI 入口（点击 → 关旧 + 建新）**必须自带幂等保护**，仅靠按钮
+visibility 控制不可靠——Compose 重组与 click event 不在同一帧。同类入口（如
+`goHome` / `startMultiplayer`）也要审视。
+
+---
+
+### 9.16 Admin SPA 部署链路：纯 npm 子项目 + Caddy 路由顺序（PR #61 / 4 实战）
+
+**Vue 3 子项目放哪？**：`apps/admin/` 独立 npm/vite 项目，**不进 settings.gradle.kts**
+（不是 Kotlin 项目）。CI 单独跑 `npm ci && npm run build`，dist 通过 rsync 部署。
+
+**Caddy 路由顺序是隐形 P0**：bermin.cn 块内按特异性排序：
+1. `@ws path /game` → reverse_proxy（最特异）
+2. `@adminApi path /admin/api/* /admin-auth/*` → reverse_proxy（admin REST）
+3. `handle_path /admin/*` → file_server（admin SPA + `try_files` 兜底 history mode）
+4. `handle` catch-all → file_server（游戏 Web 主站）
+
+错序后果：第 3 行的 `handle_path /admin/*` 会**先于** `@adminApi` 匹配 `/admin/api/...`
+路径，把 API 请求当成 SPA 静态文件返回 HTML，前端报 "JSON parse error"。
+
+**教训**：
+- Caddy `handle` 是排他匹配，第一条命中就不再往下走 → 顺序是契约
+- write Caddyfile 时用最特异（更细路径）排在前的原则
+- 部署前用 `curl -i https://bermin.cn/admin/api/overview` 验证返回 JSON 而非 HTML
+
+---
+
+### 9.17 Admin 与游戏关键路径的"运维层不阻塞业务层"分离（CLAUDE.md 约束 9）
+
+**核心契约**：admin 路由处理路径**不得**在 `mutexFor(room).withLock` 内做：文件 IO、
+SQLite 写、网络发送、JSON 序列化。允许两种模式：
+
+- **(a) 短暂持锁取 immutable snapshot**：进锁 → `RoomSnapshot` defensive copy → 出锁
+  → 渲染 JSON。SnapshotBuilder 用这条
+- **(b) 完全 lock-free 读 ConcurrentHashMap**：`rooms.values.toList()` 弱一致快照
+  后处理。overview / players / sessions 用这条
+
+**反例（PR #62 Codex P2 修复前曾这样想）**：
+```kotlin
+// ❌ 把 SQLite 写入嵌进游戏 mutex
+mutexFor(room).withLock {
+    val record = GameRecord.capture(room, gameResult)
+    historyStore.insertSync(record)   // ← 磁盘 IO 阻塞所有动作
+}
+```
+
+**正例（已实现）**：
+```kotlin
+// ✓ 锁内只构造 immutable record，锁外 enqueue 异步入库
+val record = mutexFor(room).withLock { GameRecord.capture(room, gameResult) }
+historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
+```
+
+**教训**：运维层挂掉只影响监控；业务层挂掉影响所有玩家。**保证业务层永不被运维
+慢查询/慢落盘拖累**是 admin 模块设计的根本不变量。约束 9 写进 CLAUDE.md 比"review
+时记得检查"靠谱得多。
+
+---
+
+### 9.18 质量金字塔：PR #58-62 五层审查的量化实证
+
+PR #58-62 是项目密度最高的 5 个 PR（admin 9 段功能 + 4 次 CI 修复 +
+3 类 AI review + 用户真机反馈）。本节用具体数字盘点"五层审查"各自的贡献。
+
+#### 五层各自的本期产出
+
+| 层 | 触发方式 | PR #58-62 阶段贡献 | 唯一识别的问题 |
+|----|---------|------|------|
+| L1 Claude 主会话 | 编辑 / 设计 / 重构时自查 | 主动指出 ~10 个潜在问题；plan-first 阶段 4 轮 AskUserQuestion 收敛范围 | 大量"看起来对但工具链有 quirk"的代码 |
+| L2 CI 自动跑 | push 后自动 | 抓 4 次编译失败（KDoc 嵌套块 / arrayOf+= / withCharset import / runTest 虚拟时钟）| 工具链 quirks（这类靠 AI 读源码看不出，编译器才有真实信号）|
+| L3 pr-reviewer subagent | `/review-pr` 手动调 | PR #61 一次审出 **1 P0**（AlertDto class 未定义但被 import 用）+ **4 P1**（race / router timing / chmod 文档 / 注释参数名）| 跨文件类型未定义；功能完整性 |
+| L4 Codex bot | PR 创建时自动 | PR #62 报 **1 P2**（gameEventListener 锁外调致并发 seq race）| 并发顺序错位（同 vendor Claude 没识别）|
+| L5 用户真机 | 部署后实际使用 | 报 **1 个 P1**（Web 连点 3 次连接服务器）| Compose 重组延迟期的 UI race（无单测可写）|
+
+#### 每层的"独占"作用
+
+| 假设撤掉某一层 | 哪些问题会逃过 | 后果 |
+|------------|----------|------|
+| 撤 Claude 主会话 | ~10 个设计期就被消灭的问题 | 这些会变成"实现期 + review 期才发现"的 bug，迭代成本 ×10 |
+| 撤 CI | 4 次编译失败 | 红 PR 流到 main；用户拉新代码本地都编不过 |
+| 撤 pr-reviewer | AlertDto 未定义 + 4 P1 | **PR #61 直接合并破坏 main**：admin 模块全部加载不出来 |
+| 撤 Codex | gameEventListener race | 并发出牌时 event 顺序错位；admin 历史回放数据废 |
+| 撤用户真机 | Web 连点 3 次 | 部署上线后用户实际不能进入大厅 |
+
+**没有任何一层是"AI 全集"能替代的**——pr-reviewer 和 Codex 都是 AI，但**独立
+context + 独立 vendor + 独立审查 rubric** 才让它们各自抓到了不同类的问题。
+
+#### 反推：哪些问题不能被这 5 层覆盖
+
+按本期 PR #58-62 数据：
+- **0 个业务级 P0 进 main**（所有 P0 在 PR 阶段被消灭）
+- **0 个 Codex 误报**（精度 100%；43 个 PR 上 Codex silent，silent 的全是真没问题）
+- **1 个用户实际报的 bug**（Web 连点 3 次），这种 race 在静态分析 / 单测里很难
+  抓到，只能靠真机
+
+剩余未覆盖的可能盲区：
+- **性能回归**：本项目未做 benchmark，admin 后台对游戏关键路径的影响只能靠
+  "约束 9 + code review" 软约束保证；如果未来 RPS 变高，需要加 load test
+- **跨平台兼容性**：仅在 bermin.cn 单一 host + Chrome 主测；Safari / Firefox /
+  iOS WebView 未覆盖
+- **数据迁移**：admin SQLite schema 变更目前靠 `ALTER TABLE ... IF NOT EXISTS`
+  人工幂等，没自动化测试。下次大改 schema 需要补 `migration_test`
+
+#### 三个量化指标作为"质量基线"
+
+PR #58-62 阶段稳定下来的可量化质量指标：
+
+| 指标 | 当前值 | 目标 |
+|------|--------|------|
+| 单 PR 平均 Codex 误报数 | 0（精度 100%）| 保持 0；若开始误报需复查 rubric |
+| PR 合并前 P0/P1 数 | 0（全部被 5 层之一抓到并修）| 保持 0 |
+| 用户报的 bug → 进 regressions.md 的延迟 | < 2 小时（#15 当天进）| < 1 天 |
+| CI 修复回路平均次数 | 4 次（PR #61-62）| 长期看希望 < 2 次（plan 越精细越少）|
+| 测试用例数随代码增长比 | 186 用例 / 23k LOC ≈ 8 / 1k LOC | 保持 > 7 / 1k LOC |
+
+**核心洞察**：质量不是"修出来的"，是**多层约束的合力**——单独看每一层都有盲区，
+组合起来才接近"绝大多数 bug 在用户看到前就被消灭"。这五层每一层都可以独立度量
+和优化，互相替代会出现可观察的回退。

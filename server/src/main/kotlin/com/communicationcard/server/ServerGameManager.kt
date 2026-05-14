@@ -85,7 +85,15 @@ class ServerGameManager(
      * 用这个钩子按 roomId 在内存里累积事件，游戏结束时连同 GameRecord 一并
      * 写入 game_events 表（FK 1:N → games）。
      *
-     * 与 [gameEndListener] 同样契约：非 suspend、只能 immutable 拷贝 + trySend。
+     * 调用时机契约（Codex P2 修复后）：
+     * - **在 mutexFor(room).withLock 内**被调用——保证多个并发动作的事件按
+     *   动作顺序触发；listener 内的 seq 计数器（GameHistoryStore.recordEvent
+     *   的 AtomicInteger）严格反映出牌顺序
+     * - 实际调用点：handlePlayCards / handlePass 的返回前（**不**在 broadcast
+     *   阶段调，因为 broadcast 跑在锁外、session.send 可 suspend 让其他动作
+     *   抢先）
+     * - 同 [gameEndListener] 契约：非 suspend、只能 immutable 拷贝 + trySend
+     * - **不可** 递归 [withRoomLock]（Mutex 非可重入会死锁）
      */
     @Volatile
     var gameEventListener: ((ServerRoom, SerializedGameEvent) -> Unit)? = null
@@ -282,6 +290,22 @@ class ServerGameManager(
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
 
+        // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（broadcast 在锁外
+        // 跑可能因 session.send suspend 而被另一个 action 抢先调 listener，造成
+        // game_events.seq 与实际出牌顺序倒置）。在锁内、按"广播会发生的顺序"调用
+        // listener：CardsPlayed → PlayerFinished → TurnStart
+        gameEventListener?.let { l ->
+            try { l(room, event) } catch (_: Throwable) { /* ignore */ }
+            finishEvent?.let { fe ->
+                try { l(room, fe) } catch (_: Throwable) { /* ignore */ }
+            }
+            if (gameResult == null) {
+                try {
+                    l(room, SerializedGameEvent.TurnStart(state.currentPlayerIndex))
+                } catch (_: Throwable) { /* ignore */ }
+            }
+        }
+
         // 触发AI回合（仅在游戏未结束时）
         if (gameResult == null) {
             scope.launch {
@@ -334,6 +358,20 @@ class ServerGameManager(
 
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
+
+        // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（详见 handlePlayCards
+        // 同名注释）。顺序：PlayerPassed → RoundWon → TurnStart
+        gameEventListener?.let { l ->
+            try { l(room, passEvent) } catch (_: Throwable) { /* ignore */ }
+            roundEndEvent?.let { re ->
+                try { l(room, re) } catch (_: Throwable) { /* ignore */ }
+            }
+            if (gameResult == null) {
+                try {
+                    l(room, SerializedGameEvent.TurnStart(state.currentPlayerIndex))
+                } catch (_: Throwable) { /* ignore */ }
+            }
+        }
 
         // 触发AI回合（仅在游戏未结束时）
         if (gameResult == null) {
@@ -661,13 +699,15 @@ class ServerGameManager(
     }
 
     /**
-     * 广播动作结果给所有玩家（公共逻辑）
+     * 广播动作结果给所有玩家（公共逻辑）。
+     *
+     * 注意：gameEventListener 不在这里调用——已搬到 handlePlayCards / handlePass
+     * 内（锁内），由 [gameEventListener] docstring 上的 Codex P2 修复保证按
+     * 动作顺序触发，避免并发 broadcast suspend 让较晚的动作先调 listener。
+     * gameEndListener 仍在这里调（在 mutexFor(room).withLock 内，与 ServerGameState
+     * 读保持互斥）。
      */
     suspend fun broadcastActionResult(room: ServerRoom, result: ActionResult) {
-        // PR 5d: 在 broadcast 同时通知 admin gameEventListener。listener 契约
-        // 见 [gameEventListener] docstring（非 suspend、只允许 trySend 类操作）
-        val eventListener = gameEventListener
-
         // 1. 广播状态更新
         room.players.forEach { player ->
             val playerState = getStateForPlayer(room, player.seatIndex)
@@ -679,7 +719,6 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
-            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 3. 广播玩家走完事件（如有）
@@ -687,7 +726,6 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
-            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 4. 广播本轮结束事件（如有）
@@ -695,7 +733,6 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(event))
             }
-            try { eventListener?.invoke(room, event) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 4. 广播回合开始事件（除非游戏结束）
@@ -705,7 +742,6 @@ class ServerGameManager(
             room.players.forEach { player ->
                 player.session?.send(GameEventMessage(turnStart))
             }
-            try { eventListener?.invoke(room, turnStart) } catch (_: Throwable) { /* ignore */ }
         }
 
         // 5. 广播游戏结束
