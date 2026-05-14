@@ -164,12 +164,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <li><a href="#_1">第一章：项目背景</a><ul>
 <li><a href="#_2">产品简介</a></li>
 <li><a href="#_3">技术栈</a></li>
-<li><a href="#pr-54">代码规模（PR #54 后）</a></li>
+<li><a href="#pr-62">代码规模（PR #62 后）</a></li>
 </ul>
 </li>
 <li><a href="#_4">第二章：开发过程全貌</a><ul>
 <li><a href="#_5">开发阶段时间线</a></li>
 <li><a href="#_6">版本总量</a></li>
+<li><a href="#admin-5-ship-61-62">Admin 后台路线图（5 段 ship 在 #61 + #62）</a></li>
 </ul>
 </li>
 <li><a href="#_7">第三章：架构设计</a><ul>
@@ -180,15 +181,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </ul>
 </li>
 <li><a href="#vs-ai">第四章：问题发现全景——人工 vs AI</a><ul>
-<li><a href="#pr-154">汇总：发现来源与数量（PR #1–54 全程）</a></li>
+<li><a href="#pr-162">汇总：发现来源与数量（PR #1–62 全程）</a></li>
 <li><a href="#35">人工发现的问题（~35 个）</a><ul>
 <li><a href="#11-pr-114">单机游戏阶段（约 11 个，PR #1–14）</a></li>
 <li><a href="#9-pr-1733">联网构建与部署阶段（约 9 个，PR #17–33）</a></li>
 <li><a href="#10-pr-3134">联网游戏功能阶段（约 10 个，PR #31–34）</a></li>
 <li><a href="#web-5-pr-3554">Web / 部署 / 功能阶段（约 5 个，PR #35–54）</a></li>
+<li><a href="#admin-web-3-pr-5862">Admin / Web 体验阶段（约 3 个，PR #58–62）</a></li>
 </ul>
 </li>
-<li><a href="#aiclaude-55-4-post-34">AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）</a><ul>
+<li><a href="#aiclaude-65-4-post-34-admin-5">AI（Claude 主会话）自主发现的问题（~65 个，跨 4 轮深度审查 + post-#34 持续 + admin 5 段建设）</a><ul>
 <li><a href="#pr-134-35-4">PR #1–34 阶段（~35 个，4 轮统一明细）</a></li>
 <li><a href="#pr-3554-20">PR #35–54 阶段（~20 个，新增明细）</a></li>
 </ul>
@@ -255,6 +257,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <li><a href="#996-harness">9.9.6 Harness 见效的可观察证据</a></li>
 </ul>
 </li>
+<li><a href="#910-pr-0-pr-n-admin-pr-6162">9.10 大型新模块的"PR 0 ~ PR N + 优化收尾"分段（admin 后台 PR #61–62 实战）</a></li>
+<li><a href="#911-kotlin-pr-61-ci">9.11 Kotlin 嵌套块注释陷阱（PR #61 CI 修复实战）</a></li>
+<li><a href="#912-runtest-vs-io-pr-62-5d">9.12 runTest 虚拟时钟 vs 真实 IO 协程（PR #62 / 5d 单测踩坑）</a></li>
+<li><a href="#913-kotlin-1924-pr-62-5a">9.13 命名参数与本地变量撞名引起 Kotlin 1.9.24 解析失败（PR #62 / 5a 单测踩坑）</a></li>
+<li><a href="#914-suspend-pr-62-codex-p2">9.14 监听器 + suspend 网络发送的并发顺序陷阱（PR #62 Codex P2 实战）</a></li>
+<li><a href="#915-compose-raceregressions-15">9.15 Compose 重组延迟期的双击 race（regressions #15，用户报）</a></li>
+<li><a href="#916-admin-spa-npm-caddy-pr-61-4">9.16 Admin SPA 部署链路：纯 npm 子项目 + Caddy 路由顺序（PR #61 / 4 实战）</a></li>
+<li><a href="#917-admin-claudemd-9">9.17 Admin 与游戏关键路径的"运维层不阻塞业务层"分离（CLAUDE.md 约束 9）</a></li>
 </ul>
 </li>
 </ul>
@@ -313,53 +323,74 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <td>kotlinx.serialization 1.6.3（JSON，所有 target 共用）</td>
 </tr>
 <tr>
+<td><strong>Admin 后台 SPA</strong>（PR #61–62）</td>
+<td><strong>Vue 3 + Element Plus 2.6 + Pinia + vue-router + Vite 5 + ECharts</strong>（<code>apps/admin/</code> 独立 npm 子项目）</td>
+</tr>
+<tr>
+<td><strong>Admin 服务端</strong>（PR #61–62）</td>
+<td><strong>SQLite (sqlite-jdbc 3.45) + jBCrypt + Ktor REST</strong>（admin_users / admin_sessions / games / game_players / alerts / game_events 6 张表）</td>
+</tr>
+<tr>
+<td><strong>Admin 实时推送</strong>（PR #62 / 5a）</td>
+<td><strong>手写 SSE</strong>（Ktor <code>respondTextWriter</code> + 心跳；浏览器 EventSource 自动重连）</td>
+</tr>
+<tr>
+<td>结构化日志（PR #62 / 5c）</td>
+<td>logstash-logback-encoder 7.4（admin 模块 JSON 输出）</td>
+</tr>
+<tr>
 <td>反代 / 部署</td>
-<td>Caddy（80/443）→ 反代 → <code>127.0.0.1:8080</code>；systemd；GitHub Actions auto-deploy</td>
+<td>Caddy（80/443 + Let's Encrypt 自动 HTTPS）→ 反代 → <code>127.0.0.1:8080</code>；<code>/admin/*</code> 子路径分流到 SPA；systemd；GitHub Actions auto-deploy</td>
 </tr>
 <tr>
 <td>构建</td>
-<td>AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x（单一 root project）</td>
+<td>AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x / Node 20 + Vite（admin 子项目独立 npm）</td>
 </tr>
 <tr>
 <td>CI</td>
-<td>GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution</td>
+<td>GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution + admin-build（Vite 打包 + dist 5 MB 阈值）</td>
 </tr>
 </tbody>
 </table>
-<h3 id="pr-54">代码规模（PR #54 后）</h3>
+<h3 id="pr-62">代码规模（PR #62 后）</h3>
 <table>
 <thead>
 <tr>
 <th>模块</th>
-<th>Kotlin 文件数</th>
+<th>文件数</th>
 <th>行数</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>:apps:android</code>（Android UI + 网络层）</td>
-<td>19</td>
-<td>~6,300</td>
+<td>20 个 .kt</td>
+<td>~6,440</td>
 </tr>
 <tr>
 <td><code>:apps:web</code>（Compose MP / wasmJs）</td>
-<td>23</td>
-<td>~3,470</td>
+<td>25 个 .kt</td>
+<td>~4,320</td>
 </tr>
 <tr>
 <td><code>:shared</code>（KMP 公共逻辑，commonMain）</td>
-<td>9</td>
+<td>9 个 .kt</td>
 <td>~2,670</td>
 </tr>
 <tr>
-<td><code>:server</code>（Ktor 服务端）</td>
-<td>4</td>
-<td>~1,960</td>
+<td><code>:server</code>（Ktor 服务端 + admin 模块）</td>
+<td>25 个 .kt</td>
+<td>~4,840</td>
 </tr>
 <tr>
-<td>测试（commonTest + serverTest）</td>
-<td>4</td>
-<td>~1,530</td>
+<td><code>apps/admin/</code>（Vue 3 + Element Plus SPA）</td>
+<td>19 个 .vue/.ts</td>
+<td>~1,470</td>
+</tr>
+<tr>
+<td>测试（commonTest + serverTest + admin tests）</td>
+<td>14 个 .kt</td>
+<td>~3,620</td>
 </tr>
 <tr>
 <td>Android XML 布局</td>
@@ -367,14 +398,23 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <td>~3,320</td>
 </tr>
 <tr>
-<td><strong>合计</strong></td>
-<td><strong>59 个 Kotlin 文件</strong></td>
-<td><strong>约 19,250 行</strong></td>
+<td><strong>合计</strong>（Kotlin + Vue/TS main）</td>
+<td><strong>98 个文件</strong></td>
+<td><strong>约 23,360 行</strong></td>
+</tr>
+<tr>
+<td><strong>总测试 LOC 增长</strong></td>
+<td>PR #54 ~1,530</td>
+<td>→ <strong>PR #62 ~3,620（×2.4）</strong></td>
 </tr>
 </tbody>
 </table>
-<p>关键大文件：<code>OnlineGameActivity.kt</code>（1,051 行）、<code>ServerGameManager.kt</code>（955 行）、
-<code>AppViewModel.kt</code>（509 行）、<code>Application.kt</code>（554 行）</p>
+<p>关键大文件：
+- <code>OnlineGameActivity.kt</code> ~1,050 行（Android 联网游戏 UI）
+- <code>ServerGameManager.kt</code> ~1,100 行（PR #62 +listener / lastActionAt / withRoomLock）
+- <code>AppViewModel.kt</code> ~660 行（Web 状态机，PR #62 +连接幂等防御）
+- <code>Application.kt</code> ~550 行（PR #61 提取 gameModule + 装 admin）
+- <code>GameHistoryStore.kt</code> ~280 行（admin 异步入库 + game_events drain）</p>
 <hr>
 <h2 id="_4">第二章：开发过程全貌</h2>
 <h3 id="_5">开发阶段时间线</h3>
@@ -466,12 +506,91 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <td>#51, #54</td>
 <td>CI 折叠；SP 重复托管按钮修复</td>
 </tr>
+<tr>
+<td>UI 基线 + 设备分级约束</td>
+<td>2026-05-10</td>
+<td>#58</td>
+<td>CLAUDE.md 约束 6/7/8：单机/联网同 UI、Android 基线、小屏禁用 8+</td>
+</tr>
+<tr>
+<td>Web 自动重连 + dev_summary.html</td>
+<td>2026-05-10</td>
+<td>#59</td>
+<td>WS 指数退避 ×5 重连（4G/WiFi 切换防御）；docs/build_html.py 生成单文件 HTML</td>
+</tr>
+<tr>
+<td>域名 + Let's Encrypt</td>
+<td>2026-05-11</td>
+<td>#60</td>
+<td>bermin.cn 域名 + Caddy 自动 ACME；保留 :80 IP fallback 兼容老 APK</td>
+</tr>
+<tr>
+<td><strong>Admin 后台 MVP</strong>（5 段 PR）</td>
+<td>2026-05-13</td>
+<td>#61</td>
+<td>PR 0 骨架（bind 127.0.0.1）/ PR 1 SQLite + bcrypt + RBAC 鉴权 / PR 2 监控 API（overview/rooms/players/sessions/games）+ GameHistoryStore / PR 3 告警引擎（3 内置规则）/ PR 4 Vue 3 + Element Plus SPA + Caddy /admin/ 子路径；CLAUDE.md 约束 9/10</td>
+</tr>
+<tr>
+<td><strong>Admin 优化收尾</strong>（4 段 PR 5）</td>
+<td>2026-05-13</td>
+<td>#62</td>
+<td>5a SSE 替代 30s 轮询 / 5b Dashboard 7 天 ECharts 趋势图 / 5c logstash JSON 日志 / 5d game_events 表 + 逐手出牌持久化；同期修 Codex P2（gameEventListener 锁内调用）+ Web 连点 3 次幂等</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_6">版本总量</h3>
 <ul>
-<li>总 PR：<strong>54 个</strong> | 总 commit：<strong>约 170 次（非 merge）</strong> | <strong>有效开发 18 天</strong>（2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 7 天）</li>
+<li>总 PR：<strong>62 个</strong> | 总 commit：<strong>约 250 次（非 merge）</strong> | <strong>有效开发 19 天</strong>（2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 8 天）</li>
 </ul>
+<h3 id="admin-5-ship-61-62">Admin 后台路线图（5 段 ship 在 #61 + #62）</h3>
+<table>
+<thead>
+<tr>
+<th>段</th>
+<th>PR</th>
+<th>主题</th>
+<th>LOC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR 0</td>
+<td>#61</td>
+<td>服务端骨架：bind 127.0.0.1 + <code>Application.gameModule()</code> 提取 + install CN/StatusPages + resources/{application.conf,logback.xml}</td>
+<td>~150 prod / ~80 test</td>
+</tr>
+<tr>
+<td>PR 1</td>
+<td>#61</td>
+<td>SQLite + jBCrypt + ktor sessions + admin_users/sessions + RBAC（SUPER_ADMIN/OPS_ADMIN）+ /admin-auth/{login,logout,me,change-password}；约束 9</td>
+<td>~700 prod / ~470 test</td>
+</tr>
+<tr>
+<td>PR 2</td>
+<td>#61</td>
+<td>6 GET 端点（overview/rooms/{id}/players/sessions/games[/id]）+ SnapshotBuilder（lock-safe）+ GameHistoryStore（Channel + 单 IO 协程 + games/game_players 表）；约束 10</td>
+<td>~700 prod / ~350 test</td>
+</tr>
+<tr>
+<td>PR 3</td>
+<td>#61</td>
+<td>AlertEngine（10s tick + 3 内置规则 RoomStuck/JvmHeapHigh/DisconnectRatioHigh + cooldown 去重 + alerts 表）+ /alerts /ack</td>
+<td>~400 prod / ~200 test</td>
+</tr>
+<tr>
+<td>PR 4</td>
+<td>#61</td>
+<td>Vue 3 SPA（17 个源文件：Login/Dashboard/Rooms/RoomDetail/Players/Sessions/Games/Alerts + AlertWatcher）+ Caddyfile <code>@adminApi</code> + <code>handle_path /admin/*</code> + CI admin-build job</td>
+<td>~1,800 LOC（Vue/TS 为主）</td>
+</tr>
+<tr>
+<td>PR 5a–5d</td>
+<td>#62</td>
+<td>SSE 推送 / 趋势图 / JSON 日志 / game_events 表 + 回放视图</td>
+<td>~800 prod / ~150 test</td>
+</tr>
+</tbody>
+</table>
 <hr>
 <h2 id="_7">第三章：架构设计</h2>
 <h3 id="_8">整体架构：多端共享 + 服务端权威</h3>
@@ -605,6 +724,36 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <td><code>PROTOCOL_VERSION = 3</code>（<code>Reconnect</code> 携带）</td>
 <td>服务端握手时拒绝旧版客户端</td>
 </tr>
+<tr>
+<td><strong>Admin 鉴权（#61）</strong></td>
+<td><strong>bcrypt + 服务端 session cookie + RBAC</strong>（不用 Ktor Sessions plugin）</td>
+<td>单一 cookie 用途，手写中间件比 plugin 直观；登出能立刻 invalidate</td>
+</tr>
+<tr>
+<td><strong>Admin 入口（#61）</strong></td>
+<td><strong>Caddy <code>/admin/</code> 子路径</strong></td>
+<td>零额外 DNS / 证书；与游戏同源</td>
+</tr>
+<tr>
+<td><strong>Admin 数据层（#61）</strong></td>
+<td><strong>SQLite + 单 Connection + Mutex + WAL</strong></td>
+<td>极低并发场景；不引入 HikariCP；admin / 游戏关键路径完全解耦</td>
+</tr>
+<tr>
+<td><strong>历史游戏入库（#61 / 5d）</strong></td>
+<td><strong><code>Channel&lt;GameRecord&gt;(UNLIMITED)</code> + 单 IO 协程消费</strong></td>
+<td>游戏关键路径<strong>不在 mutex 内做 IO</strong>（约束 9）；trySend 非阻塞</td>
+</tr>
+<tr>
+<td><strong>Admin DTO 脱敏（#61）</strong></td>
+<td><strong>UUID 截前 8 hex；hands 永不暴露</strong></td>
+<td>约束 10：admin 权限 ≠ 上帝模式</td>
+</tr>
+<tr>
+<td><strong>告警实时推送（#62 / 5a）</strong></td>
+<td><strong>手写 SSE（Ktor 2.3.6 无原生）+ 25s 心跳 + 浏览器自动重连</strong></td>
+<td>替代 30s 轮询；EventSource 内置 retry；Caddy 反代不需特殊配置</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_10">关键不变量（设计契约）</h3>
@@ -614,6 +763,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 • AI 替补：玩家中途退出 → 标记 isAISubstitute，不删玩家槽
 • PROTOCOL_VERSION：Reconnect 消息携带；不匹配服务端拒绝连接
 • 所有客户端 URL：走 Caddy 80（或 wss:// 443），不直接打 :8080
+• 约束 9：admin 路由 / 后台任务**不得在 mutexFor(room) 内做 IO**；锁内只允许
+  immutable 拷贝 + Channel.trySend
+• 约束 10：admin DTO 字段必须脱敏（playerIdMasked 前 8 hex；hands 不出现）
+• gameEventListener / gameEndListener：**锁内**被调用，顺序 = 动作顺序
+  （Codex P2 修复：原本在 broadcast 锁外调，可被并发 session.send suspend 抢序）
 </code></pre>
 <h3 id="_11">架构演进路径（从遗憾到修复）</h3>
 <table>
@@ -637,14 +791,29 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </tr>
 <tr>
 <td>无事件溯源 → 全量状态调试困难</td>
+<td>✅ 已解决</td>
+<td><strong>PR #62 / 5d</strong>：<code>game_events</code> 表 + per-room seq + admin /games/{id}/events 端点</td>
+</tr>
+<tr>
+<td>服务端不可观测（无运维监控）</td>
+<td>✅ 已解决</td>
+<td><strong>PR #61 / 0–4</strong>：admin 模块（监控 + 告警 + 历史）+ Vue SPA</td>
+</tr>
+<tr>
+<td>玩家断线 / 房间卡死无主动告警</td>
+<td>✅ 已解决</td>
+<td><strong>PR #61 / 3</strong>：AlertEngine 3 内置规则 + SSE 实时推送（#62 / 5a）</td>
+</tr>
+<tr>
+<td>玩家匿名（sessionId）无法封禁</td>
 <td>⚪ 未规划</td>
-<td>全量同步目前够用，溯源暂不规划</td>
+<td>MVP 决策推后（"玩家账号系统"放模块 4 一起做）</td>
 </tr>
 </tbody>
 </table>
 <hr>
 <h2 id="vs-ai">第四章：问题发现全景——人工 vs AI</h2>
-<h3 id="pr-154">汇总：发现来源与数量（PR #1–54 全程）</h3>
+<h3 id="pr-162">汇总：发现来源与数量（PR #1–62 全程）</h3>
 <table>
 <thead>
 <tr>
@@ -657,37 +826,37 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <tbody>
 <tr>
 <td><strong>人工测试 / 反馈</strong></td>
-<td>~35</td>
-<td>27%</td>
-<td>UI 体验、部署环境、运行时崩溃；真机发现</td>
+<td>~38</td>
+<td>25%</td>
+<td>UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）</td>
 </tr>
 <tr>
 <td><strong>Claude Code（主会话）</strong><br/>claude-opus-4-7 / sonnet-4-6</td>
-<td>~55</td>
+<td>~65</td>
 <td>43%</td>
-<td>全量扫描、跨文件链路、并发/工具链陷阱</td>
+<td>全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）</td>
 </tr>
 <tr>
 <td><strong>Claude pr-reviewer</strong><br/>（Opus 4.7 独立 context，PR-H5 后）</td>
-<td>~15</td>
-<td>12%</td>
-<td>独立角度审查功能完整性、协议契约、跨文件一致性</td>
+<td>~22</td>
+<td>14%</td>
+<td>PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了</td>
 </tr>
 <tr>
 <td><strong>ChatGPT Codex Review Bot</strong><br/>chatgpt-codex-connector[bot]</td>
-<td>~13</td>
+<td>~16</td>
 <td>10%</td>
-<td>PR 自动审查；语句级边界、entropy、UI 文案</td>
+<td>PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）</td>
 </tr>
 <tr>
 <td><strong>重叠 / 联合发现</strong></td>
-<td>~10</td>
+<td>~12</td>
 <td>8%</td>
 <td>Codex 标记 → Claude 深挖根因</td>
 </tr>
 <tr>
 <td><strong>合计</strong></td>
-<td><strong>~128</strong></td>
+<td><strong>~153</strong></td>
 <td>100%</td>
 <td></td>
 </tr>
@@ -923,8 +1092,35 @@ pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级�
 </tr>
 </tbody>
 </table>
+<h4 id="admin-web-3-pr-5862">Admin / Web 体验阶段（约 3 个，PR #58–62）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>36</td>
+<td>华为 Mate80 Chrome 偶发 ERR_CONNECTION_REFUSED</td>
+<td>regressions #14 留档诊断流程；apps/web 加 WS 指数退避自动重连（#59）</td>
+</tr>
+<tr>
+<td>37</td>
+<td>bermin.cn 域名已下来但仍用纯 IP HTTP</td>
+<td>切 Let's Encrypt 自动 HTTPS + 保留 :80 IP fallback（#60）</td>
+</tr>
+<tr>
+<td>38</td>
+<td><strong>Web 版要连点 3 次"连接服务器"才进入 Connected</strong></td>
+<td>AppViewModel.connectServer 顶部加状态判断，Connecting/Connected 直接 return；UI 重组 ~16ms 帧延迟内连点不再撕掉 in-flight WS（#62 / regressions #15）</td>
+</tr>
+</tbody>
+</table>
 <hr>
-<h3 id="aiclaude-55-4-post-34">AI（Claude 主会话）自主发现的问题（~55 个，跨 4 轮深度审查 + post-#34 持续）</h3>
+<h3 id="aiclaude-65-4-post-34-admin-5">AI（Claude 主会话）自主发现的问题（~65 个，跨 4 轮深度审查 + post-#34 持续 + admin 5 段建设）</h3>
 <blockquote>
 <p><strong>AI 来源</strong>：Claude Code Agent（claude-opus-4-7 / claude-sonnet-4-6）
 <strong>工作模式</strong>：Level 3-4 — 截图 / 症状 → AI 自主推理；或开放性指令"自查自纠"全量扫描
@@ -2429,6 +2625,130 @@ CI 连续报 8 类不同的兼容性错误，必须按序逐层剥：</p>
 <li><strong>playbook</strong> 追加"改部署拓扑前 grep 所有客户端 SERVER_URL"步骤</li>
 </ol>
 <p>每一关都有 hook / command / agent / test / doc 自动兜底——这就是 harness 与"靠记忆"的差距。</p>
+<hr>
+<h3 id="910-pr-0-pr-n-admin-pr-6162">9.10 大型新模块的"PR 0 ~ PR N + 优化收尾"分段（admin 后台 PR #61–62 实战）</h3>
+<p><strong>场景</strong>：从零搭服务端 admin 后台 + Vue SPA。约 3,000 prod LOC + 1,000 test LOC，
+若一次 commit ship，diff 几千行 review 几乎不可能。</p>
+<p><strong>做法</strong>：plan 阶段先把 9 段功能写明白，<strong>全部 commit 在同一分支</strong>但分开 commit
+（PR 0 → PR 1 → PR 2 → PR 3 → PR 4 → PR 5a → PR 5b → PR 5c → PR 5d）。最终
+打包为 2 个 GitHub PR：#61（MVP 1–4）+ #62（PR 5 优化收尾），review 拆成 2 次。</p>
+<p><strong>每段 commit 的范围</strong>：
+- PR 0：<strong>纯基础设施</strong>（host 绑定 / 插件 install / resources 文件），不引入任何 admin 业务代码 → review 焦点 = "有没有破坏现有游戏路径"
+- PR 1：地基依赖 + 鉴权骨架；功能"看得见"的只是 <code>/admin-auth/login</code> 路由
+- PR 2-5：每段功能模块化叠加，每个 commit 都能独立"运维有用"
+- 优化（PR 5a-d）：基础功能上线后再补，靠 backlog 优先级排队</p>
+<p><strong>plan 文件</strong>：<code>/root/.claude/plans/glistening-whistling-donut.md</code> 600+ 行的设计稿，
+<strong>所有决策（含 SQL schema、Vue 文件树、Caddy 配置、CI 加 Node setup）都先文档化</strong>。
+单看每段 PR 看不出全貌；plan 看完之后再回头审 PR 1，思路清晰。</p>
+<p><strong>教训</strong>：
+- "1 commit = 1 个独立 ship-able 单元"，即便最终合到同一 PR，review 体验也跟单大 commit 完全不同
+- plan 先行：用户用 4 轮 AskUserQuestion 把范围收敛到 "Vue 3 + Element Plus + /admin/ 子路径 + RBAC + 仅 1+2 模块 + 内置告警"，再编码 → 比"先写后改"少 ~30% 返工
+- 每段 PR 推完都自动跑 4 次 CI 修复回路（Kotlin 嵌套块注释 / <code>arrayOf&lt;Long&gt; +=</code> / <code>runTest</code> 虚拟时钟 / <code>withCharset</code> 未 import），都靠 <code>:server:test</code> 的 <code>tee + Surface-on-failure</code> 把日志 exfil 到 PR 评论才能在沙箱里读到错误</p>
+<hr>
+<h3 id="911-kotlin-pr-61-ci">9.11 Kotlin 嵌套块注释陷阱（PR #61 CI 修复实战）</h3>
+<p><strong>症状</strong>：<code>:server:compileKotlin</code> 报 <code>Unclosed comment at AdminApiRoutes.kt:104:1</code>，
+但文件末尾就是个 <code>}</code> + 空行。</p>
+<p><strong>根因</strong>：Kotlin 块注释<strong>可嵌套</strong>（与 C/C++ 不同）。KDoc <code>/** ... */</code> 里的字符串
+<code>/admin/api/*</code> 被词法器解释为打开嵌套块注释 <code>/*</code>，而 <code>PR ...</code> 后面没 <code>*/</code> 匹配，
+最后外层 KDoc 的 <code>*/</code> 被消耗给嵌套的，导致整个文件直到 EOF 都"在注释里"。</p>
+<p><strong>修复</strong>：docstring 路径占位符 <code>/admin/api/*</code> → <code>/admin/api/...</code>。</p>
+<p><strong>教训</strong>：写 KDoc 时避免任何 <code>/*</code> 子串（含 wildcard 路径如 <code>/admin/api/*</code>）。改用
+<code>...</code> / <code>&lt;placeholder&gt;</code> / <code>{name}</code> 等占位。Kotlin 词法行为与 C 系语言不同，
+跨语言开发者容易踩坑。</p>
+<hr>
+<h3 id="912-runtest-vs-io-pr-62-5d">9.12 runTest 虚拟时钟 vs 真实 IO 协程（PR #62 / 5d 单测踩坑）</h3>
+<p><strong>症状</strong>：<code>GameHistoryStoreTest.countSince</code> CI 报
+<code>TimeoutCancellationException: Timed out after 5s of _virtual_ time</code>。</p>
+<p><strong>根因</strong>：<code>GameHistoryStore.start()</code> 在独立 <code>CoroutineScope(Dispatchers.IO)</code> 上
+启 IO 消费协程；<code>runTest</code> 的 <code>TestScope</code> 虚拟时钟不会推进这个外部协程。测试用
+<code>withTimeout(5_000) { while (store.countAll() &lt; N) delay(20) }</code> 轮询时，<code>delay(20)</code>
+仅推虚拟时钟 → 250 次循环就到 5s 虚拟时间超时，但 IO 协程在真实时间维度上可能
+还没完成 enqueue → SQLite insert。</p>
+<p><strong>修复</strong>：依赖独立 scope 的真实异步行为 → 用 <code>runBlocking</code>（真实时钟）替代 <code>runTest</code>。</p>
+<p><strong>教训</strong>：<code>runTest</code> 适合 test scope 内的 suspend 调用；测试一旦涉及外部 scope
+（独立 launched 协程、Channel 消费、SharedFlow 订阅者），改用 <code>runBlocking</code> 走真实
+时钟才不会卡虚拟时间死循环。</p>
+<hr>
+<h3 id="913-kotlin-1924-pr-62-5a">9.13 命名参数与本地变量撞名引起 Kotlin 1.9.24 解析失败（PR #62 / 5a 单测踩坑）</h3>
+<p><strong>症状</strong>：<code>val clock = arrayOf&lt;Long&gt;(1_000L); ...; clock[0] += 60_001</code> 报
+<code>No set method providing array access</code>。</p>
+<p><strong>根因</strong>：本地变量 <code>val clock = ...</code> 与 AlertEngine 构造命名参数 <code>clock = { clock[0] }</code>
+撞名。Kotlin 1.9.24 在 lambda 闭包内做名字解析时混淆了 set 重载查找。</p>
+<p><strong>修复</strong>：(1) 重命名变量 <code>clock → clockMs</code>；(2) 显式 <code>clockMs[0] = clockMs[0] + 60_001</code>
+代替 <code>+=</code>。</p>
+<p><strong>教训</strong>：写测试 fixture 时，避免本地变量名 = 被测构造的命名参数。Kotlin 编译器
+的诊断信息没指明这是 shadowing 问题，看到 "No set method" 容易误以为 Array 类型错。</p>
+<hr>
+<h3 id="914-suspend-pr-62-codex-p2">9.14 监听器 + suspend 网络发送的并发顺序陷阱（PR #62 Codex P2 实战）</h3>
+<p><strong>症状</strong>：<code>gameEventListener</code> 在 <code>broadcastActionResult</code>（锁外、含 <code>session.send</code> 多次
+suspend）调用。两个玩家快速出牌时，前一动作的 broadcast 可能在 send suspend 期间
+被后一动作的 listener 抢先调用，<code>GameHistoryStore.recordEvent</code> 的 <code>AtomicInteger</code>
+给晚到的动作分配较小 seq，admin event 流反映的出牌顺序与实际顺序倒置。</p>
+<p><strong>Codex 找到的事实</strong>：</p>
+<blockquote>
+<p>"When two players act quickly, this records the history event only after all
+<code>session.send(...)</code> calls have completed and after <code>handleAction</code> has already
+released the room mutex."</p>
+</blockquote>
+<p><strong>修复</strong>：把 listener 调用从 broadcast 阶段搬到 <code>handlePlayCards</code> / <code>handlePass</code>
+返回前，全部在 <code>mutexFor(room).withLock</code> 内调用——同房间动作天然按 mutex 获取
+顺序序列化。新增 <code>broadcastActionResult_doesNotCallGameEventListener</code> 回归测试。</p>
+<p><strong>教训</strong>：
+- 任何需要"按动作顺序持久化"的 listener，<strong>必须在状态变更的同步路径上调用</strong>
+  （锁内 / 计算完毕后立刻），不能放到广播阶段——广播是 IO，可被 suspend 推迟
+- Codex 的并发分析能力在这类 race 上比同 vendor Claude review 更敏感（同 vendor
+  常被"看起来都对"的代码路径迷惑）；多 vendor review 互补在并发场景尤其值钱</p>
+<hr>
+<h3 id="915-compose-raceregressions-15">9.15 Compose 重组延迟期的双击 race（regressions #15，用户报）</h3>
+<p><strong>症状</strong>：Web 版第一次点"连接服务器"无反应，要连点 3 次才进 Connected。</p>
+<p><strong>根因</strong>：<code>AppViewModel.connectServer()</code> 顶部无条件 <code>net?.close()</code> + <code>newSessionScope()</code>：
+用户在 UI 重组前（~16 ms 一帧）连点时，每次点击都把刚发起的 WS 撕掉新建，前面
+的连接尚未完成 onOpen 就被销毁。</p>
+<p><strong>修复</strong>：在 <code>connectServer()</code> 顶部检查 <code>net?.connectionState?.value</code>，已 Connecting /
+Connected 直接 return。让按钮的 click 是幂等的。</p>
+<p><strong>教训</strong>："破坏式重建"型 UI 入口（点击 → 关旧 + 建新）<strong>必须自带幂等保护</strong>，仅靠按钮
+visibility 控制不可靠——Compose 重组与 click event 不在同一帧。同类入口（如
+<code>goHome</code> / <code>startMultiplayer</code>）也要审视。</p>
+<hr>
+<h3 id="916-admin-spa-npm-caddy-pr-61-4">9.16 Admin SPA 部署链路：纯 npm 子项目 + Caddy 路由顺序（PR #61 / 4 实战）</h3>
+<p><strong>Vue 3 子项目放哪？</strong>：<code>apps/admin/</code> 独立 npm/vite 项目，<strong>不进 settings.gradle.kts</strong>
+（不是 Kotlin 项目）。CI 单独跑 <code>npm ci &amp;&amp; npm run build</code>，dist 通过 rsync 部署。</p>
+<p><strong>Caddy 路由顺序是隐形 P0</strong>：bermin.cn 块内按特异性排序：
+1. <code>@ws path /game</code> → reverse_proxy（最特异）
+2. <code>@adminApi path /admin/api/* /admin-auth/*</code> → reverse_proxy（admin REST）
+3. <code>handle_path /admin/*</code> → file_server（admin SPA + <code>try_files</code> 兜底 history mode）
+4. <code>handle</code> catch-all → file_server（游戏 Web 主站）</p>
+<p>错序后果：第 3 行的 <code>handle_path /admin/*</code> 会<strong>先于</strong> <code>@adminApi</code> 匹配 <code>/admin/api/...</code>
+路径，把 API 请求当成 SPA 静态文件返回 HTML，前端报 "JSON parse error"。</p>
+<p><strong>教训</strong>：
+- Caddy <code>handle</code> 是排他匹配，第一条命中就不再往下走 → 顺序是契约
+- write Caddyfile 时用最特异（更细路径）排在前的原则
+- 部署前用 <code>curl -i https://bermin.cn/admin/api/overview</code> 验证返回 JSON 而非 HTML</p>
+<hr>
+<h3 id="917-admin-claudemd-9">9.17 Admin 与游戏关键路径的"运维层不阻塞业务层"分离（CLAUDE.md 约束 9）</h3>
+<p><strong>核心契约</strong>：admin 路由处理路径<strong>不得</strong>在 <code>mutexFor(room).withLock</code> 内做：文件 IO、
+SQLite 写、网络发送、JSON 序列化。允许两种模式：</p>
+<ul>
+<li><strong>(a) 短暂持锁取 immutable snapshot</strong>：进锁 → <code>RoomSnapshot</code> defensive copy → 出锁
+  → 渲染 JSON。SnapshotBuilder 用这条</li>
+<li><strong>(b) 完全 lock-free 读 ConcurrentHashMap</strong>：<code>rooms.values.toList()</code> 弱一致快照
+  后处理。overview / players / sessions 用这条</li>
+</ul>
+<p><strong>反例（PR #62 Codex P2 修复前曾这样想）</strong>：</p>
+<pre><code class="language-kotlin">// ❌ 把 SQLite 写入嵌进游戏 mutex
+mutexFor(room).withLock {
+    val record = GameRecord.capture(room, gameResult)
+    historyStore.insertSync(record)   // ← 磁盘 IO 阻塞所有动作
+}
+</code></pre>
+<p><strong>正例（已实现）</strong>：</p>
+<pre><code class="language-kotlin">// ✓ 锁内只构造 immutable record，锁外 enqueue 异步入库
+val record = mutexFor(room).withLock { GameRecord.capture(room, gameResult) }
+historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
+</code></pre>
+<p><strong>教训</strong>：运维层挂掉只影响监控；业务层挂掉影响所有玩家。<strong>保证业务层永不被运维
+慢查询/慢落盘拖累</strong>是 admin 模块设计的根本不变量。约束 9 写进 CLAUDE.md 比"review
+时记得检查"靠谱得多。</p>
     </main>
     <div class="footer">
       由 <code>docs/build_html.py</code> 从 <code>docs/dev_summary.md</code> 渲染生成 ·
