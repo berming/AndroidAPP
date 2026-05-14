@@ -1,5 +1,6 @@
 package com.communicationcard.server
 
+import com.communicationcard.game.network.RoomStatus
 import com.communicationcard.game.network.SerializedGameResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -591,10 +592,12 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_defaultsToNull() {
-        // PR 2：gameEndListener 默认 null，installAdmin 才会设入；
+    fun gameEndHooks_defaultToNull() {
+        // PR 2：gameEnd 钩子默认 null，installAdmin 才会设入；
         // 没装 admin 模块时（生产 enableAdmin=false 或运行单机测试）也不能 NPE
-        assertNull(gm.gameEndListener)
+        // PR #62 pr-reviewer P2 #5：listener 拆为 captureProvider + consumer
+        assertNull(gm.gameEndCaptureProvider)
+        assertNull(gm.gameEndConsumer)
     }
 
     @Test
@@ -620,12 +623,21 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_settable_and_invokable() {
-        // PR 2：admin 模块通过 listener 接收 game-end 事件后构建 GameRecord
-        // 异步入库。验证 setter / 直接 invoke 都正常
-        val captured = mutableListOf<Pair<String, String>>()
-        gm.gameEndListener = { room, result ->
-            captured.add(room.roomId to result.winner.orEmpty())
+    fun gameEndHooks_captureProvider_returns_snapshot_consumer_receives_it() {
+        // PR #62 pr-reviewer P2 #5：拆分后的两段契约
+        // - captureProvider：锁内调用，返回 immutable 快照（Any?）
+        // - consumer：锁外调用，拿快照做 trySend 等"非阻塞但不纯内存"的事
+        val snapshots = mutableListOf<Pair<String, String>>()
+        val consumed = mutableListOf<String>()
+
+        gm.gameEndCaptureProvider = { room, result ->
+            "${room.roomId}|${result.winner}"
+        }
+        gm.gameEndConsumer = { snap ->
+            consumed.add(snap as String)
+            // 验证 snap 是 captureProvider 的返回值
+            val parts = snap.split("|")
+            snapshots.add(parts[0] to parts[1])
         }
 
         val room = ServerRoom(
@@ -638,13 +650,17 @@ class ServerGameManagerTest {
             teamBScore = 10,
             trigger = "TEAM_ALL_FINISHED",
         )
-        gm.gameEndListener?.invoke(room, result)
+        // 模拟 broadcastActionResult 的调用顺序：锁内 capture，锁外 consume
+        val captured = gm.gameEndCaptureProvider?.invoke(room, result)
+        captured?.let { gm.gameEndConsumer?.invoke(it) }
 
-        assertEquals(1, captured.size)
-        assertEquals("room-x" to "TEAM_A", captured.first())
+        assertEquals(1, snapshots.size)
+        assertEquals("room-x" to "TEAM_A", snapshots.first())
+        assertEquals(1, consumed.size)
 
         // tearDown：避免影响其他 test
-        gm.gameEndListener = null
+        gm.gameEndCaptureProvider = null
+        gm.gameEndConsumer = null
     }
 
     @Test
@@ -701,13 +717,11 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_contract_listenerCanReadStateWithoutAdditionalLock() = runTest {
-        // PR 3 review feedback: gameEndListener 必须在锁内被调用，listener 内可以
-        // 安全读 room.gameState / room.players（无需再 withRoomLock）。
-        //
-        // 这个测试模拟 "broadcastActionResult 在锁内调 listener" 的契约——
-        // 在 withRoomLock 内 invoke listener；listener 读 room 字段成功；
-        // 没有重入死锁（因为 listener 没再调 withRoomLock）。
+    fun gameEndCaptureProvider_contract_canReadStateWithoutAdditionalLock() = runTest {
+        // PR 3 review feedback + PR #62 pr-reviewer P2 #5：
+        // captureProvider 必须在锁内被调用，内部可以安全读 room.gameState / room.players
+        // （无需再 withRoomLock，因为 Mutex 非可重入会死锁）。
+        // consumer 在锁外调用，应该收到 captureProvider 的返回值。
         val room = ServerRoom(
             roomId = "room-contract", roomCode = "CTRC", roomName = "Contract",
             hostId = "h", maxPlayers = 6,
@@ -720,21 +734,79 @@ class ServerGameManagerTest {
         )
 
         var readPlayers: Int = -1
-        gm.gameEndListener = { r, _ ->
-            // listener 在锁内被调用——直接读 r.players 安全（无需再上锁）
+        var consumed: Any? = null
+        gm.gameEndCaptureProvider = { r, _ ->
+            // 在锁内被调用 → 直接读 r.players 安全（无需再上锁）
             readPlayers = r.players.size
+            "snapshot:${r.players.size}"
+        }
+        gm.gameEndConsumer = { snap ->
+            consumed = snap
         }
 
-        gm.withRoomLock(room) {
-            gm.gameEndListener?.invoke(room, SerializedGameResult(
+        // 模拟 broadcastActionResult 的调用顺序
+        val captured = gm.withRoomLock(room) {
+            gm.gameEndCaptureProvider?.invoke(room, SerializedGameResult(
                 winner = "TEAM_A",
                 teamAScore = 200,
                 teamBScore = 0,
                 trigger = "TEAM_ALL_FINISHED",
             ))
         }
+        captured?.let { gm.gameEndConsumer?.invoke(it) }
 
-        assertEquals(1, readPlayers, "listener 应该能在锁内读 room.players")
-        gm.gameEndListener = null
+        assertEquals(1, readPlayers, "captureProvider 应能在锁内读 room.players")
+        assertEquals("snapshot:1", consumed, "consumer 应收到 captureProvider 的返回值")
+        gm.gameEndCaptureProvider = null
+        gm.gameEndConsumer = null
     }
+
+    @Test
+    fun broadcastActionResult_doesNotMutateRoomStatus() = runTest {
+        // pr-reviewer/Codex PR #64 P2 修复后的契约：
+        // - room.status = FINISHED 必须在 handlePlayCards/handlePass 锁内完成
+        //   （和 ActionResult.gameResult 原子地一起设置）
+        // - broadcastActionResult 在锁外跑，**不**应再 mutate room.status
+        //
+        // 反向验证：模拟"handler 已锁内 set FINISHED"的状态进 broadcast，
+        // broadcast 不应改回去；同时模拟"handler 还没 set"（status=IN_GAME）的
+        // 状态进 broadcast，broadcast 也不应在锁外 mark FINISHED。
+        val room1 = ServerRoom(
+            roomId = "r-fin1", roomCode = "FIN1", roomName = "FinishedAlready",
+            hostId = "h", maxPlayers = 6,
+        )
+        room1.status = RoomStatus.FINISHED  // handler 锁内已设
+        val result1 = ActionResult(
+            success = true,
+            event = null,
+            gameResult = SerializedGameResult(
+                winner = "TEAM_A", teamAScore = 250, teamBScore = 10,
+                trigger = "TEAM_ALL_FINISHED",
+            ),
+            roundEndEvent = null, finishEvent = null,
+        )
+        gm.broadcastActionResult(room1, result1)
+        assertEquals(
+            RoomStatus.FINISHED, room1.status,
+            "broadcast 不应回退 status；FINISHED 由 handler 锁内设并保持",
+        )
+
+        val room2 = ServerRoom(
+            roomId = "r-fin2", roomCode = "FIN2", roomName = "StillInGame",
+            hostId = "h", maxPlayers = 6,
+        )
+        // 显式把 room2 提到 IN_GAME，再走 broadcast；新契约下 broadcast 不应把它推到 FINISHED
+        room2.status = RoomStatus.IN_GAME
+        gm.broadcastActionResult(room2, result1)
+        assertEquals(
+            RoomStatus.IN_GAME, room2.status,
+            "broadcast 不应在锁外把 status 改成 FINISHED（PR #64 P2 修复后）；" +
+                "FINISHED 的设置职责完全归 handlePlayCards/handlePass 在锁内承担",
+        )
+    }
+
+    // 注：handleAction 锁内 status 重检的测试需要 mock GameSession (WebSocketSession 依赖)；
+    // 当前覆盖通过 broadcastActionResult_doesNotMutateRoomStatus + 代码 review。
+    // PR #64 Codex P2 描述里给出的攻击窗口已经因 handle*Cards/Pass 锁内 set FINISHED
+    // 而关闭（status 转换与 ActionResult.gameResult 原子）；锁内重检为 defense-in-depth。
 }

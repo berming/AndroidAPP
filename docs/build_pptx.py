@@ -536,7 +536,7 @@ add_textbox(s, Inches(0.8), Inches(1.2), Inches(11.5), Inches(0.6),
 add_textbox(s, Inches(0.8), Inches(1.8), Inches(11.5), Inches(1.0),
             "完整实践总结", font_size=44, bold=True, color=PRIMARY)
 add_textbox(s, Inches(0.8), Inches(3.0), Inches(11.5), Inches(0.5),
-            "沟通牌  ×  Claude Code  ×  54 PR · 有效开发 18 天",
+            "沟通牌  ×  Claude Code  ×  62 PR · 有效开发 19 天",
             font_size=BODY_LG, color=DARK)
 
 add_textbox(s, Inches(0.8), Inches(4.0), Inches(11.5), Inches(0.4),
@@ -580,21 +580,22 @@ add_table(s, Inches(0.5), Inches(2.0), Inches(6.0), Inches(2.3),
             col_widths=[Inches(1.5), Inches(4.5)])
 
 add_textbox(s, Inches(7.0), Inches(1.55), Inches(6.0), Inches(0.4),
-            "代码规模 (PR #54 后)  ·  约 19,250 行",
+            "代码规模 (PR #62 后)  ·  约 23,360 行 / 98 文件",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 vol = [
-    [":apps:android (UI+网络)", "19 文件 · ~6,300 行"],
-    [":apps:web (Compose MP)", "23 文件 · ~3,470 行"],
+    [":apps:android (UI+网络)", "20 文件 · ~6,440 行"],
+    [":apps:web (Compose MP)", "25 文件 · ~4,320 行"],
     [":shared (KMP commonMain)", "9 文件 · ~2,670 行"],
-    [":server (Ktor)", "4 文件 · ~1,960 行"],
-    ["测试 + Android XML", "24 文件 · ~4,850 行"],
+    [":server (Ktor + admin)", "25 文件 · ~4,840 行"],
+    ["apps/admin (Vue 3 SPA)", "19 文件 · ~1,470 行"],
+    ["测试 (server + shared)", "14 文件 · 186 用例 · ~3,620 行"],
 ]
 add_table(s, Inches(7.0), Inches(2.0), Inches(6.0), Inches(2.3),
             ["模块", "规模"], vol, font_size=BODY_SM,
             col_widths=[Inches(2.4), Inches(3.6)])
 
 add_textbox(s, Inches(0.5), Inches(4.45), Inches(12.3), Inches(0.4),
-            "12 阶段时间线  ·  54 PR  ·  ~170 commit  ·  有效开发 18 天",
+            "13 阶段时间线  ·  62 PR  ·  ~250 commit  ·  有效开发 19 天",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 phases = [
     ["2026-02-02 / 07~12 / 24", "单机游戏 (#1–14)", "引擎/牌型/AI/结算 · 11 轮人工 UI 反馈"],
@@ -604,7 +605,11 @@ phases = [
     ["2026-05-08", "KMP 重构 + Web (#35)", "抽 :shared / Compose MP wasmJs"],
     ["2026-05-08", "Harness H1–H5 (#36–43)", "hooks / TDD-gate / pr-reviewer"],
     ["2026-05-09", "Web UI 4 阶段 (#47–50)", "菜单/响应式/视觉/Android 同等"],
-    ["2026-05-10", "AI 接管 + 单机修复 (#51–54)", "G34-G38 · PROTOCOL_VERSION 3"],
+    ["2026-05-10", "AI 接管 + 约束 6/7/8 (#51-58)", "G34-G38 · PROTOCOL=3 · UI 基线"],
+    ["2026-05-11", "bermin.cn HTTPS (#60)", "Caddy ACME · :80 fallback"],
+    ["2026-05-12", "WS 重连 + HTML docs (#59)", "指数退避 ×5 · dev_summary.html"],
+    ["2026-05-13", "Admin MVP (#61) PR 0-4", "SQLite/bcrypt/监控/告警/Vue SPA"],
+    ["2026-05-13", "Admin 优化 (#62) PR 5a-d", "SSE / 趋势图 / JSON / 事件回放"],
 ]
 add_table(s, Inches(0.5), Inches(4.9), Inches(12.3), Inches(2.0),
             ["时间", "阶段", "主要内容"], phases, font_size=BODY_SM,
@@ -654,15 +659,15 @@ add_callout(s, Inches(0.5), Inches(6.6), Inches(12.5), Inches(0.55),
 # Slide 4: 三、问题发现：人工 + AI（合并旧 slides 4+5+6）
 # =================================================================
 s = add_slide()
-add_header(s, "三、问题发现：人工 + AI（~128 个，4 视角不重叠）")
+add_header(s, "三、问题发现：5 层审查（~162 个；PR #1-#62 全程）")
 
 # Top: 4 metric cards — 浅灰底 + 红色数字强调 + 深字标题（极简调色板）
 y = 1.05
 cards = [
-    ("🔴 人工测试 / 反馈", "~35", "27%", "UI · 部署 · 真机崩溃"),
-    ("🔵 Claude Code 主会话", "~55", "43%", "全量扫描 · 跨文件 · 并发"),
-    ("🟢 Claude pr-reviewer", "~15", "12%", "独立 context · 跨文件契约"),
-    ("🟡 ChatGPT Codex Bot", "~13", "10%", "语句级边界 · entropy · 文案"),
+    ("🔴 人工 + 真机", "~38", "23%", "UI · 部署 · UI race (Web 连点 3 次)"),
+    ("🔵 Claude Code 主会话", "~65", "40%", "全量扫描 + CI 修复 (4 次 quirks)"),
+    ("🟢 Claude pr-reviewer", "~22", "14%", "PR #61 一次审 1 P0 + 4 P1"),
+    ("🟡 ChatGPT Codex Bot", "25 精确", "15%", "全量审计 · 0 误报 · P1×7/P2×18"),
 ]
 x_positions = [0.5, 3.7, 6.9, 10.1]
 NEUTRAL_FILL = RGBColor(0xFA, 0xFA, 0xFA)
@@ -685,7 +690,7 @@ for (title, num, pct, desc), x in zip(cards, x_positions):
 
 # Middle: Left = 人工 (3 阶段); Right = AI (Claude 4 轮 + Codex 3 个)
 add_textbox(s, Inches(0.5), Inches(2.75), Inches(6.2), Inches(0.35),
-            "🔴 人工发现（~35，3 阶段）",
+            "🔴 人工 + 真机（~38；含 Web 连点 3 次 race）",
             font_size=BODY_MD, bold=True, color=RED)
 human = [
     ["单机 (11)", "UI 显示 / 游戏逻辑 / 环境兼容（炸弹重叠 · APK 签名 · 旧 Android）"],
@@ -697,7 +702,7 @@ add_table(s, Inches(0.5), Inches(3.15), Inches(6.2), Inches(2.0),
           col_widths=[Inches(1.4), Inches(4.8)])
 
 add_textbox(s, Inches(7.0), Inches(2.75), Inches(6.0), Inches(0.35),
-            "🔵 AI 发现（Claude ~55 · pr-reviewer ~15 · Codex ~13）",
+            "🔵 AI 发现（Claude ~65 · pr-reviewer ~22 · Codex 25 精确）",
             font_size=BODY_MD, bold=True, color=PRIMARY)
 ai_findings = [
     ["Claude R1 综合 (~20)", "协议 4 · 会话 3 · 房间 4 · UI 6 · 其他 3"],
@@ -963,7 +968,7 @@ add_textbox(s, Inches(0.8), Inches(4.55), Inches(12.0), Inches(0.5),
             "🏆 全程交付成果",
             font_size=BODY_LG, bold=True, color=PRIMARY)
 add_textbox(s, Inches(0.8), Inches(5.05), Inches(12.0), Inches(0.4),
-            "·  全程 54 PR / ~170 commit  ·  有效开发 18 天  ·  发现 ~128 个问题",
+            "·  全程 62 PR / ~250 commit  ·  有效开发 19 天  ·  发现 ~162 个问题",
             font_size=BODY_SM, color=DARK)
 add_textbox(s, Inches(0.8), Inches(5.45), Inches(12.0), Inches(0.4),
             "·  Android + Web 双端  ·  KMP 共享模块（编译期保证一致）  ·  Caddy 自托管自动部署",

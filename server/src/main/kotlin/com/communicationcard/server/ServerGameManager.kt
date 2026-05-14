@@ -62,23 +62,30 @@ class ServerGameManager(
         mutexFor(room).withLock { block() }
 
     /**
-     * 游戏结束钩子（在 [broadcastActionResult] 触发 `gameResult` 那一刻调用）。
+     * 游戏结束钩子（pr-reviewer PR #61 P2 #5 重构）。
      *
-     * admin 模块的 GameHistoryStore 在 [com.communicationcard.server.admin.installAdmin]
-     * 里把 listener 设进来；监听到游戏结束就 [GameRecord.capture] + 异步入 SQLite。
+     * 拆为 2 个 hook 严格对应 CLAUDE.md 约束 9 "锁内 capture + 锁外 enqueue" 的正例：
      *
-     * 设计契约（违反任一条都会出 P0 bug）：
-     * - **在锁内**被调用（broadcastActionResult 用 mutexFor(room).withLock 包了
-     *   listener 调用），所以 listener 实现可以安全读 room.gameState / room.players
-     * - listener body **必须是非 suspend** 函数，**只允许** immutable 值拷贝 +
-     *   `Channel.trySend`（UNLIMITED capacity 不阻塞）
-     * - **绝不允许** IO / SQLite 写 / 网络发送（CLAUDE.md 约束 9）
-     * - **绝不允许** 递归调 [withRoomLock]：kotlinx [Mutex] 非可重入，会死锁
-     *   （已知 listener 实现 = [com.communicationcard.server.admin.GameHistoryStore.enqueue]
-     *   走 Channel.trySend，不重入锁，安全）
+     * 1. [gameEndCaptureProvider]：**在 mutexFor(room).withLock 内**被调用。
+     *    实现只允许做 immutable 值拷贝（如 `GameRecord.capture(room, result)`），
+     *    返回一个 opaque 快照对象给上层
+     * 2. [gameEndConsumer]：**在锁外**被调用，参数是上一步返回的快照。
+     *    可以做 `Channel.trySend` 等"非阻塞但非纯内存"的操作
+     *
+     * 拆开的好处：哪怕 [gameEndConsumer] 实现忘记非阻塞（如改成 SQLite 同步写），
+     * 也只阻塞调用线程而非整个房间的 mutex；约束 9 的契约从"约定"变成"结构性保证"。
+     *
+     * Captured 类型在这一层是 `Any?`，由 admin 模块自由解释（实际是 `GameRecord`），
+     * 避免 server 主模块依赖 admin 类型。
      */
     @Volatile
-    var gameEndListener: ((ServerRoom, SerializedGameResult) -> Unit)? = null
+    var gameEndCaptureProvider: ((ServerRoom, SerializedGameResult) -> Any?)? = null
+
+    /**
+     * 见 [gameEndCaptureProvider]：锁外消费 capture 出的快照。
+     */
+    @Volatile
+    var gameEndConsumer: ((Any) -> Unit)? = null
 
     /**
      * PR 5d：每个游戏内动作 / 事件触发时调用。admin 模块的 GameHistoryStore
@@ -92,7 +99,8 @@ class ServerGameManager(
      * - 实际调用点：handlePlayCards / handlePass 的返回前（**不**在 broadcast
      *   阶段调，因为 broadcast 跑在锁外、session.send 可 suspend 让其他动作
      *   抢先）
-     * - 同 [gameEndListener] 契约：非 suspend、只能 immutable 拷贝 + trySend
+     * - 同 [gameEndCaptureProvider] / [gameEndConsumer] 契约：非 suspend、
+     *   只能 immutable 拷贝 + trySend
      * - **不可** 递归 [withRoomLock]（Mutex 非可重入会死锁）
      */
     @Volatile
@@ -188,6 +196,14 @@ class ServerGameManager(
 
         // 通过互斥锁串行化每个房间的动作，避免并发的 PlayCards/Pass + AI 行动相互踩踏
         return mutexFor(room).withLock {
+            // pr-reviewer/Codex PR #64 P2 修复：在锁内重新校验 status。
+            // 锁外的 line 193 预检 + 锁内的转换为 FINISHED（在 handlePlayCards /
+            // handlePass 内）共同构成正确性边界——锁外 check 可能拿到陈旧 IN_GAME，
+            // 锁内再 check 一次才能拒绝那种"等锁期间游戏已结束"的请求。
+            if (room.status != RoomStatus.IN_GAME) {
+                return@withLock ActionResult(false, "游戏未在进行中")
+            }
+
             val gameState = room.gameState
                 ?: return@withLock ActionResult(false, "游戏未开始")
 
@@ -290,6 +306,14 @@ class ServerGameManager(
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
 
+        // pr-reviewer/Codex PR #64 P2 修复：room.status 必须在锁内随 gameResult 一起
+        // 设为 FINISHED。原来由锁外的 broadcastActionResult 设，但 capture 锁 → 释放
+        // → 锁外 consumer 这段窗口内，下一个 handleAction（锁外预检 status==IN_GAME
+        // 通过）会拿到 mutex 后操作已结束游戏，触发额外 event 或重复 end handling。
+        if (gameResult != null) {
+            room.status = RoomStatus.FINISHED
+        }
+
         // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（broadcast 在锁外
         // 跑可能因 session.send suspend 而被另一个 action 抢先调 listener，造成
         // game_events.seq 与实际出牌顺序倒置）。在锁内、按"广播会发生的顺序"调用
@@ -358,6 +382,12 @@ class ServerGameManager(
 
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
+
+        // pr-reviewer/Codex PR #64 P2 修复：锁内立即 mark FINISHED，详见
+        // handlePlayCards 同名修复块的注释。
+        if (gameResult != null) {
+            room.status = RoomStatus.FINISHED
+        }
 
         // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（详见 handlePlayCards
         // 同名注释）。顺序：PlayerPassed → RoundWon → TurnStart
@@ -704,8 +734,11 @@ class ServerGameManager(
      * 注意：gameEventListener 不在这里调用——已搬到 handlePlayCards / handlePass
      * 内（锁内），由 [gameEventListener] docstring 上的 Codex P2 修复保证按
      * 动作顺序触发，避免并发 broadcast suspend 让较晚的动作先调 listener。
-     * gameEndListener 仍在这里调（在 mutexFor(room).withLock 内，与 ServerGameState
-     * 读保持互斥）。
+     *
+     * gameEnd 钩子（[gameEndCaptureProvider] + [gameEndConsumer]）仍在这里调：
+     * captureProvider 在 mutexFor(room).withLock 内调（拍 immutable 快照），
+     * consumer 在锁外调（拿快照做 trySend 等非阻塞操作）。pr-reviewer PR #61
+     * P2 #5 拆分后的契约。
      */
     suspend fun broadcastActionResult(room: ServerRoom, result: ActionResult) {
         // 1. 广播状态更新
@@ -749,17 +782,27 @@ class ServerGameManager(
             // PR 2 admin 监控：拍 GameRecord 必须在锁内（防 finishOrder / hands /
             // playerScores 的 MutableMap/MutableList 与 handleDisconnect /
             // handlePlayerLeave 并发读时 ConcurrentModificationException）。
-            // listener 的契约：在锁内被调用，内部只做 immutable 值拷贝 + 锁外
-            // Channel.trySend，**绝不**做 IO / 网络发送（CLAUDE.md 约束 9）。
-            try {
-                mutexFor(room).withLock {
-                    gameEndListener?.invoke(room, gameResult)
-                }
+            //
+            // pr-reviewer PR #61 P2 #5 重构：把"锁内 capture + 锁外 enqueue"做成
+            // 两个独立 hook。即便未来 consumer 实现忘记非阻塞，也只会阻塞 broadcast
+            // 这一根线程，不会卡住房间 mutex（CLAUDE.md 约束 9 正例）。
+            val captured: Any? = try {
+                mutexFor(room).withLock { gameEndCaptureProvider?.invoke(room, gameResult) }
             } catch (e: Throwable) {
-                System.err.println("gameEndListener throw (ignored): ${e.message}")
+                System.err.println("gameEndCaptureProvider throw (ignored): ${e.message}")
+                null
+            }
+            if (captured != null) {
+                try {
+                    gameEndConsumer?.invoke(captured)
+                } catch (e: Throwable) {
+                    System.err.println("gameEndConsumer throw (ignored): ${e.message}")
+                }
             }
 
-            room.status = RoomStatus.FINISHED
+            // pr-reviewer/Codex PR #64 P2 修复：room.status 现在由 handlePlayCards /
+            // handlePass 在锁内立即设置为 FINISHED；broadcast 不再 touch status，
+            // 否则锁外 status 转换会产生 check-then-mutate 窗口。
             stopTurnTimer(room)
             room.players.forEach { player ->
                 player.session?.send(GameEnd(gameResult))

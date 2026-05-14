@@ -72,11 +72,20 @@ suspend fun ApplicationCall.requirePermission(
 
 /**
  * 从请求里推断客户端 user-agent / IP，用于 session 行的审计列。
- * IP 优先读 `X-Forwarded-For`（Caddy 反代会塞），否则用 remoteHost。
+ *
+ * IP 优先读 `X-Forwarded-For`（Caddy 反代会**追加**），否则用 remoteHost。
+ *
+ * **关键（pr-reviewer PR #61 P2 #2）**：Caddy 默认 `reverse_proxy` 是
+ * **append** 行为而非 overwrite。攻击者发 `X-Forwarded-For: 8.8.8.8` 到 Ktor
+ * 后变成 `8.8.8.8, <caddy_remote>`；取 `first` 拿到伪造 IP。**必须取 last**
+ * —— 链尾是我们自己 Caddy 写入的可信值。
+ *
+ * 若未来想接受多跳反代（如 CDN → Caddy → Ktor），需要可配置 "信任跳数 N"，
+ * 取倒数第 N 个。当前单跳 Caddy 取 last 即可。
  */
 fun ApplicationCall.clientAuditFields(): Pair<String?, String?> {
     val ua = request.userAgent()
-    val xff = request.headers["X-Forwarded-For"]?.split(",")?.firstOrNull()?.trim()
+    val xff = request.headers["X-Forwarded-For"]?.split(",")?.lastOrNull()?.trim()
     val ip = xff?.takeIf { it.isNotBlank() } ?: request.local.remoteHost
     return ua to ip
 }

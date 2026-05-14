@@ -74,18 +74,30 @@ if [[ ! -f "$ENV_FILE" ]]; then
     cat > "$ENV_FILE" <<EOF
 # Admin 后台环境变量（install.sh 生成；切勿提交进 git）。
 ADMIN_COOKIE_SECURE=true
-ADMIN_COOKIE_DOMAIN=bermin.cn
+# 留空 → host-only cookie，仅 bermin.cn 这一具体 host 收得到（更安全）。
+# 如未来真增加 admin 子域且需要共享 cookie，再改为 ADMIN_COOKIE_DOMAIN=bermin.cn
+# pr-reviewer PR #61 P2 #3：宽 domain 会被未来子域 XSS 用于 CSRF
+ADMIN_COOKIE_DOMAIN=
 ADMIN_INITIAL_USERNAME=root
 ADMIN_INITIAL_PASSWORD=$INIT_PASS
 EOF
     chown root:"$DEPLOY_USER" "$ENV_FILE"
     chmod 640 "$ENV_FILE"
+
+    # 同时写一份 root-only 文件 /etc/communication-card/.initial_password
+    # 让运维 sudo cat 取，**不直接打到 stdout / scrollback**
+    # pr-reviewer PR #61 nit #4：防 SSH 录屏 / tmux 日志留痕
+    PASS_FILE="$ENV_DIR/.initial_password"
+    printf '%s\n' "$INIT_PASS" > "$PASS_FILE"
+    chown root:root "$PASS_FILE"
+    chmod 600 "$PASS_FILE"
+
     echo ""
     echo "    🔑 已生成初始 admin 账号 (root) 及随机密码。"
-    echo "       首次登录后请进 admin UI 改密 → 然后编辑 $ENV_FILE 删掉 ADMIN_INITIAL_PASSWORD 行。"
-    echo "       初始密码（请保管好）："
-    echo ""
-    echo "         $INIT_PASS"
+    echo "       初始密码已写入: $PASS_FILE（root:600）"
+    echo "       查看密码：sudo cat $PASS_FILE"
+    echo "       首次登录后：进 admin UI 改密 → 编辑 $ENV_FILE 删掉 ADMIN_INITIAL_PASSWORD 行 →"
+    echo "                    rm $PASS_FILE"
     echo ""
 else
     echo "    ℹ️  $ENV_FILE 已存在，保留不动。"
