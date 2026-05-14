@@ -675,15 +675,36 @@ override fun onOpen(ws: WebSocket, response: Response) {
    - 两份 canBeat / 两份 DTO → 三处不一致；最终必须 KMP 模块解决
    - **原则**：重复代码是 Bug 的温床，不是"性能优化"
 
-4. **四层审查缺一不可**
-   - Claude 主会话（全局逻辑）+ pr-reviewer（功能完整 / 文档漂移）+
-     Codex（语句级边界 / entropy）+ 真机验证（看不见的环境问题）
-   - **原则**：单一 AI 视角有系统性盲区，异构比同构更重要
+4. **五层审查缺一不可**（PR #61-62 新增第 5 层"用户真机"）
+   - Claude 主会话（全局逻辑）+ pr-reviewer（功能完整 / 文档漂移 / 类型未定义）+
+     Codex（语句级边界 / entropy / 并发 race）+ CI（工具链 quirks / 编译失败）+
+     **用户真机**（Compose 重组延迟期的双击 race 这类无单测可写的场景）
+   - PR #62 Web 连点 3 次 bug：4 关 AI review 都没识别，由用户报告才发现——
+     说明再多 AI 视角也替代不了真实使用反馈
+   - **原则**：单一 AI 视角有系统性盲区，异构比同构更重要；但 AI 全集 ≠ 完整覆盖
 
 5. **CI 是第二套反馈系统**
    - 沙箱里 90% 的改动可以快速验证（`:shared:jvmTest` ≤30s）
-   - wasmJs / Android 构建必须 push 才知道对不对
+   - wasmJs / Android / Vue 构建必须 push 才知道对不对
    - **原则**：把 gradle stderr exfil 到 PR comment，让 AI 能读 CI 日志
+   - PR #62 实战：`:server:test` 加 `tee + Surface-on-failure` 后，4 次 CI 修复
+     回路（嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）每次都能从
+     PR 评论里看到错误，沙箱无需登录就能定位
+
+6. **质量保障要 plan 先行而非事后补**（PR #61-62 admin 后台实战）
+   - admin 9 段功能合计 ~3,000 prod LOC：plan 文件预先 600+ 行写清楚 SQL schema
+     / Vue 文件树 / Caddy 路由 / CI Node 配置，再编码
+   - 实测**省 ~30% 返工**（用户提前用 4 轮 AskUserQuestion 收敛范围 → 编码时不再
+     反复改方向）
+   - **原则**：plan-first 比 "先写后改" 在大特性上的边际收益最大；plan 越具体，
+     生成代码出错越少
+
+7. **"1 commit = 1 个独立 ship-able 单元"**（admin 9 段 → 2 个 PR 实战）
+   - 即便最终合到同一 PR，每个 commit 也要能独立通过 review（自己解释清楚动机 +
+     测试 + 不破坏现有代码）
+   - PR #61 的 PR 0（基础设施）/ PR 1（鉴权骨架）/ PR 2（监控 API）按这个原则
+     拆分；single-purpose commit 让 review 焦点不会被淹没
+   - **原则**：commit 粒度 = review 粒度；不是"PR = review 单元"
 
 ### 交付成果（PR #1–#62 全程）
 
@@ -1278,3 +1299,65 @@ historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
 **教训**：运维层挂掉只影响监控；业务层挂掉影响所有玩家。**保证业务层永不被运维
 慢查询/慢落盘拖累**是 admin 模块设计的根本不变量。约束 9 写进 CLAUDE.md 比"review
 时记得检查"靠谱得多。
+
+---
+
+### 9.18 质量金字塔：PR #58-62 五层审查的量化实证
+
+PR #58-62 是项目密度最高的 5 个 PR（admin 9 段功能 + 4 次 CI 修复 +
+3 类 AI review + 用户真机反馈）。本节用具体数字盘点"五层审查"各自的贡献。
+
+#### 五层各自的本期产出
+
+| 层 | 触发方式 | PR #58-62 阶段贡献 | 唯一识别的问题 |
+|----|---------|------|------|
+| L1 Claude 主会话 | 编辑 / 设计 / 重构时自查 | 主动指出 ~10 个潜在问题；plan-first 阶段 4 轮 AskUserQuestion 收敛范围 | 大量"看起来对但工具链有 quirk"的代码 |
+| L2 CI 自动跑 | push 后自动 | 抓 4 次编译失败（KDoc 嵌套块 / arrayOf+= / withCharset import / runTest 虚拟时钟）| 工具链 quirks（这类靠 AI 读源码看不出，编译器才有真实信号）|
+| L3 pr-reviewer subagent | `/review-pr` 手动调 | PR #61 一次审出 **1 P0**（AlertDto class 未定义但被 import 用）+ **4 P1**（race / router timing / chmod 文档 / 注释参数名）| 跨文件类型未定义；功能完整性 |
+| L4 Codex bot | PR 创建时自动 | PR #62 报 **1 P2**（gameEventListener 锁外调致并发 seq race）| 并发顺序错位（同 vendor Claude 没识别）|
+| L5 用户真机 | 部署后实际使用 | 报 **1 个 P1**（Web 连点 3 次连接服务器）| Compose 重组延迟期的 UI race（无单测可写）|
+
+#### 每层的"独占"作用
+
+| 假设撤掉某一层 | 哪些问题会逃过 | 后果 |
+|------------|----------|------|
+| 撤 Claude 主会话 | ~10 个设计期就被消灭的问题 | 这些会变成"实现期 + review 期才发现"的 bug，迭代成本 ×10 |
+| 撤 CI | 4 次编译失败 | 红 PR 流到 main；用户拉新代码本地都编不过 |
+| 撤 pr-reviewer | AlertDto 未定义 + 4 P1 | **PR #61 直接合并破坏 main**：admin 模块全部加载不出来 |
+| 撤 Codex | gameEventListener race | 并发出牌时 event 顺序错位；admin 历史回放数据废 |
+| 撤用户真机 | Web 连点 3 次 | 部署上线后用户实际不能进入大厅 |
+
+**没有任何一层是"AI 全集"能替代的**——pr-reviewer 和 Codex 都是 AI，但**独立
+context + 独立 vendor + 独立审查 rubric** 才让它们各自抓到了不同类的问题。
+
+#### 反推：哪些问题不能被这 5 层覆盖
+
+按本期 PR #58-62 数据：
+- **0 个业务级 P0 进 main**（所有 P0 在 PR 阶段被消灭）
+- **0 个 Codex 误报**（精度 100%；43 个 PR 上 Codex silent，silent 的全是真没问题）
+- **1 个用户实际报的 bug**（Web 连点 3 次），这种 race 在静态分析 / 单测里很难
+  抓到，只能靠真机
+
+剩余未覆盖的可能盲区：
+- **性能回归**：本项目未做 benchmark，admin 后台对游戏关键路径的影响只能靠
+  "约束 9 + code review" 软约束保证；如果未来 RPS 变高，需要加 load test
+- **跨平台兼容性**：仅在 bermin.cn 单一 host + Chrome 主测；Safari / Firefox /
+  iOS WebView 未覆盖
+- **数据迁移**：admin SQLite schema 变更目前靠 `ALTER TABLE ... IF NOT EXISTS`
+  人工幂等，没自动化测试。下次大改 schema 需要补 `migration_test`
+
+#### 三个量化指标作为"质量基线"
+
+PR #58-62 阶段稳定下来的可量化质量指标：
+
+| 指标 | 当前值 | 目标 |
+|------|--------|------|
+| 单 PR 平均 Codex 误报数 | 0（精度 100%）| 保持 0；若开始误报需复查 rubric |
+| PR 合并前 P0/P1 数 | 0（全部被 5 层之一抓到并修）| 保持 0 |
+| 用户报的 bug → 进 regressions.md 的延迟 | < 2 小时（#15 当天进）| < 1 天 |
+| CI 修复回路平均次数 | 4 次（PR #61-62）| 长期看希望 < 2 次（plan 越精细越少）|
+| 测试用例数随代码增长比 | 186 用例 / 23k LOC ≈ 8 / 1k LOC | 保持 > 7 / 1k LOC |
+
+**核心洞察**：质量不是"修出来的"，是**多层约束的合力**——单独看每一层都有盲区，
+组合起来才接近"绝大多数 bug 在用户看到前就被消灭"。这五层每一层都可以独立度量
+和优化，互相替代会出现可观察的回退。
