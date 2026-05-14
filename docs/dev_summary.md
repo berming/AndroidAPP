@@ -768,7 +768,29 @@ Sonnet：实现代码让测试绿
 Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 ```
 
-> 本项目 `SettlementCalculator` 有 15 个用例，3 个月无回归；联网版无测试，反复出问题。
+> **历史对比**：早期项目 `SettlementCalculator` 有 15 个用例、3 个月无回归；
+> 而联网版 PR #16-#34 阶段**几乎无服务端测试**，反复出问题（结算公式漏算、
+> reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这条对比
+> 直接推动了 **PR-H2 关键路径强制 TDD + CI tdd-gate**（CLAUDE.md 第三章）。
+>
+> **当前状态（PR #62 后）**：全项目共 **186 个 `@Test`**（跨 14 个 *Test.kt 文件），
+> 其中：
+> - `:shared` 59 个：CardRulesTest 33 + SettlementCalculatorTest 18 +
+>   GameMessageSerializationTest 8
+> - `:server` 127 个：ServerGameManagerTest 48 + ApplicationBootstrapTest 3 +
+>   admin/ 76（AdminAuthService 13 / AdminAuthRoutes 8 / AdminApiRoutes 11 /
+>   AdminDb 5 / GameHistoryStore 9 / SnapshotBuilder 7 / AlertRule 9 /
+>   AlertStore 9 / AlertEngine 5）
+> - **CI `tdd-gate` 硬关**：CardRules / SettlementCalculator / ServerGameManager
+>   任一改动**必须**同 PR 改对应 `*Test.kt`（机制是 `git diff --name-only` 校验），
+>   未同改直接红
+> - 联网版**已纳入工作流**：每次 PR push 跑 `:shared:jvmTest + :server:test`，
+>   detekt + assembleDebug + wasmJsBrowserDistribution；admin SPA 加 admin-build job
+>
+> 这不是"加了测试 = 没有 bug"。PR #62 的 4 次 CI 修复（嵌套块注释 / runTest 虚拟
+> 时钟 / 命名撞名 / withCharset import）就是有测试也会被工具链 quirks 卡。但测试
+> + tdd-gate 把"代码改动可以在不被发现的情况下溜过"的概率降到接近零，bug 改前
+> 一定会先被测试或 CI 暴露——这正是"联网版反复出问题"时期最缺的反馈环。
 
 ### 8.3 多 Claude 协同的天花板
 

@@ -2408,7 +2408,27 @@ override fun onOpen(ws: WebSocket, response: Response) {
 
 
 <blockquote>
-<p>本项目 <code>SettlementCalculator</code> 有 15 个用例，3 个月无回归；联网版无测试，反复出问题。</p>
+<p><strong>历史对比</strong>：早期项目 <code>SettlementCalculator</code> 有 15 个用例、3 个月无回归；
+而联网版 PR #16-#34 阶段<strong>几乎无服务端测试</strong>，反复出问题（结算公式漏算、
+reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这条对比
+直接推动了 <strong>PR-H2 关键路径强制 TDD + CI tdd-gate</strong>（CLAUDE.md 第三章）。</p>
+<p><strong>当前状态（PR #62 后）</strong>：全项目共 <strong>186 个 <code>@Test</code></strong>（跨 14 个 <em>Test.kt 文件），
+其中：
+- <code>:shared</code> 59 个：CardRulesTest 33 + SettlementCalculatorTest 18 +
+  GameMessageSerializationTest 8
+- <code>:server</code> 127 个：ServerGameManagerTest 48 + ApplicationBootstrapTest 3 +
+  admin/ 76（AdminAuthService 13 / AdminAuthRoutes 8 / AdminApiRoutes 11 /
+  AdminDb 5 / GameHistoryStore 9 / SnapshotBuilder 7 / AlertRule 9 /
+  AlertStore 9 / AlertEngine 5）
+- </em><em>CI <code>tdd-gate</code> 硬关</em><em>：CardRules / SettlementCalculator / ServerGameManager
+  任一改动</em><em>必须</em><em>同 PR 改对应 <code>*Test.kt</code>（机制是 <code>git diff --name-only</code> 校验），
+  未同改直接红
+- 联网版</em><em>已纳入工作流</em>*：每次 PR push 跑 <code>:shared:jvmTest + :server:test</code>，
+  detekt + assembleDebug + wasmJsBrowserDistribution；admin SPA 加 admin-build job</p>
+<p>这不是"加了测试 = 没有 bug"。PR #62 的 4 次 CI 修复（嵌套块注释 / runTest 虚拟
+时钟 / 命名撞名 / withCharset import）就是有测试也会被工具链 quirks 卡。但测试
++ tdd-gate 把"代码改动可以在不被发现的情况下溜过"的概率降到接近零，bug 改前
+一定会先被测试或 CI 暴露——这正是"联网版反复出问题"时期最缺的反馈环。</p>
 </blockquote>
 <h3 id="83-claude">8.3 多 Claude 协同的天花板</h3>
 <p>要诚实说：<strong>多 Claude 协同有用，但有结构性上限。</strong></p>
