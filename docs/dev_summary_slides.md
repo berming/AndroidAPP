@@ -30,24 +30,25 @@ style: |
 
 <br>
 
-**沟通牌 × Claude Code × 54 PR · 有效开发 18 天**
+**沟通牌 × Claude Code × 62 PR · 有效开发 19 天**
 
 <br>
 
-> 内容：技术架构 · 问题全景 · 人机协同模式 · 工程经验
+> 内容：技术架构 · 问题全景 · 人机协同模式 · 工程经验 · Admin 后台 · 质量量化
 
 ---
 
 ## 目录
 
-1. **项目背景** — Kotlin Multiplatform · 代码规模 · 三模式
-2. **开发全貌** — 12 阶段 · 54 PR · ~170 commit · 有效开发 18 天
-3. **架构设计** — 多端共享 + 服务端权威 · 关键决策 · 演进路径
-4. **问题全景** — 4 视角发现 ~128 个问题，如何互补
+1. **项目背景** — Kotlin Multiplatform + Vue 3 admin · 代码规模 · 三端
+2. **开发全貌** — 13 阶段 · 62 PR · ~250 commit · 有效开发 19 天
+3. **架构设计** — 多端共享 + 服务端权威 + Admin 模块 · 关键决策 · 演进路径
+4. **问题全景** — 5 层审查发现 ~162 个问题，如何互补
 5. **人机协同** — 4 个层次 · 分工矩阵 · 反模式 · 最佳实践
 6. **关键技术修复** — 6 处典型（游戏逻辑 / 部署 / 平台陷阱）
-7. **经验与行动** — 核心结论 · 已落地 · 待规划
-8. **harness 跨会话经验** — Phase 分段 · Codex 互补 · L0–L4 体系
+7. **经验与行动** — 5 层审查 · plan-first · 1 commit = 1 ship-able
+8. **harness 跨会话经验** — Phase 分段 · Codex 互补 · L0–L4 体系 · Admin 实战
+9. **质量金字塔 & Token 实测** — PR #58-62 量化数据
 
 ---
 
@@ -67,25 +68,28 @@ style: |
 | Android 客户端 | Kotlin + Coroutines + Flow + OkHttp + XML 布局 |
 | Web 客户端 | **Compose Multiplatform 1.6.10 / Wasm-JS** + 浏览器原生 WebSocket (`@JsFun`) |
 | 服务端 | Ktor 2.3.6 + Netty + WebSockets + 依赖 `:shared` |
-| 反代部署 | Caddy 80/443 → `127.0.0.1:8080` + systemd + GitHub Actions auto-deploy |
-| 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x |
+| **Admin 后台** | **Vue 3 + Element Plus + Pinia + Vite + ECharts**（apps/admin/）|
+| **Admin 服务端** | **SQLite + jBCrypt + 手写 SSE + logstash JSON 日志** |
+| 反代部署 | Caddy 80/443 + 自动 HTTPS → `127.0.0.1:8080` + `/admin/` 子路径 |
+| 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x + Node 20 |
 
-### 代码规模（PR #54 后）：约 **19,250 行**
+### 代码规模（PR #62 后）：约 **23,360 行 / 98 文件**
 
 | 模块 | 规模 |
 |----|----|
-| `:apps:android` | 19 文件 · ~6,300 行 |
-| `:apps:web` (Compose MP) | 23 文件 · ~3,470 行 |
+| `:apps:android` | 20 文件 · ~6,440 行 |
+| `:apps:web` (Compose MP) | 25 文件 · ~4,320 行 |
 | `:shared` (KMP commonMain) | 9 文件 · ~2,670 行 |
-| `:server` (Ktor) | 4 文件 · ~1,960 行 |
-| 测试 + Android XML | 24 文件 · ~4,850 行 |
+| `:server`（含 admin 模块）| 25 文件 · ~4,840 行 |
+| `apps/admin/`（Vue 3 SPA）| 19 文件 · ~1,470 行 |
+| 测试 | **14 文件 · 186 用例 · ~3,620 行** |
 
 ---
 
-## 二、开发全貌：12 阶段 · 54 PR · 有效开发 **18 天**
+## 二、开发全貌：13 阶段 · 62 PR · 有效开发 **19 天**
 
-> **18 天分布**：2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 7 天
-> 月份间存在大量空档（产品节奏 / 个人时间）；密集开发集中在 5 月
+> **19 天分布**：2 月 8 天 + 3 月 1 天 + 4 月 2 天 + 5 月 8 天
+> 月份间存在大量空档；密集开发集中在 5 月
 
 ```
 2026-02-02 / 02-07~12 / 02-24
@@ -98,11 +102,14 @@ style: |
 2026-05-08     部署自动化 (#41–44)      Caddy 反代 / systemd / GH Actions
 2026-05-09     Web UI 4 阶段 (#47–50)   菜单/响应式/视觉/Android 同等
 2026-05-09     Web CJK / Android URL    中文豆腐块修复 · 拓扑 URL 漂移
-2026-05-10     AI 接管 (#52–53)         G34-G38 · PROTOCOL_VERSION = 3
-2026-05-10     单机修复 + 文档 (#51–54) CI 折叠 · SP 重复按钮 · L0-L4 沉淀
+2026-05-10     AI 接管 (#52–53, #58)    G34-G38 · PROTOCOL_VERSION=3 · 约束 6/7/8
+2026-05-10     WS 重连 (#59)            Web 指数退避 + dev_summary.html 渲染
+2026-05-11     bermin.cn HTTPS (#60)    Caddy 自动 ACME · 保留 :80 IP fallback
+2026-05-13     Admin MVP (#61)          PR 0-4：骨架/SQLite-bcrypt/监控/告警/Vue SPA
+2026-05-13     Admin 优化 (#62)         PR 5a-d：SSE/趋势图/JSON 日志/事件回放
 ```
 
-**总计：54 PR · ~170 commit · 发现 ~128 个问题（4 视角）**
+**总计：62 PR · ~250 commit · ~162 问题（5 层审查）· 186 测试用例**
 
 ---
 
@@ -169,21 +176,24 @@ style: |
 
 ---
 
-## 四、问题全景：4 视角 ~128 个问题
+## 四、问题全景：5 层审查 ~162 个问题（PR #1-#62 全程）
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| 🔴 **人工测试 / 反馈** | **~35** | 27% | UI 体验 · 部署环境 · 运行时崩溃（真机发现）|
-| 🔵 **Claude Code 主会话** | **~55** | 43% | 全量扫描 · 跨文件链路 · 并发陷阱 |
-| 🟢 **Claude pr-reviewer** | **~15** | 12% | 独立 context · 功能完整性 · 协议契约 |
-| 🟡 **ChatGPT Codex Bot** | **~13** | 10% | PR 自动 · 语句级边界 · entropy / UI 文案 |
-| 重叠联合 | ~10 | 8% | Codex 标记 → Claude 深挖根因 |
+| 🔴 **人工测试 / 反馈 + 真机** | **~38** | 23% | UI 体验 · 部署环境 · UI race（如 Web 连点 3 次）|
+| 🔵 **Claude Code 主会话** | **~65** | 40% | 全量扫描 · 跨文件链路 · CI 修复回路（4 次工具链 quirks）|
+| 🟢 **Claude pr-reviewer** | **~22** | 14% | PR #61 一次审出 1 P0（AlertDto 未定义）+ 4 P1 |
+| 🟡 **ChatGPT Codex Bot** | **25**（精确）| 15% | PR #29-#62 全量审计：0 误报 / P1×7 / P2×18 |
+| 重叠联合 | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
 
-> ### 核心发现：4 种视角几乎不重叠
-> **人工**：截图 / 真机崩溃（动态）·  **Claude 主会话**：跨文件链路（静态全量）
-> **pr-reviewer**：跨文件契约（独立 context）·  **Codex**：语句级边界（PR 自动）
+> ### 核心发现：5 种视角几乎不重叠
+> **人工真机**：UI race（Compose 重组延迟期双击 - 无单测可写）
+> **Claude 主会话**：跨文件链路（静态全量）+ CI 修复
+> **pr-reviewer**：跨文件契约 / 类型未定义（独立 context；PR #61 救场）
+> **Codex**：语句级边界 / 并发 race（PR #62 gameEventListener 锁外调）
+> **CI**：工具链 quirks（嵌套块注释 / runTest 虚拟时钟）
 >
-> **盲区互补**——单独跑一个**至少漏一类问题**（PR #53 实证：Codex 抓 race，pr-reviewer 抓 fabricated symbol）
+> **撤掉任一层都有可观察的回退**——见 §九 9.18 质量金字塔量化数据
 
 ---
 
@@ -484,62 +494,63 @@ fun CommunicationCardTheme(cjkFamily: FontFamily, content: @Composable () -> Uni
 
 ---
 
-## 七、工程经验总结
+## 七、工程经验总结（PR #58-62 新加 3 条）
 
 ### 1. "修了又坏"的根因：只修表层症状
-
 ```
-第1次修 canBeat → 还卡（AI 无回退）
-第2次加回退   → 还卡（并发写损坏状态）
-第3次加 Mutex → 偶发（无最终兜底）
-第4次加兜底   → 彻底解决 ✓
+canBeat → 还卡（无 AI 回退）→ 还卡（并发）→ 偶发（无兜底）→ 4 层防御彻底解决 ✓
 ```
 **原则**：找到最小可复现场景，分层排除，验证到底
 
 ### 2. 跨端共享逻辑必须用 KMP 强制
-- 炸弹比较 / 结算公式 / 回合归属：早期三处均不一致
-- **已实现**：PR #35 + H3 把规则抽到 `:shared` KMP 模块，编译期保证一致
+**已实现**：PR #35 + H3 抽 `:shared` 模块，编译期保证一致
 
-### 3. 4 视角全跑：AI 静态 + 人工真机 + Codex bot 不可替代
-- Claude 主会话 / pr-reviewer / Codex / 人工真机：盲区互补，单独跑漏一类问题
+### 3. **五层**审查缺一不可（PR #62 新增"用户真机"为第 5 层）
+- Claude 主会话 / pr-reviewer / Codex bot / CI / **用户真机**
+- PR #62 Web 连点 3 次 bug：4 关 AI review 都没识别，由用户报——
+  说明再多 AI 视角也替代不了真实使用反馈
+- 详见 §九 9.18 质量金字塔（PR #58-62 量化数据）
 
 ### 4. 协议 / 环境 / 拓扑变更必须人工打通
 - Android cleartext / 503 / Caddy 反代 / 双层防火墙：纯代码审查看不出来
 
-### 5. 大特性 Phase 分段提交
-- 协议 → 主客户端 → 次客户端，每 Phase 独立 commit + review
+### 5. **质量保障要 plan 先行而非事后补**（PR #61-62 admin 实战）
+- admin 9 段 ~3,000 prod LOC：plan 文件预先 600+ 行写清楚 SQL schema / Vue
+  文件树 / Caddy 路由 / CI Node 配置，再编码 → 实测**省 ~30% 返工**
 
-### 6. delay() 之后必须重检所有依赖项
-- 不只 currentPlayerIndex；isAISubstitute / isConnected 也要查（regressions #11）
+### 6. **"1 commit = 1 个独立 ship-able 单元"**（admin 9 段 commit 拆分实战）
+- 即便最终合到同一 PR，每个 commit 也要能独立通过 review
+- commit 粒度 = review 粒度；不是"PR = review 单元"
+
+### 7. delay() 之后必须重检所有依赖项（regressions #11）
 
 ---
 
-## 七、交付成果 & 后续行动
+## 七、交付成果 & 后续行动（PR #62）
 
 ### 全程交付成果
 
 | 指标 | 数值 |
 |------|------|
-| 全程 PR / commit | **54 个 / ~170 次** |
-| 发现问题总数 | **~128 个**（4 视角） |
-| 开发量 | **有效开发 18 天** |
-| 终端覆盖 | Android + Web 双端 |
+| 全程 PR / commit | **62 个 / ~250 次** |
+| 发现问题总数 | **~162 个**（5 层审查；Codex 精确 25） |
+| 开发量 | **有效开发 19 天** |
+| 终端覆盖 | Android + Web + **Admin SPA (Vue 3 / Element Plus)** |
 | 共享逻辑 | `:shared` KMP（编译期保证一致） |
-| 部署 | Caddy 自托管 + GitHub Actions auto-deploy |
-| 游戏永不卡死 | 四层防御已验证 ✓ |
-| 两端结算一致 | 15 用例全部通过 ✓ |
-| 协议版本管理 | `PROTOCOL_VERSION = 3` ✓ |
+| 服务端 | Ktor + 内置 Admin（SQLite + bcrypt + SSE + 告警 + 历史回放）|
+| **自动化测试** | **186 个 @Test / 14 个 *Test.kt**（覆盖关键路径） |
+| 部署 | Caddy 自动 HTTPS + `/admin/` 子路径 + GitHub Actions auto-deploy |
 
-### 后续建议行动（已部分落地）
+### 后续建议行动（PR #62 已落地的标 ✅）
 
 | 状态 | 行动 |
 |------|------|
-| ✅ 已实现 | `:shared` KMP 共享模块（PR #35）|
-| ✅ 已实现 | `PROTOCOL_VERSION` + 握手检查（PR-H3） |
-| ✅ 已实现 | harness L0-L4（hooks / playbook / regression）|
-| ✅ 已实现 | tdd-gate CI 硬关（PR-H2） |
-| ✅ 已实现 | pr-reviewer subagent（PR-H5） |
-| ⚪ 待规划 | force-advance 监控告警 / 弱网 e2e |
+| ✅ 已实现 | `:shared` KMP（PR #35）/ `PROTOCOL_VERSION` + 握手（PR-H3） |
+| ✅ 已实现 | harness L0-L4（hooks / playbook / regressions）|
+| ✅ 已实现 | tdd-gate CI 硬关（PR-H2）/ pr-reviewer subagent（PR-H5）|
+| ✅ 已实现 | **监控告警**（PR #61/3：AlertEngine 3 内置规则 + PR #62/5a SSE 推送）|
+| ✅ 已实现 | **历史游戏回放**（PR #62/5d：game_events 表 + 逐手出牌持久化）|
+| ⚪ 待规划 | step-through 回放 UI / 玩家账号系统（模块 4）/ 弱网 e2e |
 
 ---
 
@@ -622,15 +633,93 @@ mutexFor(room).withLock {
 > **核心**：harness 让教训跨 session 沉淀，新人 / 新 AI 不需要每次从头踩坑
 
 ---
+
+## 九、Admin 后台实战：PR 0~N + 优化收尾分段（PR #61–62）
+
+### 9 段 commit / 2 个 GitHub PR
+
+| 段 | PR | 主题 | LOC |
+|----|----|------|----|
+| **PR 0** | #61 | 骨架：bind 127.0.0.1 + 提取 gameModule + install CN/StatusPages | ~150 prod / ~80 test |
+| **PR 1** | #61 | SQLite + bcrypt + RBAC + /admin-auth/* | ~700 / ~470 |
+| **PR 2** | #61 | 6 GET 监控 API + SnapshotBuilder + GameHistoryStore | ~700 / ~350 |
+| **PR 3** | #61 | AlertEngine（3 内置规则）+ alerts 表 | ~400 / ~200 |
+| **PR 4** | #61 | Vue 3 SPA + Caddy /admin/ + CI admin-build | ~1,800 LOC |
+| **PR 5a-d** | #62 | SSE 告警 / Dashboard 趋势图 / JSON 日志 / game_events | ~800 / ~150 |
+
+### 3 条提炼经验
+
+- **1 commit = 1 ship-able 单元**：即便最终合到同一 PR，PR 0 review 焦点 ≠
+  PR 1 review 焦点，互不混淆
+- **plan 先行省 ~30% 返工**：4 轮 AskUserQuestion 收敛范围 → 编码不反复改向
+- **CI 修复回路占非平凡时间**：PR #61-62 跑了 4 次 CI 修复（Kotlin 嵌套块注释 /
+  arrayOf+= / runTest 虚拟时钟 / withCharset import），靠 `tee + Surface-on-failure`
+  把日志 exfil 到 PR 评论才能在沙箱里读到错误
+
+---
+
+## 九、质量金字塔：PR #58-62 五层审查量化实证
+
+### 五层各自唯一识别的问题
+
+| 层 | 触发方式 | PR #58-62 唯一抓到的 |
+|---|---------|----|
+| L1 Claude 主会话 | 设计 / 重构时自查 | ~10 个潜在问题 + 4 轮 AskUserQuestion 收敛范围 |
+| L2 CI 自动跑 | push 后 | **4 次工具链 quirks**（嵌套块注释 / arrayOf+= / withCharset / runTest 虚拟时钟）|
+| L3 pr-reviewer subagent | `/review-pr` 手动 | PR #61：**1 P0** AlertDto 未定义 + 4 P1 |
+| L4 Codex bot | PR 创建自动 | PR #62：1 P2 gameEventListener 锁外致并发 seq race |
+| L5 用户真机 | 部署后实际用 | **1 P1** Web 连点 3 次（Compose 重组延迟期 UI race，无单测可写）|
+
+### 撤掉某层的回退
+
+> **撤 Claude 主会话** → 10 个设计期消灭的 bug 变成实现期 bug，迭代成本 ×10
+> **撤 CI** → 4 次编译失败流到 main
+> **撤 pr-reviewer** → AlertDto 未定义直接破 main（admin 模块全加载不出来）
+> **撤 Codex** → admin 历史回放数据废（seq 错位）
+> **撤用户真机** → 部署后用户实际进不了大厅
+
+**质量基线**：本期 P0/P1 合并前 = 0 · Codex 误报 = 0 · 测试用例/LOC = 8 / 1k LOC
+
+---
+
+## 九、Token 用量实测（仅 Claude Code 接入后阶段）
+
+> **数据缺口**：早期 PR #1-50（2 月单机 → 5 月 9 日 Web 功能）transcript 不在本机；
+> 表只列已采集的 5/10-5/14 五天。
+
+| 阶段 | 日期 | 轮次 | 输出 | 缓存读 | 计费等效* |
+|------|------|----:|----:|------:|--------:|
+| AI 托管 + UI 约束（#51-58）| 5/10 | 951 | 904K | **267.4M** | **41.1M** |
+| bermin.cn HTTPS（#60）| 5/11 | 76 | 46K | 28.9M | 5.1M |
+| WS 重连 + HTML docs（#59）| 5/12 | 232 | 243K | 8.6M | 4.2M |
+| Admin MVP + PR 5（#61-62）| 5/13 | 897 | 1.44M | **293.8M** | **43.3M** |
+| 今日 doc 刷新 | 5/14 | 54 | 70K | 37.1M | 7.6M |
+| **5 天合计** | — | **2,210** | 2.7M | **635.7M** | **~101M** |
+
+\*计费等效 = `pure_input + cache_creation + cache_read × 0.1 + output`（Anthropic cache 读价 1/10）
+
+### 观察
+
+- **cache_read 主导 94%**：每轮重读 CLAUDE.md + 代码上下文 ~300K token；Claude Code 的
+  prompt cache 让"重复读已知内容"成本远低于"每轮从头输入"
+- **两个尖峰对应大特性日**（5/10 AI 托管 / 5/13 Admin 后台）
+- **3 天 ~$300-400 量级**（按 Opus 4.7 标准定价粗算 5 天高强度开发）
+
+---
 <!-- 结束页 -->
 
 # 谢谢
 
 <br>
 
-> **核心结论**：
-> 4 视角覆盖（人工 / Claude 主会话 / pr-reviewer / Codex）+
-> harness 跨会话沉淀（L0–L4）= 教训不浪费、bug 不重复
+> **核心结论**（PR #62 更新）：
+> **5 层审查覆盖**（人工真机 / Claude 主会话 / pr-reviewer / Codex / CI）+
+> **harness 跨会话沉淀**（L0–L4）= 教训不浪费、bug 不重复
+
+<br>
+
+> **可量化质量基线**：本期 P0/P1 合并前 = 0 · Codex 误报 = 0 · 业务级遗漏 = 0
+> · 用户报 bug → regressions.md 延迟 < 2 小时
 
 <br>
 
