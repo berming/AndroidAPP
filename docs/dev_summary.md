@@ -212,9 +212,9 @@
 | **人工测试 / 反馈** | ~38 | 25% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）|
 | **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 43% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
 | **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 14% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
-| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | ~16 | 10% | PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）|
-| **重叠 / 联合发现** | ~12 | 8% | Codex 标记 → Claude 深挖根因 |
-| **合计** | **~153** | 100% | |
+| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **25**（精确）| 15% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）|
+| **重叠 / 联合发现** | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
+| **合计** | **~162** | 100% | （Codex 列为精确审计，其余列为估算）|
 
 > **核心规律**：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
 > pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
@@ -384,7 +384,7 @@
 
 ---
 
-### ChatGPT Codex Review Bot（**26 条**，PR #29-#62 全程审计）
+### ChatGPT Codex Review Bot（**25 条**，PR #29-#62 全程审计）
 
 > **工作模式**：PR 创建时自动触发（GitHub App `chatgpt-codex-connector[bot]`）；
 > 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
@@ -396,35 +396,67 @@
 | 维度 | 数字 |
 |------|------|
 | 跨 19 个 PR 留下 inline 发现 | #29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62 |
-| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **26 条** |
-| 优先级分布 | **P0×0 · P1×7 · P2×19 · nit×0** |
-| 处置 | ✅ fixed = **23** / ⏭️ skipped = **3** / ❌ disputed = **0** / unclear = 0 |
-| 误报（false positive）| **0** —— 每条都触发了代码 / 文档改动，或作者解释"已被前一 commit 修过" |
+| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **25 条** |
+| 优先级分布 | **P0×0 · P1×7 · P2×18 · nit×0** |
+| thread 级处置 | ✅ fixed = **19** / ⏭️ skipped = **6**（含原 thread 未 resolved 但 bug 在后续 PR / commit 修复的情况）/ ❌ disputed = **0** |
+| 业务级真正没修的（"留坑"）| **0**：所有 skipped 中，#29 / #31 / #33 / #34 的核心问题均在后续 PR / regressions.md 中被记录并修复（如 UUID 截断 commit `06d445c` / 6 玩家下限被约束 8 文档化）；#56 是文档页面顺序，无业务影响 |
+| 误报（false positive）| **0** —— 每条都触发了代码 / 文档改动或设计澄清 |
+
+**全部 25 条详表**（按 PR 升序 + 优先级 P1 在前）：
+
+| # | PR | 优先级 | 文件 | 内容 | 处置 |
+|---|----|--------|------|------|------|
+| 1 | #29 | P1 | Application.kt:57 | 截断 UUID 至 8 字符导致 sessionId 碰撞 | ⏭️ skipped*（后续 commit `06d445c`；regressions #5）|
+| 2 | #31 | P1 | LobbyActivity.kt:219 | 重连后 loading 遮罩未清除导致大厅卡住 | ⏭️ skipped*（PR #33 三状态都加 hideLoading）|
+| 3 | #33 | P2 | MainActivity.kt | 提示按"房间名"加入但服务端只查 roomCode | ⏭️ skipped*（后续 UI 重写为列表点击）|
+| 4 | #34 | P1 | Application.kt | 主动离开时未清 `playerToRoom` 仍可重连 | ⏭️ skipped*（后续 leaveRoom 整改）|
+| 5 | #34 | P1 | Application.kt:218 | `maxPlayers<6` 时硬卡 6 人导致永远开局失败 | ⏭️ skipped*（6 人下限被 CLAUDE.md 约束 8 固化为有意行为）|
+| 6 | #35 | P1 | detekt.yml | 新 LargeClass 阈值未 baseline 会卡所有 CI | ✅ fixed |
+| 7 | #36 | P2 | .claude/settings.json | TDD hook matcher 未包含 MultiEdit | ✅ fixed |
+| 8 | #36 | P2 | .githooks/pre-push | 资源 / manifest 改动被误判 docs-only 跳过测试 | ✅ fixed |
+| 9 | #39 | P2 | ServerGameManager.kt:833 | rank 改 1-based 后 AI 绝对阈值（`≥7` / `≤2`）未同步偏移 | ✅ fixed |
+| 10 | #40 | P2 | pull_request_template.md | GameMessage 改动被要求 Test.kt 但无对应 gate | ✅ fixed |
+| 11 | #40 | P2 | trace-bug.md | `/trace-bug` 需 git add/commit 但 frontmatter 未授权 | ✅ fixed |
+| 12 | #42 | P1 | install.sh:69 | sudoers 路径 `/usr/bin/systemctl` 与 deploy.yml 用 `/bin` 不一致 | ✅ fixed (`e18c3a6`) |
+| 13 | #42 | P2 | deploy.yml:35 | install 引导缺 `DEPLOY_ENABLED` 变量与手动触发说明 | ✅ fixed (`e18c3a6`) |
+| 14 | #43 | P2 | review-pr.md:3 | allowed-tools 并不能隔离 caller session 调用（命名误导）| ✅ fixed (`6ef2aea`) |
+| 15 | #45 | P2 | App.kt:38 | GB2312 子集字体丢失 ♠♥♣♦ 与 em-dash 等 6 个 codepoint | ✅ fixed (`ce74b39`) |
+| 16 | #47 | P1 | UserPreferences.kt | `:apps:web` 未 apply serialization plugin 编译失败 | ✅ fixed (`7f83753`) |
+| 17 | #47 | P2 | GameScreen.kt:92 | 出牌后未清 `selectedCardIds`，出牌按钮误激活 | ✅ fixed (`7f83753`) |
+| 18 | #49 | P2 | GameScreen.kt | Compact 模式 FlowRow 手牌挤压表格区与按钮 | ✅ fixed (`1779890`) |
+| 19 | #50 | P2 | AppViewModel.kt:440 | 单机 `lastPlayerId` 为 null 看不到上家出牌（作者认定实际 P1）| ✅ fixed (`d484dbc`) |
+| 20 | #52 | P2 | HelpScreen.kt:55 | 文案说"随机首家"但服务端实为 ♠3 持有者 | ✅ fixed (`e25eb2e`) |
+| 21 | #53 | P2 | ServerGameManager.kt:540 | AI 延迟唤醒前未重检 `isAISubstitute`，代替已回归玩家出牌 | ✅ fixed (`c9988fd`) |
+| 22 | #53 | P2 | activity_game.xml:317 | 单机布局共享导致"AI 接管"按钮空挂 | ✅ fixed (`d976e81`) |
+| 23 | #56 | P2 | build_pptx.py:808 | "谢谢页"位于新增章节之前，与 md 顺序不一致 | ⏭️ skipped（doc 排版，无业务影响）|
+| 24 | #59 | P1 | WebSocketTransport.kt:99 | 重连后未发 `Reconnect` 致房间状态丢失 | ✅ fixed (`593e4ec`) |
+| 25 | #62 | P2 | ServerGameManager.kt:682 | 事件在 mutex 锁外记录致并发 seq 顺序错乱 | ✅ fixed (`e8d9ff6`) |
+
+\*skipped 仅指 GitHub thread 在原 PR 内未标 resolved；业务上均已通过后续
+PR / regressions.md 跟进。
+
+**6 条 skipped 集中在 PR #29-#34 早期联网迭代**（2026-05-03 - 05-04）：当时
+4 关 PR 流程（CI / Codex / Claude review / 真机）尚未操作起来，thread 经常被
+新 PR 超越。PR #34 后团队开始**每个 Codex thread 必用 commit SHA 回复**，从那
+之后再无 thread-level skipped。第 6 条 skipped（#56）是 PPT 页面顺序的低优文档
+问题，无业务影响。
 
 **Top 5 最有价值的 finding**（按作者后续 commentary + 下游影响）：
 
-| # | PR | 优先级 | 位置 | 内容 | 价值 |
-|---|----|--------|------|------|------|
-| 1 | #29 | P1 | `Application.kt:57` | UUID 截到 8 字符 → 32 位熵，会话碰撞 | regressions.md #5 标杆案例（Claude 漏，Codex 抓） |
-| 2 | #39 | P2 | `ServerGameManager.kt:833` | refactor 把 rank 改 1-based 后两个**绝对阈值**（`≥7` / `≤2`）未同步偏移 | 作者提交信里曾断言"所有调用都比较相对值" → Codex 2 分钟内打脸 |
-| 3 | #50 | P2→P1 | `AppViewModel.kt:440` | Web 单机 lastPlayerId 中央渲染缺失 + 状态判断 | 作者判定实际是 P1（影响功能可用性）|
-| 4 | #45 | P2 | `App.kt:38` | 字体子集漏 6 个 codepoint（`· — ♠♥♣♦`），wasmJs 无 OS fallback | Codex 做了 cmap 级核对 |
-| 5 | #62 | P2 | `ServerGameManager.kt:682` | `gameEventListener` 在 broadcast 锁外调，并发 action 的 `session.send` suspend 后 seq 倒置 | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
-
-**3 条 skipped 的集中区间**（PR #31 / #33 / #34，2026-05-03~04，联网早期）：
-- PR #31 P1：loading 遮罩 reconnecting 路径未隐藏 → 早期未操作 4 关流程，后续 refactor 时被超越
-- PR #33 P2：roomName 复制方向 → 后续 room 列表 UI 重写时被超越
-- PR #34 P1+P1：playerToRoom leave-mapping + 6 玩家下限 vs maxPlayers → 6 玩家下限后被
-  CLAUDE.md 约束 8 固化为有意行为，已不算 bug
-
-PR #34 之后团队开始**每个 Codex thread 都用 commit SHA 回复**，4 关 PR 流程正式
-operationalized；从那以后再没出现 skipped。
+| 排名 | PR | 内容 | 价值 |
+|------|----|------|------|
+| 1 | #29 | UUID 截 8 字符 → 32 位熵碰撞 | regressions.md #5 标杆案例（Claude 漏，Codex 抓）|
+| 2 | #39 | AI 炸弹阈值偏移（1-based vs 0-based）| 作者提交信曾断言"所有调用比较相对值"→ Codex 2 分钟内打脸 |
+| 3 | #50 | Web 单机 lastPlayerId 中央 fallback 缺失 | 作者判定实际是 P1（影响游戏可玩性）|
+| 4 | #45 | 字体 cmap 漏 6 个 codepoint | Codex 做了 cmap 级核对 |
+| 5 | #62 | gameEventListener 锁外调致并发 seq race | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
 
 **关键观察**：
-- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，**实际 26 条**
-- **0 误报**：Codex 在本项目精确度 100%。在另外 36 个 PR 上 silent（要么 docs-only / 要么没问题）
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，**实际 25 条**
+- **0 业务级遗漏**：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
+- **0 误报**：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
 - 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
-  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 41 条独立发现
+  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 40+ 条独立发现
 - PR #62 Codex P2 救场：admin 监听器在锁外的 seq race 是同 vendor Claude 没发现的——
   跨 vendor 在并发场景尤其值钱
 
@@ -750,7 +782,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 
 → **相关性盲区**会同时存在于所有 Claude 模型里。
 
-本项目 **26 个 Codex 意见**中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：
+本项目 **25 个 Codex 意见**中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：
 
 - `UUID.take(8)`：训练语料里到处是，所有 LLM 都视为"常用模式"
 - "房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项
@@ -817,10 +849,10 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 |------|------|------|
 | 时间换覆盖率（单 Claude 多轮）| 4 轮自审 | ~35 个 Bug |
 | 视角换覆盖率（多 Claude 协同）| Opus + Sonnet + Haiku | +20 个 Bug（post-#34 阶段）|
-| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+26 个 Codex**（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
+| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+25 个 Codex**（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
 
 异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 **26 个 Codex 发现**与 ~65 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 **25 个 Codex 发现**与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。
 
 ---

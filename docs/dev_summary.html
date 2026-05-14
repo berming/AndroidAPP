@@ -196,7 +196,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </ul>
 </li>
 <li><a href="#claude-pr-reviewer-15-pr-h5">Claude pr-reviewer 发现的问题（~15 个，PR-H5 后引入）</a></li>
-<li><a href="#chatgpt-codex-review-bot26-pr-29-62">ChatGPT Codex Review Bot（26 条，PR #29-#62 全程审计）</a></li>
+<li><a href="#chatgpt-codex-review-bot25-pr-29-62">ChatGPT Codex Review Bot（25 条，PR #29-#62 全程审计）</a></li>
 </ul>
 </li>
 <li><a href="#ai_1">第五章：人工与 AI 协同模式深度解析</a><ul>
@@ -845,21 +845,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </tr>
 <tr>
 <td><strong>ChatGPT Codex Review Bot</strong><br/>chatgpt-codex-connector[bot]</td>
-<td>~16</td>
-<td>10%</td>
-<td>PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）</td>
+<td><strong>25</strong>（精确）</td>
+<td>15%</td>
+<td>全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）</td>
 </tr>
 <tr>
 <td><strong>重叠 / 联合发现</strong></td>
 <td>~12</td>
-<td>8%</td>
+<td>7%</td>
 <td>Codex 标记 → Claude 深挖根因</td>
 </tr>
 <tr>
 <td><strong>合计</strong></td>
-<td><strong>~153</strong></td>
+<td><strong>~162</strong></td>
 <td>100%</td>
-<td></td>
+<td>（Codex 列为精确审计，其余列为估算）</td>
 </tr>
 </tbody>
 </table>
@@ -1461,7 +1461,7 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 的 race condition 不敏感（由 Codex 补盲）。两者组合才完整。</p>
 </blockquote>
 <hr>
-<h3 id="chatgpt-codex-review-bot26-pr-29-62">ChatGPT Codex Review Bot（<strong>26 条</strong>，PR #29-#62 全程审计）</h3>
+<h3 id="chatgpt-codex-review-bot25-pr-29-62">ChatGPT Codex Review Bot（<strong>25 条</strong>，PR #29-#62 全程审计）</h3>
 <blockquote>
 <p><strong>工作模式</strong>：PR 创建时自动触发（GitHub App <code>chatgpt-codex-connector[bot]</code>）；
 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
@@ -1483,30 +1483,254 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 </tr>
 <tr>
 <td>总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）</td>
-<td><strong>26 条</strong></td>
+<td><strong>25 条</strong></td>
 </tr>
 <tr>
 <td>优先级分布</td>
-<td><strong>P0×0 · P1×7 · P2×19 · nit×0</strong></td>
+<td><strong>P0×0 · P1×7 · P2×18 · nit×0</strong></td>
 </tr>
 <tr>
-<td>处置</td>
-<td>✅ fixed = <strong>23</strong> / ⏭️ skipped = <strong>3</strong> / ❌ disputed = <strong>0</strong> / unclear = 0</td>
+<td>thread 级处置</td>
+<td>✅ fixed = <strong>19</strong> / ⏭️ skipped = <strong>6</strong>（含原 thread 未 resolved 但 bug 在后续 PR / commit 修复的情况）/ ❌ disputed = <strong>0</strong></td>
+</tr>
+<tr>
+<td>业务级真正没修的（"留坑"）</td>
+<td><strong>0</strong>：所有 skipped 中，#29 / #31 / #33 / #34 的核心问题均在后续 PR / regressions.md 中被记录并修复（如 UUID 截断 commit <code>06d445c</code> / 6 玩家下限被约束 8 文档化）；#56 是文档页面顺序，无业务影响</td>
 </tr>
 <tr>
 <td>误报（false positive）</td>
-<td><strong>0</strong> —— 每条都触发了代码 / 文档改动，或作者解释"已被前一 commit 修过"</td>
+<td><strong>0</strong> —— 每条都触发了代码 / 文档改动或设计澄清</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Top 5 最有价值的 finding</strong>（按作者后续 commentary + 下游影响）：</p>
+<p><strong>全部 25 条详表</strong>（按 PR 升序 + 优先级 P1 在前）：</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
 <th>PR</th>
 <th>优先级</th>
-<th>位置</th>
+<th>文件</th>
+<th>内容</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>#29</td>
+<td>P1</td>
+<td>Application.kt:57</td>
+<td>截断 UUID 至 8 字符导致 sessionId 碰撞</td>
+<td>⏭️ skipped*（后续 commit <code>06d445c</code>；regressions #5）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>#31</td>
+<td>P1</td>
+<td>LobbyActivity.kt:219</td>
+<td>重连后 loading 遮罩未清除导致大厅卡住</td>
+<td>⏭️ skipped*（PR #33 三状态都加 hideLoading）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>#33</td>
+<td>P2</td>
+<td>MainActivity.kt</td>
+<td>提示按"房间名"加入但服务端只查 roomCode</td>
+<td>⏭️ skipped*（后续 UI 重写为列表点击）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>#34</td>
+<td>P1</td>
+<td>Application.kt</td>
+<td>主动离开时未清 <code>playerToRoom</code> 仍可重连</td>
+<td>⏭️ skipped*（后续 leaveRoom 整改）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>#34</td>
+<td>P1</td>
+<td>Application.kt:218</td>
+<td><code>maxPlayers&lt;6</code> 时硬卡 6 人导致永远开局失败</td>
+<td>⏭️ skipped*（6 人下限被 CLAUDE.md 约束 8 固化为有意行为）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>#35</td>
+<td>P1</td>
+<td>detekt.yml</td>
+<td>新 LargeClass 阈值未 baseline 会卡所有 CI</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>7</td>
+<td>#36</td>
+<td>P2</td>
+<td>.claude/settings.json</td>
+<td>TDD hook matcher 未包含 MultiEdit</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>8</td>
+<td>#36</td>
+<td>P2</td>
+<td>.githooks/pre-push</td>
+<td>资源 / manifest 改动被误判 docs-only 跳过测试</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>9</td>
+<td>#39</td>
+<td>P2</td>
+<td>ServerGameManager.kt:833</td>
+<td>rank 改 1-based 后 AI 绝对阈值（<code>≥7</code> / <code>≤2</code>）未同步偏移</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>10</td>
+<td>#40</td>
+<td>P2</td>
+<td>pull_request_template.md</td>
+<td>GameMessage 改动被要求 Test.kt 但无对应 gate</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>11</td>
+<td>#40</td>
+<td>P2</td>
+<td>trace-bug.md</td>
+<td><code>/trace-bug</code> 需 git add/commit 但 frontmatter 未授权</td>
+<td>✅ fixed</td>
+</tr>
+<tr>
+<td>12</td>
+<td>#42</td>
+<td>P1</td>
+<td>install.sh:69</td>
+<td>sudoers 路径 <code>/usr/bin/systemctl</code> 与 deploy.yml 用 <code>/bin</code> 不一致</td>
+<td>✅ fixed (<code>e18c3a6</code>)</td>
+</tr>
+<tr>
+<td>13</td>
+<td>#42</td>
+<td>P2</td>
+<td>deploy.yml:35</td>
+<td>install 引导缺 <code>DEPLOY_ENABLED</code> 变量与手动触发说明</td>
+<td>✅ fixed (<code>e18c3a6</code>)</td>
+</tr>
+<tr>
+<td>14</td>
+<td>#43</td>
+<td>P2</td>
+<td>review-pr.md:3</td>
+<td>allowed-tools 并不能隔离 caller session 调用（命名误导）</td>
+<td>✅ fixed (<code>6ef2aea</code>)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>#45</td>
+<td>P2</td>
+<td>App.kt:38</td>
+<td>GB2312 子集字体丢失 ♠♥♣♦ 与 em-dash 等 6 个 codepoint</td>
+<td>✅ fixed (<code>ce74b39</code>)</td>
+</tr>
+<tr>
+<td>16</td>
+<td>#47</td>
+<td>P1</td>
+<td>UserPreferences.kt</td>
+<td><code>:apps:web</code> 未 apply serialization plugin 编译失败</td>
+<td>✅ fixed (<code>7f83753</code>)</td>
+</tr>
+<tr>
+<td>17</td>
+<td>#47</td>
+<td>P2</td>
+<td>GameScreen.kt:92</td>
+<td>出牌后未清 <code>selectedCardIds</code>，出牌按钮误激活</td>
+<td>✅ fixed (<code>7f83753</code>)</td>
+</tr>
+<tr>
+<td>18</td>
+<td>#49</td>
+<td>P2</td>
+<td>GameScreen.kt</td>
+<td>Compact 模式 FlowRow 手牌挤压表格区与按钮</td>
+<td>✅ fixed (<code>1779890</code>)</td>
+</tr>
+<tr>
+<td>19</td>
+<td>#50</td>
+<td>P2</td>
+<td>AppViewModel.kt:440</td>
+<td>单机 <code>lastPlayerId</code> 为 null 看不到上家出牌（作者认定实际 P1）</td>
+<td>✅ fixed (<code>d484dbc</code>)</td>
+</tr>
+<tr>
+<td>20</td>
+<td>#52</td>
+<td>P2</td>
+<td>HelpScreen.kt:55</td>
+<td>文案说"随机首家"但服务端实为 ♠3 持有者</td>
+<td>✅ fixed (<code>e25eb2e</code>)</td>
+</tr>
+<tr>
+<td>21</td>
+<td>#53</td>
+<td>P2</td>
+<td>ServerGameManager.kt:540</td>
+<td>AI 延迟唤醒前未重检 <code>isAISubstitute</code>，代替已回归玩家出牌</td>
+<td>✅ fixed (<code>c9988fd</code>)</td>
+</tr>
+<tr>
+<td>22</td>
+<td>#53</td>
+<td>P2</td>
+<td>activity_game.xml:317</td>
+<td>单机布局共享导致"AI 接管"按钮空挂</td>
+<td>✅ fixed (<code>d976e81</code>)</td>
+</tr>
+<tr>
+<td>23</td>
+<td>#56</td>
+<td>P2</td>
+<td>build_pptx.py:808</td>
+<td>"谢谢页"位于新增章节之前，与 md 顺序不一致</td>
+<td>⏭️ skipped（doc 排版，无业务影响）</td>
+</tr>
+<tr>
+<td>24</td>
+<td>#59</td>
+<td>P1</td>
+<td>WebSocketTransport.kt:99</td>
+<td>重连后未发 <code>Reconnect</code> 致房间状态丢失</td>
+<td>✅ fixed (<code>593e4ec</code>)</td>
+</tr>
+<tr>
+<td>25</td>
+<td>#62</td>
+<td>P2</td>
+<td>ServerGameManager.kt:682</td>
+<td>事件在 mutex 锁外记录致并发 seq 顺序错乱</td>
+<td>✅ fixed (<code>e8d9ff6</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>*skipped 仅指 GitHub thread 在原 PR 内未标 resolved；业务上均已通过后续
+PR / regressions.md 跟进。</p>
+<p><strong>6 条 skipped 集中在 PR #29-#34 早期联网迭代</strong>（2026-05-03 - 05-04）：当时
+4 关 PR 流程（CI / Codex / Claude review / 真机）尚未操作起来，thread 经常被
+新 PR 超越。PR #34 后团队开始<strong>每个 Codex thread 必用 commit SHA 回复</strong>，从那
+之后再无 thread-level skipped。第 6 条 skipped（#56）是 PPT 页面顺序的低优文档
+问题，无业务影响。</p>
+<p><strong>Top 5 最有价值的 finding</strong>（按作者后续 commentary + 下游影响）：</p>
+<table>
+<thead>
+<tr>
+<th>排名</th>
+<th>PR</th>
 <th>内容</th>
 <th>价值</th>
 </tr>
@@ -1515,57 +1739,41 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 <tr>
 <td>1</td>
 <td>#29</td>
-<td>P1</td>
-<td><code>Application.kt:57</code></td>
-<td>UUID 截到 8 字符 → 32 位熵，会话碰撞</td>
+<td>UUID 截 8 字符 → 32 位熵碰撞</td>
 <td>regressions.md #5 标杆案例（Claude 漏，Codex 抓）</td>
 </tr>
 <tr>
 <td>2</td>
 <td>#39</td>
-<td>P2</td>
-<td><code>ServerGameManager.kt:833</code></td>
-<td>refactor 把 rank 改 1-based 后两个<strong>绝对阈值</strong>（<code>≥7</code> / <code>≤2</code>）未同步偏移</td>
-<td>作者提交信里曾断言"所有调用都比较相对值" → Codex 2 分钟内打脸</td>
+<td>AI 炸弹阈值偏移（1-based vs 0-based）</td>
+<td>作者提交信曾断言"所有调用比较相对值"→ Codex 2 分钟内打脸</td>
 </tr>
 <tr>
 <td>3</td>
 <td>#50</td>
-<td>P2→P1</td>
-<td><code>AppViewModel.kt:440</code></td>
-<td>Web 单机 lastPlayerId 中央渲染缺失 + 状态判断</td>
-<td>作者判定实际是 P1（影响功能可用性）</td>
+<td>Web 单机 lastPlayerId 中央 fallback 缺失</td>
+<td>作者判定实际是 P1（影响游戏可玩性）</td>
 </tr>
 <tr>
 <td>4</td>
 <td>#45</td>
-<td>P2</td>
-<td><code>App.kt:38</code></td>
-<td>字体子集漏 6 个 codepoint（<code>· — ♠♥♣♦</code>），wasmJs 无 OS fallback</td>
+<td>字体 cmap 漏 6 个 codepoint</td>
 <td>Codex 做了 cmap 级核对</td>
 </tr>
 <tr>
 <td>5</td>
 <td>#62</td>
-<td>P2</td>
-<td><code>ServerGameManager.kt:682</code></td>
-<td><code>gameEventListener</code> 在 broadcast 锁外调，并发 action 的 <code>session.send</code> suspend 后 seq 倒置</td>
+<td>gameEventListener 锁外调致并发 seq race</td>
 <td>移到 <code>mutexFor(room).withLock</code> 内 + 新增回归测试</td>
 </tr>
 </tbody>
 </table>
-<p><strong>3 条 skipped 的集中区间</strong>（PR #31 / #33 / #34，2026-05-03~04，联网早期）：
-- PR #31 P1：loading 遮罩 reconnecting 路径未隐藏 → 早期未操作 4 关流程，后续 refactor 时被超越
-- PR #33 P2：roomName 复制方向 → 后续 room 列表 UI 重写时被超越
-- PR #34 P1+P1：playerToRoom leave-mapping + 6 玩家下限 vs maxPlayers → 6 玩家下限后被
-  CLAUDE.md 约束 8 固化为有意行为，已不算 bug</p>
-<p>PR #34 之后团队开始<strong>每个 Codex thread 都用 commit SHA 回复</strong>，4 关 PR 流程正式
-operationalized；从那以后再没出现 skipped。</p>
 <p><strong>关键观察</strong>：
-- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，<strong>实际 26 条</strong>
-- <strong>0 误报</strong>：Codex 在本项目精确度 100%。在另外 36 个 PR 上 silent（要么 docs-only / 要么没问题）
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，<strong>实际 25 条</strong>
+- <strong>0 业务级遗漏</strong>：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
+- <strong>0 误报</strong>：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
 - 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
-  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 41 条独立发现
+  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 40+ 条独立发现
 - PR #62 Codex P2 救场：admin 监听器在锁外的 seq race 是同 vendor Claude 没发现的——
   跨 vendor 在并发场景尤其值钱</p>
 <hr>
@@ -2211,7 +2419,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <li><strong>同一架构</strong> → 共享类似的注意力分布</li>
 </ol>
 <p>→ <strong>相关性盲区</strong>会同时存在于所有 Claude 模型里。</p>
-<p>本项目 <strong>26 个 Codex 意见</strong>中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：</p>
+<p>本项目 <strong>25 个 Codex 意见</strong>中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：</p>
 <ul>
 <li><code>UUID.take(8)</code>：训练语料里到处是，所有 LLM 都视为"常用模式"</li>
 <li>"房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项</li>
@@ -2348,12 +2556,12 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 <tr>
 <td>异构换覆盖率（Codex + 真机）</td>
 <td>自动 + 季度手动</td>
-<td><strong>+26 个 Codex</strong>（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；<strong>90% 是前两者找不到的</strong></td>
+<td><strong>+25 个 Codex</strong>（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；<strong>90% 是前两者找不到的</strong></td>
 </tr>
 </tbody>
 </table>
 <p>异构换覆盖率不只是"多找 Bug"，更重要的是它<strong>找的是另一类 Bug</strong>——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 <strong>26 个 Codex 发现</strong>与 ~65 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 <strong>25 个 Codex 发现</strong>与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。</p>
 <hr>
 <h3 id="86-token-claude-code">8.6 Token 用量实测（仅覆盖 Claude Code 接入后阶段）</h3>
