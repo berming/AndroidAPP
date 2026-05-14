@@ -196,6 +196,14 @@ class ServerGameManager(
 
         // 通过互斥锁串行化每个房间的动作，避免并发的 PlayCards/Pass + AI 行动相互踩踏
         return mutexFor(room).withLock {
+            // pr-reviewer/Codex PR #64 P2 修复：在锁内重新校验 status。
+            // 锁外的 line 193 预检 + 锁内的转换为 FINISHED（在 handlePlayCards /
+            // handlePass 内）共同构成正确性边界——锁外 check 可能拿到陈旧 IN_GAME，
+            // 锁内再 check 一次才能拒绝那种"等锁期间游戏已结束"的请求。
+            if (room.status != RoomStatus.IN_GAME) {
+                return@withLock ActionResult(false, "游戏未在进行中")
+            }
+
             val gameState = room.gameState
                 ?: return@withLock ActionResult(false, "游戏未开始")
 
@@ -298,6 +306,14 @@ class ServerGameManager(
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
 
+        // pr-reviewer/Codex PR #64 P2 修复：room.status 必须在锁内随 gameResult 一起
+        // 设为 FINISHED。原来由锁外的 broadcastActionResult 设，但 capture 锁 → 释放
+        // → 锁外 consumer 这段窗口内，下一个 handleAction（锁外预检 status==IN_GAME
+        // 通过）会拿到 mutex 后操作已结束游戏，触发额外 event 或重复 end handling。
+        if (gameResult != null) {
+            room.status = RoomStatus.FINISHED
+        }
+
         // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（broadcast 在锁外
         // 跑可能因 session.send suspend 而被另一个 action 抢先调 listener，造成
         // game_events.seq 与实际出牌顺序倒置）。在锁内、按"广播会发生的顺序"调用
@@ -366,6 +382,12 @@ class ServerGameManager(
 
         // 检查游戏是否结束
         val gameResult = checkGameEnd(room)
+
+        // pr-reviewer/Codex PR #64 P2 修复：锁内立即 mark FINISHED，详见
+        // handlePlayCards 同名修复块的注释。
+        if (gameResult != null) {
+            room.status = RoomStatus.FINISHED
+        }
 
         // PR 5d + Codex P2 修复：listener 在锁内按动作顺序触发（详见 handlePlayCards
         // 同名注释）。顺序：PlayerPassed → RoundWon → TurnStart
@@ -778,7 +800,9 @@ class ServerGameManager(
                 }
             }
 
-            room.status = RoomStatus.FINISHED
+            // pr-reviewer/Codex PR #64 P2 修复：room.status 现在由 handlePlayCards /
+            // handlePass 在锁内立即设置为 FINISHED；broadcast 不再 touch status，
+            // 否则锁外 status 转换会产生 check-then-mutate 窗口。
             stopTurnTimer(room)
             room.players.forEach { player ->
                 player.session?.send(GameEnd(gameResult))

@@ -759,4 +759,53 @@ class ServerGameManagerTest {
         gm.gameEndCaptureProvider = null
         gm.gameEndConsumer = null
     }
+
+    @Test
+    fun broadcastActionResult_doesNotMutateRoomStatus() = runTest {
+        // pr-reviewer/Codex PR #64 P2 修复后的契约：
+        // - room.status = FINISHED 必须在 handlePlayCards/handlePass 锁内完成
+        //   （和 ActionResult.gameResult 原子地一起设置）
+        // - broadcastActionResult 在锁外跑，**不**应再 mutate room.status
+        //
+        // 反向验证：模拟"handler 已锁内 set FINISHED"的状态进 broadcast，
+        // broadcast 不应改回去；同时模拟"handler 还没 set"（status=IN_GAME）的
+        // 状态进 broadcast，broadcast 也不应在锁外 mark FINISHED。
+        val room1 = ServerRoom(
+            roomId = "r-fin1", roomCode = "FIN1", roomName = "FinishedAlready",
+            hostId = "h", maxPlayers = 6,
+        )
+        room1.status = RoomStatus.FINISHED  // handler 锁内已设
+        val result1 = ActionResult(
+            success = true,
+            event = null,
+            gameResult = SerializedGameResult(
+                winner = "TEAM_A", teamAScore = 250, teamBScore = 10,
+                trigger = "TEAM_ALL_FINISHED",
+            ),
+            roundEndEvent = null, finishEvent = null,
+        )
+        gm.broadcastActionResult(room1, result1)
+        assertEquals(
+            RoomStatus.FINISHED, room1.status,
+            "broadcast 不应回退 status；FINISHED 由 handler 锁内设并保持",
+        )
+
+        val room2 = ServerRoom(
+            roomId = "r-fin2", roomCode = "FIN2", roomName = "StillInGame",
+            hostId = "h", maxPlayers = 6,
+        )
+        // 显式把 room2 提到 IN_GAME，再走 broadcast；新契约下 broadcast 不应把它推到 FINISHED
+        room2.status = RoomStatus.IN_GAME
+        gm.broadcastActionResult(room2, result1)
+        assertEquals(
+            RoomStatus.IN_GAME, room2.status,
+            "broadcast 不应在锁外把 status 改成 FINISHED（PR #64 P2 修复后）；" +
+                "FINISHED 的设置职责完全归 handlePlayCards/handlePass 在锁内承担",
+        )
+    }
+
+    // 注：handleAction 锁内 status 重检的测试需要 mock GameSession (WebSocketSession 依赖)；
+    // 当前覆盖通过 broadcastActionResult_doesNotMutateRoomStatus + 代码 review。
+    // PR #64 Codex P2 描述里给出的攻击窗口已经因 handle*Cards/Pass 锁内 set FINISHED
+    // 而关闭（status 转换与 ActionResult.gameResult 原子）；锁内重检为 defense-in-depth。
 }
