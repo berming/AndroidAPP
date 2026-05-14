@@ -57,10 +57,19 @@ fun Application.gameModule(enableAdmin: Boolean = true) {
     }
 
     // 未捕获异常兜底：避免协程异常冒泡导致 500 空响应
+    // pr-reviewer PR #61 P2 #4：`/admin-auth/*` 路径下的异常可能由 kotlinx-serialization
+    // 反序列化登录请求体时抛，cause.message / printStackTrace 链可能含 password
+    // 字段值。对该路径前缀**只**记录"路径 + 异常类型"，不输出 message / stacktrace
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            System.err.println("Unhandled exception on ${call.request.uri}: ${cause.message}")
-            cause.printStackTrace()
+            val uri = call.request.uri
+            if (uri.startsWith("/admin-auth/")) {
+                // 敏感路径：仅记类型，不输出 message / stacktrace（防 password 入日志）
+                System.err.println("Unhandled exception on $uri (redacted): ${cause::class.simpleName}")
+            } else {
+                System.err.println("Unhandled exception on $uri: ${cause.message}")
+                cause.printStackTrace()
+            }
             call.respondText(
                 text = "Internal Server Error",
                 contentType = ContentType.Text.Plain,

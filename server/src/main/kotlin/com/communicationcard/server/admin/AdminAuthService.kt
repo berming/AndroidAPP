@@ -1,5 +1,7 @@
 package com.communicationcard.server.admin
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.mindrot.jbcrypt.BCrypt
 import java.security.SecureRandom
 import java.sql.Connection
@@ -31,13 +33,21 @@ class AdminAuthService(
         require(plainPassword.length >= MIN_PASSWORD_LEN) {
             "ADMIN_INITIAL_PASSWORD must be at least $MIN_PASSWORD_LEN characters"
         }
+        // pr-reviewer PR #61 P2 #7：先 COUNT；表非空直接 return false，省 250 ms
+        // bcrypt 启动 overhead（hashPassword 在表非空时永远是 wasted work）
+        val empty = db.withConnection { conn -> countAdmins(conn) == 0 }
+        if (!empty) return false
+
+        // 表确实空 → 才付 bcrypt 成本。bcrypt CPU-bound：在锁外算好 hash 再插入
+        // （pr-reviewer PR #61 P2 #1：避免 hashpw 250 ms 阻塞 DB mutex）
+        val passwordHash = withContext(Dispatchers.Default) { hashPassword(plainPassword) }
         return db.withConnection { conn ->
-            val count = countAdmins(conn)
-            if (count > 0) return@withConnection false
+            // 二次校验（防极小并发窗口：两个进程同时检测到表空）
+            if (countAdmins(conn) > 0) return@withConnection false
             insertAdmin(
                 conn = conn,
                 username = username,
-                passwordHash = hashPassword(plainPassword),
+                passwordHash = passwordHash,
                 role = AdminRole.SUPER_ADMIN,
                 createdAt = clock(),
             )
@@ -53,12 +63,16 @@ class AdminAuthService(
     suspend fun login(username: String, password: String, userAgent: String?, ip: String?): String? {
         // bcrypt.checkpw 单次约 250 ms；放 DB lock 外做，避免拖慢其他查询。
         // 但要先取出 password_hash —— 表锁内取一次，然后表锁外校验。
+        // 关键：bcrypt 是 **CPU-bound 同步操作**，必须 withContext(Dispatchers.Default)
+        // 否则会阻塞 Ktor / Netty 的 IO 线程，登录洪泛时 N 个并发登录吃 N 个 worker
+        // 250 ms（pr-reviewer PR #61 P2 #1）
         val user = db.withConnection { conn -> findActiveByUsername(conn, username) } ?: run {
             // 即使用户不存在也跑一次 bcrypt 防 timing attack。常数耗时即可。
-            BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING)
+            withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
             return null
         }
-        if (!BCrypt.checkpw(password, user.passwordHash)) return null
+        val ok = withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
+        if (!ok) return null
 
         val now = clock()
         val token = generateToken()
@@ -127,10 +141,12 @@ class AdminAuthService(
         }
         val user = db.withConnection { conn -> findAdminById(conn, adminId) }
             ?: return ChangePasswordResult.AdminNotFound
-        if (!BCrypt.checkpw(oldPassword, user.passwordHash)) {
+        // bcrypt CPU-bound → Dispatchers.Default 避免阻塞 Ktor worker（同 login）
+        val ok = withContext(Dispatchers.Default) { BCrypt.checkpw(oldPassword, user.passwordHash) }
+        if (!ok) {
             return ChangePasswordResult.WrongOldPassword
         }
-        val newHash = hashPassword(newPassword)
+        val newHash = withContext(Dispatchers.Default) { hashPassword(newPassword) }
         db.withConnection { conn ->
             updatePasswordHash(conn, adminId, newHash)
             deleteOtherSessions(conn, adminId, keepToken)
@@ -313,8 +329,10 @@ class AdminAuthService(
         private const val TOKEN_BYTES = 32
 
         // 用一次 bcrypt 当 timing 占位（用户不存在时也跑一次，免 timing 攻击）
-        // 哈希内容无所谓，反正不会比中。cost 12 与生产配置一致
-        private val DUMMY_HASH_FOR_TIMING = BCrypt.hashpw("xxxxx", BCrypt.gensalt(12))
+        // 哈希内容无所谓，反正不会比中。cost 12 与生产配置一致。
+        // pr-reviewer PR #61 P2 #9：改 by lazy，避免类首次加载就消耗 250 ms。
+        // 等真有第一次"用户不存在"的 login 才付这次 cost；之后所有调用共享同一字符串
+        private val DUMMY_HASH_FOR_TIMING: String by lazy { BCrypt.hashpw("xxxxx", BCrypt.gensalt(12)) }
 
         private val random = SecureRandom()
         private val urlEncoder = Base64.getUrlEncoder().withoutPadding()

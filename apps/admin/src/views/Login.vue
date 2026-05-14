@@ -13,7 +13,8 @@ const form = reactive({
   password: '',
 })
 const submitting = ref(false)
-const serverHost = ref(typeof window !== 'undefined' ? window.location.host : '')
+// Vite SPA 一定有 window；之前的 typeof guard 是死代码（pr-reviewer PR #61 nit）
+const serverHost = ref(window.location.host)
 
 async function handleSubmit() {
   if (!form.username || !form.password) {

@@ -591,10 +591,12 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_defaultsToNull() {
-        // PR 2：gameEndListener 默认 null，installAdmin 才会设入；
+    fun gameEndHooks_defaultToNull() {
+        // PR 2：gameEnd 钩子默认 null，installAdmin 才会设入；
         // 没装 admin 模块时（生产 enableAdmin=false 或运行单机测试）也不能 NPE
-        assertNull(gm.gameEndListener)
+        // PR #62 pr-reviewer P2 #5：listener 拆为 captureProvider + consumer
+        assertNull(gm.gameEndCaptureProvider)
+        assertNull(gm.gameEndConsumer)
     }
 
     @Test
@@ -620,12 +622,21 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_settable_and_invokable() {
-        // PR 2：admin 模块通过 listener 接收 game-end 事件后构建 GameRecord
-        // 异步入库。验证 setter / 直接 invoke 都正常
-        val captured = mutableListOf<Pair<String, String>>()
-        gm.gameEndListener = { room, result ->
-            captured.add(room.roomId to result.winner.orEmpty())
+    fun gameEndHooks_captureProvider_returns_snapshot_consumer_receives_it() {
+        // PR #62 pr-reviewer P2 #5：拆分后的两段契约
+        // - captureProvider：锁内调用，返回 immutable 快照（Any?）
+        // - consumer：锁外调用，拿快照做 trySend 等"非阻塞但不纯内存"的事
+        val snapshots = mutableListOf<Pair<String, String>>()
+        val consumed = mutableListOf<String>()
+
+        gm.gameEndCaptureProvider = { room, result ->
+            "${room.roomId}|${result.winner}"
+        }
+        gm.gameEndConsumer = { snap ->
+            consumed.add(snap as String)
+            // 验证 snap 是 captureProvider 的返回值
+            val parts = snap.split("|")
+            snapshots.add(parts[0] to parts[1])
         }
 
         val room = ServerRoom(
@@ -638,13 +649,17 @@ class ServerGameManagerTest {
             teamBScore = 10,
             trigger = "TEAM_ALL_FINISHED",
         )
-        gm.gameEndListener?.invoke(room, result)
+        // 模拟 broadcastActionResult 的调用顺序：锁内 capture，锁外 consume
+        val captured = gm.gameEndCaptureProvider?.invoke(room, result)
+        captured?.let { gm.gameEndConsumer?.invoke(it) }
 
-        assertEquals(1, captured.size)
-        assertEquals("room-x" to "TEAM_A", captured.first())
+        assertEquals(1, snapshots.size)
+        assertEquals("room-x" to "TEAM_A", snapshots.first())
+        assertEquals(1, consumed.size)
 
         // tearDown：避免影响其他 test
-        gm.gameEndListener = null
+        gm.gameEndCaptureProvider = null
+        gm.gameEndConsumer = null
     }
 
     @Test
@@ -701,13 +716,11 @@ class ServerGameManagerTest {
     }
 
     @Test
-    fun gameEndListener_contract_listenerCanReadStateWithoutAdditionalLock() = runTest {
-        // PR 3 review feedback: gameEndListener 必须在锁内被调用，listener 内可以
-        // 安全读 room.gameState / room.players（无需再 withRoomLock）。
-        //
-        // 这个测试模拟 "broadcastActionResult 在锁内调 listener" 的契约——
-        // 在 withRoomLock 内 invoke listener；listener 读 room 字段成功；
-        // 没有重入死锁（因为 listener 没再调 withRoomLock）。
+    fun gameEndCaptureProvider_contract_canReadStateWithoutAdditionalLock() = runTest {
+        // PR 3 review feedback + PR #62 pr-reviewer P2 #5：
+        // captureProvider 必须在锁内被调用，内部可以安全读 room.gameState / room.players
+        // （无需再 withRoomLock，因为 Mutex 非可重入会死锁）。
+        // consumer 在锁外调用，应该收到 captureProvider 的返回值。
         val room = ServerRoom(
             roomId = "room-contract", roomCode = "CTRC", roomName = "Contract",
             hostId = "h", maxPlayers = 6,
@@ -720,21 +733,30 @@ class ServerGameManagerTest {
         )
 
         var readPlayers: Int = -1
-        gm.gameEndListener = { r, _ ->
-            // listener 在锁内被调用——直接读 r.players 安全（无需再上锁）
+        var consumed: Any? = null
+        gm.gameEndCaptureProvider = { r, _ ->
+            // 在锁内被调用 → 直接读 r.players 安全（无需再上锁）
             readPlayers = r.players.size
+            "snapshot:${r.players.size}"
+        }
+        gm.gameEndConsumer = { snap ->
+            consumed = snap
         }
 
-        gm.withRoomLock(room) {
-            gm.gameEndListener?.invoke(room, SerializedGameResult(
+        // 模拟 broadcastActionResult 的调用顺序
+        val captured = gm.withRoomLock(room) {
+            gm.gameEndCaptureProvider?.invoke(room, SerializedGameResult(
                 winner = "TEAM_A",
                 teamAScore = 200,
                 teamBScore = 0,
                 trigger = "TEAM_ALL_FINISHED",
             ))
         }
+        captured?.let { gm.gameEndConsumer?.invoke(it) }
 
-        assertEquals(1, readPlayers, "listener 应该能在锁内读 room.players")
-        gm.gameEndListener = null
+        assertEquals(1, readPlayers, "captureProvider 应能在锁内读 room.players")
+        assertEquals("snapshot:1", consumed, "consumer 应收到 captureProvider 的返回值")
+        gm.gameEndCaptureProvider = null
+        gm.gameEndConsumer = null
     }
 }

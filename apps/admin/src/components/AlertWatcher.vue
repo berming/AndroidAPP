@@ -16,6 +16,8 @@ const emit = defineEmits<{ (e: 'ack-changed'): void }>()
 const seen = ref<Set<number>>(new Set())
 const firstFetch = ref(true)
 let pollTimer: number | undefined
+let pollInflight = false  // pr-reviewer PR #61 P2 #8：防慢请求 + 30s tick 重叠
+let stopped = false        // unmount 后阻止递归 setTimeout
 let sse: EventSource | null = null
 
 function showAlertNotification(a: Alert) {
@@ -32,6 +34,8 @@ function showAlertNotification(a: Alert) {
 }
 
 async function poll() {
+  if (pollInflight) return  // 上一轮还没回来，直接跳过本次 tick（防重叠）
+  pollInflight = true
   try {
     const list = await alertsApi.listUnacked(100)
     const currentIds = new Set(list.map((a) => a.id))
@@ -49,7 +53,19 @@ async function poll() {
     emit('ack-changed')
   } catch (_e) {
     // 401 拦截器接管，忽略
+  } finally {
+    pollInflight = false
   }
+}
+
+// pr-reviewer PR #61 P2 #8：用 setTimeout 递归替代 setInterval。
+// 哪怕 poll() 慢于 30 s，也只在前一次彻底完成后才排下一次。
+function schedulePoll() {
+  if (stopped) return
+  pollTimer = window.setTimeout(async () => {
+    await poll()
+    schedulePoll()
+  }, 30_000)
 }
 
 function connectSse() {
@@ -76,10 +92,11 @@ function connectSse() {
 onMounted(() => {
   poll()
   connectSse()
-  pollTimer = window.setInterval(poll, 30_000)
+  schedulePoll()
 })
 onBeforeUnmount(() => {
-  if (pollTimer) window.clearInterval(pollTimer)
+  stopped = true
+  if (pollTimer) window.clearTimeout(pollTimer)
   sse?.close()
   sse = null
 })

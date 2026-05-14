@@ -79,13 +79,21 @@ fun Application.installAdmin(serverCtx: ServerContext) {
         alertEngine = alertEngine,
     )
 
-    // 把"游戏结束 → 异步入库"挂到 gameManager
-    serverCtx.gameManager.gameEndListener = { room, result ->
+    // 把"游戏结束 → 异步入库"挂到 gameManager。
+    // pr-reviewer PR #61 P2 #5：拆为 captureProvider（锁内只做 immutable 拷贝）
+    // 和 consumer（锁外 trySend）。即便 consumer 未来回归到阻塞实现，也只阻塞
+    // broadcast 协程，不会卡住房间 mutex。
+    serverCtx.gameManager.gameEndCaptureProvider = { room, result ->
         try {
-            historyStore.enqueue(GameRecord.capture(room, result))
+            GameRecord.capture(room, result)
         } catch (e: Throwable) {
-            System.err.println("GameHistoryStore capture failed (ignored): ${e.message}")
+            System.err.println("GameRecord.capture failed (ignored): ${e.message}")
+            null
         }
+    }
+    serverCtx.gameManager.gameEndConsumer = { record ->
+        // record 在 ServerGameManager 层是 Any，admin 层知道实际类型
+        historyStore.enqueue(record as GameRecord)
     }
 
     // PR 5d: 把每手出牌 / pass / 回合结束等事件按 roomId 缓冲到 historyStore
@@ -102,8 +110,18 @@ fun Application.installAdmin(serverCtx: ServerContext) {
         adminApiRoutes(ctx)
     }
 
-    // 关闭钩子：停 alert engine + history 协程 + 让 SQLite 有机会 checkpoint WAL
+    // 关闭钩子：按"先断输入 → 停消费者 → 关连接"顺序：
+    // (pr-reviewer PR #61 P2 #6)
+    // 1. 先 null 掉 gameEnd / gameEvent hook：防止 in-flight 游戏完成后再触发
+    //    listener → 给已关闭 Channel trySend（功能无害但是 wasted op）
+    // 2. 等当前 broadcast 中的 listener invoke 完成（这里靠 mutexFor(room) 顺序保证，
+    //    不引入额外 sleep）
+    // 3. 停 alertEngine（停周期 tick）+ historyStore（关 Channel → IO 协程 join）
+    // 4. 最后 db.close()，让 SQLite WAL 有机会 checkpoint
     environment.monitor.subscribe(io.ktor.server.application.ApplicationStopping) {
+        serverCtx.gameManager.gameEndCaptureProvider = null
+        serverCtx.gameManager.gameEndConsumer = null
+        serverCtx.gameManager.gameEventListener = null
         runBlocking {
             try { alertEngine.stop() } catch (_: Throwable) { /* ignore */ }
             try { historyStore.stop() } catch (_: Throwable) { /* ignore */ }
