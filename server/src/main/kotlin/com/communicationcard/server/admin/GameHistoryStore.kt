@@ -138,7 +138,11 @@ class GameHistoryStore(private val db: AdminDb) {
                 )
                 if (from != null) append(" AND started_at >= ?")
                 if (to != null) append(" AND started_at < ?")
-                append(" ORDER BY started_at DESC LIMIT ?")
+                // id DESC tiebreaker：两条 enqueue 同毫秒（System.currentTimeMillis 分辨率
+                // 1 ms，IO 协程也可能跑得快）时单 `started_at DESC` 顺序不确定，导致
+                // GameHistoryStoreTest > "enqueue then async insert ..." CI flaky。AUTOINCREMENT
+                // 的 id 与插入顺序单调一致，是稳定 tiebreaker。
+                append(" ORDER BY started_at DESC, id DESC LIMIT ?")
             }
             conn.prepareStatement(sql).use { ps ->
                 var idx = 1
