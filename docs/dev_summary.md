@@ -1,6 +1,6 @@
 # AI 辅助联网游戏开发——完整实践总结
 
-> 约 25 分钟 | 目标受众：移动端 / 后端 / 全栈开发团队
+> 目标受众：移动端 / 后端 / 全栈开发团队
 
 ---
 
@@ -384,31 +384,49 @@
 
 ---
 
-### ChatGPT Codex Review Bot（~13 条，全程）
+### ChatGPT Codex Review Bot（**26 条**，PR #29-#62 全程审计）
 
-> **工作模式**：PR 创建时自动触发；聚焦语句级风险，按 P1 / P2 标注
+> **工作模式**：PR 创建时自动触发（GitHub App `chatgpt-codex-connector[bot]`）；
+> 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
+> `get_reviews` / `get_review_comments` / `get_comments`"独立审计得出
+> （pr-reviewer subagent 2026-05-14 跑出，全数据可复现）。
 
-| # | PR | 优先级 | 位置 | 意见 | 处置 |
+**汇总**：
+
+| 维度 | 数字 |
+|------|------|
+| 跨 19 个 PR 留下 inline 发现 | #29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62 |
+| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **26 条** |
+| 优先级分布 | **P0×0 · P1×7 · P2×19 · nit×0** |
+| 处置 | ✅ fixed = **23** / ⏭️ skipped = **3** / ❌ disputed = **0** / unclear = 0 |
+| 误报（false positive）| **0** —— 每条都触发了代码 / 文档改动，或作者解释"已被前一 commit 修过" |
+
+**Top 5 最有价值的 finding**（按作者后续 commentary + 下游影响）：
+
+| # | PR | 优先级 | 位置 | 内容 | 价值 |
 |---|----|--------|------|------|------|
-| 1 | #29 | P1 | Application.kt | UUID 截到 8 字符 → 32 位熵，会话碰撞 | ✅ commit 06d445c（完整 36 字符 UUID） |
-| 2 | #31 | P1 | LobbyActivity | Reconnecting 路径不触发 hideLoading，遮罩永久卡住 | ✅ PR #33 三状态都加 hideLoading |
-| 3 | #33 | P2 | MainActivity | UI 提示"房间名"但服务端只解析 roomCode，必失败 | ✅ UI 改为房间列表点击加入 |
-| 4 | #35 | P1 | detekt | `!!` 和 swallowed exceptions 超阈值 | ✅ PR #34/35 null safety 修复 + baseline |
-| 5 | PR-H1 | P2 | PreCommitScan | MultiEdit matcher 潜在误匹配 + doc-only filter 绕过 | ✅ commit 369e682 |
-| 6 | PR-H3 | P2 | ServerGameManager | AI 炸弹决策阈值用 rank.value（1-based），比较值偏移 | ✅ commit 49ded62（`>= 8` / `<= 3`）|
-| 7 | PR-H4 | P2 | trace-bug | allowed-tools 声称的工具权限与实际不符；缺 git add/commit | ✅ commit c888ad5 |
-| 8 | #43 | P2 | settings.json | allowed-tools Bash 表达式语法不精确 | ✅ commit 6ef2aea |
-| 9 | #45 | P2 | fonts | 字体子集漏包"·"/"—"/"♠♣♥♦"等 UI 字符 | ✅ commit ce74b39 |
-| 10 | #47 | P1+P2 | web | kotlinx.serialization plugin 缺 apply；出牌后未清空 selection | ✅ commit 7f83753 |
-| 11 | #49 | P1 | web GameScreen | pass 按钮条件逻辑在本轮先手场景有误 | ✅ commit 1779890 |
-| 12 | #50 | P2 | web SinglePlayer | lastPlayerId 中央 fallback 缺失；SP 结束状态判断 | ✅ commit d484dbc |
-| 13 | #53 | P2 | ServerGameManager | processAITurn `delay()` 后只重检 currentPlayerIndex，漏检 isAISubstitute | ✅ commit c9988fd |
+| 1 | #29 | P1 | `Application.kt:57` | UUID 截到 8 字符 → 32 位熵，会话碰撞 | regressions.md #5 标杆案例（Claude 漏，Codex 抓） |
+| 2 | #39 | P2 | `ServerGameManager.kt:833` | refactor 把 rank 改 1-based 后两个**绝对阈值**（`≥7` / `≤2`）未同步偏移 | 作者提交信里曾断言"所有调用都比较相对值" → Codex 2 分钟内打脸 |
+| 3 | #50 | P2→P1 | `AppViewModel.kt:440` | Web 单机 lastPlayerId 中央渲染缺失 + 状态判断 | 作者判定实际是 P1（影响功能可用性）|
+| 4 | #45 | P2 | `App.kt:38` | 字体子集漏 6 个 codepoint（`· — ♠♥♣♦`），wasmJs 无 OS fallback | Codex 做了 cmap 级核对 |
+| 5 | #62 | P2 | `ServerGameManager.kt:682` | `gameEventListener` 在 broadcast 锁外调，并发 action 的 `session.send` suspend 后 seq 倒置 | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
+
+**3 条 skipped 的集中区间**（PR #31 / #33 / #34，2026-05-03~04，联网早期）：
+- PR #31 P1：loading 遮罩 reconnecting 路径未隐藏 → 早期未操作 4 关流程，后续 refactor 时被超越
+- PR #33 P2：roomName 复制方向 → 后续 room 列表 UI 重写时被超越
+- PR #34 P1+P1：playerToRoom leave-mapping + 6 玩家下限 vs maxPlayers → 6 玩家下限后被
+  CLAUDE.md 约束 8 固化为有意行为，已不算 bug
+
+PR #34 之后团队开始**每个 Codex thread 都用 commit SHA 回复**，4 关 PR 流程正式
+operationalized；从那以后再没出现 skipped。
 
 **关键观察**：
-- Codex 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量"，pr-reviewer
-  抓"功能完整 / 文档漂移 / 跨文件契约"。第 13 条（race condition）只被 Codex 发现。
-- 13 条 Codex 意见中 **1 条 P0、5 条 P1、7 条 P2**，全部已修复。
-- UUID 截断（#1）在 PR #29 审查后拖了 4 天才修，其余 P1 全部在当 PR 内修。
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，**实际 26 条**
+- **0 误报**：Codex 在本项目精确度 100%。在另外 36 个 PR 上 silent（要么 docs-only / 要么没问题）
+- 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
+  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 41 条独立发现
+- PR #62 Codex P2 救场：admin 监听器在锁外的 seq race 是同 vendor Claude 没发现的——
+  跨 vendor 在并发场景尤其值钱
 
 ---
 
@@ -732,7 +750,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 
 → **相关性盲区**会同时存在于所有 Claude 模型里。
 
-本项目 **~13 个 Codex 意见**中，大量是多个 Claude 自查也大概率找不出来的：
+本项目 **26 个 Codex 意见**中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：
 
 - `UUID.take(8)`：训练语料里到处是，所有 LLM 都视为"常用模式"
 - "房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项
@@ -799,11 +817,48 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 |------|------|------|
 | 时间换覆盖率（单 Claude 多轮）| 4 轮自审 | ~35 个 Bug |
 | 视角换覆盖率（多 Claude 协同）| Opus + Sonnet + Haiku | +20 个 Bug（post-#34 阶段）|
-| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | +13 个 Codex + 5 个真机；**90% 是前两者找不到的** |
+| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+26 个 Codex**（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
 
 异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 13 个 Codex 与 ~55 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 **26 个 Codex 发现**与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。
+
+---
+
+### 8.6 Token 用量实测（仅覆盖 Claude Code 接入后阶段）
+
+**口径**：从本机 `~/.claude/projects/-home-user-AndroidAPP/` 142 个 transcript
+（按 `uuid` 字段去重后 **2,210 个 assistant turn**）聚合而来。每 turn 含
+`input_tokens` / `output_tokens` / `cache_creation_input_tokens` /
+`cache_read_input_tokens` 四项，按 timestamp 落桶到开发阶段。
+
+⚠️ **数据缺口**：早期 PR #1-50（2026-02-02 单机起步 → 2026-05-09 Web 功能补齐）
+的 transcript **不在本仓库的 host 上**——要么当时用了其他 host / 工作目录的
+session，要么 Claude Code 集成是 5/10 之后才接入。下表只列**已采集**到 token
+数据的阶段。
+
+| 阶段 | 日期 | 轮次 | 纯输入 | 输出 | 缓存写 | 缓存读 | 总和 | **计费等效** |
+|------|------|----:|------:|----:|------:|------:|----:|----------:|
+| AI 托管 + UI 约束（PR #51-58）| 5/10 | 951 | 29K | 904K | 13.4M | **267.4M** | 281.7M | **41.1M** |
+| bermin.cn HTTPS（PR #60）| 5/11 | 76 | 0.3K | 46K | 2.2M | 28.9M | 31.1M | 5.1M |
+| WS 重连 + HTML docs（PR #59）| 5/12 | 232 | 12K | 243K | 3.1M | 8.6M | 11.9M | 4.2M |
+| Admin MVP + PR 5（PR #61-62）| 5/13 | 897 | 1.7K | 1.44M | 12.5M | **293.8M** | 307.7M | **43.3M** |
+| 今日（dev_summary 刷新 / 审计）| 5/14 | 54 | 0.1K | 70K | 3.9M | 37.1M | 41.0M | 7.6M |
+| **合计（5/10-5/14）** | 5 天 | **2,210** | 42K | 2.7M | 34.9M | **635.7M** | **673M** | **~101M** |
+
+\*计费等效 = `pure_input + cache_creation + cache_read × 0.1 + output`
+（Anthropic API 定价：cache 读价 = 输入的 1/10）
+
+**几个观察**：
+
+1. **cache_read 主导（94%）**：每轮重读 CLAUDE.md + 代码上下文 ~300K cache_read
+   tokens。Claude Code 的 prompt cache 让"重复读已知内容"的成本远低于"每轮从头输入"
+2. **5/10 与 5/13 是两个尖峰**：分别对应 AI 托管设计 + Admin 后台开发；都是
+   "大特性 + 多轮 Codex / pr-reviewer 来回 + 真机调试"的组合
+3. **3 天合计 ~100M 计费等效 token**：按 Claude Opus 4.7 标准定价
+   （$3/MTok input + $15/MTok output）粗算 ~$300-400 / 5 天高强度开发
+4. **缓存命中率高 ≠ 浪费**：每轮读取的 cache_read 大都是必要上下文（项目代码 +
+   规约 + 历史 PR），没缓存的话每轮要重输入 ~3M token，成本和延迟都会爆炸
 
 ---
 

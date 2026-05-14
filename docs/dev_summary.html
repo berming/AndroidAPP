@@ -196,7 +196,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </ul>
 </li>
 <li><a href="#claude-pr-reviewer-15-pr-h5">Claude pr-reviewer 发现的问题（~15 个，PR-H5 后引入）</a></li>
-<li><a href="#chatgpt-codex-review-bot13">ChatGPT Codex Review Bot（~13 条，全程）</a></li>
+<li><a href="#chatgpt-codex-review-bot26-pr-29-62">ChatGPT Codex Review Bot（26 条，PR #29-#62 全程审计）</a></li>
 </ul>
 </li>
 <li><a href="#ai_1">第五章：人工与 AI 协同模式深度解析</a><ul>
@@ -237,6 +237,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </li>
 <li><a href="#84">8.4 本项目的实际实施结果</a></li>
 <li><a href="#85">8.5 核心洞察</a></li>
+<li><a href="#86-token-claude-code">8.6 Token 用量实测（仅覆盖 Claude Code 接入后阶段）</a></li>
 </ul>
 </li>
 <li><a href="#harness-pr-h-ai">第九章：harness 跨会话经验（PR-H 系列 + AI 托管特性）</a><ul>
@@ -276,7 +277,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
     <main>
 <h1 id="ai">AI 辅助联网游戏开发——完整实践总结</h1>
 <blockquote>
-<p>约 25 分钟 | 目标受众：移动端 / 后端 / 全栈开发团队</p>
+<p>目标受众：移动端 / 后端 / 全栈开发团队</p>
 </blockquote>
 <hr>
 <h2 id="_1">第一章：项目背景</h2>
@@ -1460,10 +1461,45 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 的 race condition 不敏感（由 Codex 补盲）。两者组合才完整。</p>
 </blockquote>
 <hr>
-<h3 id="chatgpt-codex-review-bot13">ChatGPT Codex Review Bot（~13 条，全程）</h3>
+<h3 id="chatgpt-codex-review-bot26-pr-29-62">ChatGPT Codex Review Bot（<strong>26 条</strong>，PR #29-#62 全程审计）</h3>
 <blockquote>
-<p><strong>工作模式</strong>：PR 创建时自动触发；聚焦语句级风险，按 P1 / P2 标注</p>
+<p><strong>工作模式</strong>：PR 创建时自动触发（GitHub App <code>chatgpt-codex-connector[bot]</code>）；
+在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
+<code>get_reviews</code> / <code>get_review_comments</code> / <code>get_comments</code>"独立审计得出
+（pr-reviewer subagent 2026-05-14 跑出，全数据可复现）。</p>
 </blockquote>
+<p><strong>汇总</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>数字</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>跨 19 个 PR 留下 inline 发现</td>
+<td>#29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62</td>
+</tr>
+<tr>
+<td>总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）</td>
+<td><strong>26 条</strong></td>
+</tr>
+<tr>
+<td>优先级分布</td>
+<td><strong>P0×0 · P1×7 · P2×19 · nit×0</strong></td>
+</tr>
+<tr>
+<td>处置</td>
+<td>✅ fixed = <strong>23</strong> / ⏭️ skipped = <strong>3</strong> / ❌ disputed = <strong>0</strong> / unclear = 0</td>
+</tr>
+<tr>
+<td>误报（false positive）</td>
+<td><strong>0</strong> —— 每条都触发了代码 / 文档改动，或作者解释"已被前一 commit 修过"</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Top 5 最有价值的 finding</strong>（按作者后续 commentary + 下游影响）：</p>
 <table>
 <thead>
 <tr>
@@ -1471,8 +1507,8 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 <th>PR</th>
 <th>优先级</th>
 <th>位置</th>
-<th>意见</th>
-<th>处置</th>
+<th>内容</th>
+<th>价值</th>
 </tr>
 </thead>
 <tbody>
@@ -1480,113 +1516,58 @@ PR #35 后的 wasmJs 8 层是工具链兼容性，<strong>完全不在前 4 轮�
 <td>1</td>
 <td>#29</td>
 <td>P1</td>
-<td>Application.kt</td>
+<td><code>Application.kt:57</code></td>
 <td>UUID 截到 8 字符 → 32 位熵，会话碰撞</td>
-<td>✅ commit 06d445c（完整 36 字符 UUID）</td>
+<td>regressions.md #5 标杆案例（Claude 漏，Codex 抓）</td>
 </tr>
 <tr>
 <td>2</td>
-<td>#31</td>
-<td>P1</td>
-<td>LobbyActivity</td>
-<td>Reconnecting 路径不触发 hideLoading，遮罩永久卡住</td>
-<td>✅ PR #33 三状态都加 hideLoading</td>
+<td>#39</td>
+<td>P2</td>
+<td><code>ServerGameManager.kt:833</code></td>
+<td>refactor 把 rank 改 1-based 后两个<strong>绝对阈值</strong>（<code>≥7</code> / <code>≤2</code>）未同步偏移</td>
+<td>作者提交信里曾断言"所有调用都比较相对值" → Codex 2 分钟内打脸</td>
 </tr>
 <tr>
 <td>3</td>
-<td>#33</td>
-<td>P2</td>
-<td>MainActivity</td>
-<td>UI 提示"房间名"但服务端只解析 roomCode，必失败</td>
-<td>✅ UI 改为房间列表点击加入</td>
+<td>#50</td>
+<td>P2→P1</td>
+<td><code>AppViewModel.kt:440</code></td>
+<td>Web 单机 lastPlayerId 中央渲染缺失 + 状态判断</td>
+<td>作者判定实际是 P1（影响功能可用性）</td>
 </tr>
 <tr>
 <td>4</td>
-<td>#35</td>
-<td>P1</td>
-<td>detekt</td>
-<td><code>!!</code> 和 swallowed exceptions 超阈值</td>
-<td>✅ PR #34/35 null safety 修复 + baseline</td>
+<td>#45</td>
+<td>P2</td>
+<td><code>App.kt:38</code></td>
+<td>字体子集漏 6 个 codepoint（<code>· — ♠♥♣♦</code>），wasmJs 无 OS fallback</td>
+<td>Codex 做了 cmap 级核对</td>
 </tr>
 <tr>
 <td>5</td>
-<td>PR-H1</td>
+<td>#62</td>
 <td>P2</td>
-<td>PreCommitScan</td>
-<td>MultiEdit matcher 潜在误匹配 + doc-only filter 绕过</td>
-<td>✅ commit 369e682</td>
-</tr>
-<tr>
-<td>6</td>
-<td>PR-H3</td>
-<td>P2</td>
-<td>ServerGameManager</td>
-<td>AI 炸弹决策阈值用 rank.value（1-based），比较值偏移</td>
-<td>✅ commit 49ded62（<code>&gt;= 8</code> / <code>&lt;= 3</code>）</td>
-</tr>
-<tr>
-<td>7</td>
-<td>PR-H4</td>
-<td>P2</td>
-<td>trace-bug</td>
-<td>allowed-tools 声称的工具权限与实际不符；缺 git add/commit</td>
-<td>✅ commit c888ad5</td>
-</tr>
-<tr>
-<td>8</td>
-<td>#43</td>
-<td>P2</td>
-<td>settings.json</td>
-<td>allowed-tools Bash 表达式语法不精确</td>
-<td>✅ commit 6ef2aea</td>
-</tr>
-<tr>
-<td>9</td>
-<td>#45</td>
-<td>P2</td>
-<td>fonts</td>
-<td>字体子集漏包"·"/"—"/"♠♣♥♦"等 UI 字符</td>
-<td>✅ commit ce74b39</td>
-</tr>
-<tr>
-<td>10</td>
-<td>#47</td>
-<td>P1+P2</td>
-<td>web</td>
-<td>kotlinx.serialization plugin 缺 apply；出牌后未清空 selection</td>
-<td>✅ commit 7f83753</td>
-</tr>
-<tr>
-<td>11</td>
-<td>#49</td>
-<td>P1</td>
-<td>web GameScreen</td>
-<td>pass 按钮条件逻辑在本轮先手场景有误</td>
-<td>✅ commit 1779890</td>
-</tr>
-<tr>
-<td>12</td>
-<td>#50</td>
-<td>P2</td>
-<td>web SinglePlayer</td>
-<td>lastPlayerId 中央 fallback 缺失；SP 结束状态判断</td>
-<td>✅ commit d484dbc</td>
-</tr>
-<tr>
-<td>13</td>
-<td>#53</td>
-<td>P2</td>
-<td>ServerGameManager</td>
-<td>processAITurn <code>delay()</code> 后只重检 currentPlayerIndex，漏检 isAISubstitute</td>
-<td>✅ commit c9988fd</td>
+<td><code>ServerGameManager.kt:682</code></td>
+<td><code>gameEventListener</code> 在 broadcast 锁外调，并发 action 的 <code>session.send</code> suspend 后 seq 倒置</td>
+<td>移到 <code>mutexFor(room).withLock</code> 内 + 新增回归测试</td>
 </tr>
 </tbody>
 </table>
+<p><strong>3 条 skipped 的集中区间</strong>（PR #31 / #33 / #34，2026-05-03~04，联网早期）：
+- PR #31 P1：loading 遮罩 reconnecting 路径未隐藏 → 早期未操作 4 关流程，后续 refactor 时被超越
+- PR #33 P2：roomName 复制方向 → 后续 room 列表 UI 重写时被超越
+- PR #34 P1+P1：playerToRoom leave-mapping + 6 玩家下限 vs maxPlayers → 6 玩家下限后被
+  CLAUDE.md 约束 8 固化为有意行为，已不算 bug</p>
+<p>PR #34 之后团队开始<strong>每个 Codex thread 都用 commit SHA 回复</strong>，4 关 PR 流程正式
+operationalized；从那以后再没出现 skipped。</p>
 <p><strong>关键观察</strong>：
-- Codex 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量"，pr-reviewer
-  抓"功能完整 / 文档漂移 / 跨文件契约"。第 13 条（race condition）只被 Codex 发现。
-- 13 条 Codex 意见中 <strong>1 条 P0、5 条 P1、7 条 P2</strong>，全部已修复。
-- UUID 截断（#1）在 PR #29 审查后拖了 4 天才修，其余 P1 全部在当 PR 内修。</p>
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，<strong>实际 26 条</strong>
+- <strong>0 误报</strong>：Codex 在本项目精确度 100%。在另外 36 个 PR 上 silent（要么 docs-only / 要么没问题）
+- 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
+  抓"功能完整 / 文档漂移 / 跨文件契约 / 类型未定义但被引用"。两者并集 ≈ 41 条独立发现
+- PR #62 Codex P2 救场：admin 监听器在锁外的 seq race 是同 vendor Claude 没发现的——
+  跨 vendor 在并发场景尤其值钱</p>
 <hr>
 <h2 id="ai_1">第五章：人工与 AI 协同模式深度解析</h2>
 <h3 id="_12">协同的四个层次</h3>
@@ -2230,7 +2211,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <li><strong>同一架构</strong> → 共享类似的注意力分布</li>
 </ol>
 <p>→ <strong>相关性盲区</strong>会同时存在于所有 Claude 模型里。</p>
-<p>本项目 <strong>~13 个 Codex 意见</strong>中，大量是多个 Claude 自查也大概率找不出来的：</p>
+<p>本项目 <strong>26 个 Codex 意见</strong>中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：</p>
 <ul>
 <li><code>UUID.take(8)</code>：训练语料里到处是，所有 LLM 都视为"常用模式"</li>
 <li>"房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项</li>
@@ -2367,13 +2348,119 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 <tr>
 <td>异构换覆盖率（Codex + 真机）</td>
 <td>自动 + 季度手动</td>
-<td>+13 个 Codex + 5 个真机；<strong>90% 是前两者找不到的</strong></td>
+<td><strong>+26 个 Codex</strong>（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；<strong>90% 是前两者找不到的</strong></td>
 </tr>
 </tbody>
 </table>
 <p>异构换覆盖率不只是"多找 Bug"，更重要的是它<strong>找的是另一类 Bug</strong>——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 13 个 Codex 与 ~55 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 <strong>26 个 Codex 发现</strong>与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。</p>
+<hr>
+<h3 id="86-token-claude-code">8.6 Token 用量实测（仅覆盖 Claude Code 接入后阶段）</h3>
+<p><strong>口径</strong>：从本机 <code>~/.claude/projects/-home-user-AndroidAPP/</code> 142 个 transcript
+（按 <code>uuid</code> 字段去重后 <strong>2,210 个 assistant turn</strong>）聚合而来。每 turn 含
+<code>input_tokens</code> / <code>output_tokens</code> / <code>cache_creation_input_tokens</code> /
+<code>cache_read_input_tokens</code> 四项，按 timestamp 落桶到开发阶段。</p>
+<p>⚠️ <strong>数据缺口</strong>：早期 PR #1-50（2026-02-02 单机起步 → 2026-05-09 Web 功能补齐）
+的 transcript <strong>不在本仓库的 host 上</strong>——要么当时用了其他 host / 工作目录的
+session，要么 Claude Code 集成是 5/10 之后才接入。下表只列<strong>已采集</strong>到 token
+数据的阶段。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>日期</th>
+<th style="text-align: right;">轮次</th>
+<th style="text-align: right;">纯输入</th>
+<th style="text-align: right;">输出</th>
+<th style="text-align: right;">缓存写</th>
+<th style="text-align: right;">缓存读</th>
+<th style="text-align: right;">总和</th>
+<th style="text-align: right;"><strong>计费等效</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AI 托管 + UI 约束（PR #51-58）</td>
+<td>5/10</td>
+<td style="text-align: right;">951</td>
+<td style="text-align: right;">29K</td>
+<td style="text-align: right;">904K</td>
+<td style="text-align: right;">13.4M</td>
+<td style="text-align: right;"><strong>267.4M</strong></td>
+<td style="text-align: right;">281.7M</td>
+<td style="text-align: right;"><strong>41.1M</strong></td>
+</tr>
+<tr>
+<td>bermin.cn HTTPS（PR #60）</td>
+<td>5/11</td>
+<td style="text-align: right;">76</td>
+<td style="text-align: right;">0.3K</td>
+<td style="text-align: right;">46K</td>
+<td style="text-align: right;">2.2M</td>
+<td style="text-align: right;">28.9M</td>
+<td style="text-align: right;">31.1M</td>
+<td style="text-align: right;">5.1M</td>
+</tr>
+<tr>
+<td>WS 重连 + HTML docs（PR #59）</td>
+<td>5/12</td>
+<td style="text-align: right;">232</td>
+<td style="text-align: right;">12K</td>
+<td style="text-align: right;">243K</td>
+<td style="text-align: right;">3.1M</td>
+<td style="text-align: right;">8.6M</td>
+<td style="text-align: right;">11.9M</td>
+<td style="text-align: right;">4.2M</td>
+</tr>
+<tr>
+<td>Admin MVP + PR 5（PR #61-62）</td>
+<td>5/13</td>
+<td style="text-align: right;">897</td>
+<td style="text-align: right;">1.7K</td>
+<td style="text-align: right;">1.44M</td>
+<td style="text-align: right;">12.5M</td>
+<td style="text-align: right;"><strong>293.8M</strong></td>
+<td style="text-align: right;">307.7M</td>
+<td style="text-align: right;"><strong>43.3M</strong></td>
+</tr>
+<tr>
+<td>今日（dev_summary 刷新 / 审计）</td>
+<td>5/14</td>
+<td style="text-align: right;">54</td>
+<td style="text-align: right;">0.1K</td>
+<td style="text-align: right;">70K</td>
+<td style="text-align: right;">3.9M</td>
+<td style="text-align: right;">37.1M</td>
+<td style="text-align: right;">41.0M</td>
+<td style="text-align: right;">7.6M</td>
+</tr>
+<tr>
+<td><strong>合计（5/10-5/14）</strong></td>
+<td>5 天</td>
+<td style="text-align: right;"><strong>2,210</strong></td>
+<td style="text-align: right;">42K</td>
+<td style="text-align: right;">2.7M</td>
+<td style="text-align: right;">34.9M</td>
+<td style="text-align: right;"><strong>635.7M</strong></td>
+<td style="text-align: right;"><strong>673M</strong></td>
+<td style="text-align: right;"><strong>~101M</strong></td>
+</tr>
+</tbody>
+</table>
+<p>*计费等效 = <code>pure_input + cache_creation + cache_read × 0.1 + output</code>
+（Anthropic API 定价：cache 读价 = 输入的 1/10）</p>
+<p><strong>几个观察</strong>：</p>
+<ol>
+<li><strong>cache_read 主导（94%）</strong>：每轮重读 CLAUDE.md + 代码上下文 ~300K cache_read
+   tokens。Claude Code 的 prompt cache 让"重复读已知内容"的成本远低于"每轮从头输入"</li>
+<li><strong>5/10 与 5/13 是两个尖峰</strong>：分别对应 AI 托管设计 + Admin 后台开发；都是
+   "大特性 + 多轮 Codex / pr-reviewer 来回 + 真机调试"的组合</li>
+<li><strong>3 天合计 ~100M 计费等效 token</strong>：按 Claude Opus 4.7 标准定价
+   （$3/MTok input + $15/MTok output）粗算 ~$300-400 / 5 天高强度开发</li>
+<li><strong>缓存命中率高 ≠ 浪费</strong>：每轮读取的 cache_read 大都是必要上下文（项目代码 +
+   规约 + 历史 PR），没缓存的话每轮要重输入 ~3M token，成本和延迟都会爆炸</li>
+</ol>
 <hr>
 <h2 id="harness-pr-h-ai">第九章：harness 跨会话经验（PR-H 系列 + AI 托管特性）</h2>
 <blockquote>
