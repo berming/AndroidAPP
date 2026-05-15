@@ -87,6 +87,22 @@ Claude Code 跑在云端（web / GitHub Action / 远程容器）时，session �
 一次订阅对应一个 PR（`pullNumber` 参数）。同时跟踪多个 PR 时，对每个
 PR 各调一次 `subscribe_pr_activity`；完成后各自 unsubscribe。
 
+### GitHub 写操作预授权（settings.json 决策记录）
+
+`.claude/settings.json` 的 `permissions.allow` 中已预授权以下三条工具，
+主会话可**无需用户逐次确认**即调用：
+
+| 工具 | 用途 |
+|------|------|
+| `mcp__github__add_issue_comment` | 发布 review 摘要评论 |
+| `mcp__github__add_reply_to_pull_request_comment` | 回复 review thread |
+| `mcp__github__resolve_review_thread` | 标记已修复的 thread |
+
+**决策理由**（2026-05，PR #65）：push 后的自动修复 + 回复 thread 是
+CLAUDE.md 第五章「常驻行为约定」的核心流程，每次写操作都需人工点击
+会打断自动化节奏。预授权范围严格限定在上述三条；合并、关闭 PR、修改
+PR 描述等破坏性写操作**未**预授权，仍需人工确认。
+
 ### 本地环境 fallback
 
 本地 session 若不支持事件推送，退化为轮询：等 60 秒后用
