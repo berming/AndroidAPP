@@ -49,6 +49,72 @@
 
 ---
 
+## 1.5 Claude 会话监听 PR 事件（remote execution 模式）
+
+Claude Code 跑在云端（web / GitHub Action / 远程容器）时，session 无法
+阻塞轮询；应当使用 `subscribe_pr_activity` 接收事件驱动通知。
+
+### 触发时机
+
+每次 `git push` 后，`PostToolUse.sh` hook 会注入提醒。主会话应当：
+
+```
+1. mcp__github__list_pull_requests        → 找到当前分支对应 PR number
+2. mcp__github__subscribe_pr_activity
+       owner=berming repo=AndroidAPP pullNumber=<PR#>
+   （订阅后 harness 将 PR 事件以 <github-webhook-activity> tag 注入 session；
+    不要 sleep / 轮询，等 tag 到达即可）
+3. 事件处理完毕后 mcp__github__unsubscribe_pr_activity
+```
+
+> `mcp__github__subscribe_pr_activity` 是 Claude Code GitHub MCP server 的真实工具，
+> 已在本仓库会话中验证可用（PR #65，2026-05）。
+
+### 事件类型处理矩阵
+
+结论分组（GitHub check_run conclusion 枚举）：
+- **绿色**：`success` / `skipped` / `neutral`（路径过滤未触发的 job 记为绿色）
+- **红色**：`failure` / `cancelled` / `timed_out` / `action_required`
+
+| 事件类型 | 动作 |
+|---------|------|
+| `check_run` → `completed: *` | 调用 `get_check_runs` 查该 PR head SHA 的**所有** job；全部结论为绿色 → 汇报全绿 → unsubscribe；任一红色 → 拉 PR comment 中 exfil 的 gradle 日志 → 定位 → 修 → push；仍有 `in_progress` → 继续等待 |
+| `pull_request_review` / `review_comment` | 分析严重度；P0/P1 → 修 + 用 `add_reply_to_pull_request_comment` 回复 thread；P2 → 评估后决定 |
+| 其他（label / assign 等） | 忽略，继续等待 |
+
+### 多 PR 并行
+
+一次订阅对应一个 PR（`pullNumber` 参数）。同时跟踪多个 PR 时，对每个
+PR 各调一次 `subscribe_pr_activity`；完成后各自 unsubscribe。
+
+### GitHub 写操作预授权（settings.json 决策记录）
+
+`.claude/settings.json` 的 `permissions.allow` 中已预授权以下三条工具，
+主会话可**无需用户逐次确认**即调用：
+
+| 工具 | 用途 |
+|------|------|
+| `mcp__github__add_issue_comment` | 发布 review 摘要评论 |
+| `mcp__github__add_reply_to_pull_request_comment` | 回复 review thread |
+| `mcp__github__resolve_review_thread` | 标记已修复的 thread |
+
+**决策理由**（2026-05，PR #65）：push 后的自动修复 + 回复 thread 是
+CLAUDE.md 第五章「常驻行为约定」的核心流程，每次写操作都需人工点击
+会打断自动化节奏。预授权范围严格限定在上述三条；合并、关闭 PR、修改
+PR 描述等破坏性写操作**未**预授权，仍需人工确认。
+
+### 本地环境 fallback
+
+本地 session 若不支持事件推送，退化为轮询：等 60 秒后用
+`mcp__github__pull_request_read` 拉 `get_reviews` / `get_review_comments`
+/ `get_check_runs`，逻辑与事件驱动模式相同。
+
+> `mcp__github__subscribe_pr_activity` 及其他 GitHub MCP 工具已在
+> `.claude/settings.json` 的 `permissions.allow` 中预授权，调用时不需要
+> 用户手动审批。
+
+---
+
 ## 2. 半自动触发：关键路径必走 `/review-pr <PR#>`
 
 CLAUDE.md 第五章 PR 4 关的第 3 关：「Claude PR review（确认无 P0/P1）」。

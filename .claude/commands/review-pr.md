@@ -98,6 +98,54 @@ P0/P1 found:
 - If on main / different branch, suggest checking out the PR branch
   first
 
+## GitHub comment format (when posting findings to the PR)
+
+When posting the pr-reviewer report to GitHub via `add_issue_comment`,
+wrap the full report in a `<details>` block so it is collapsed by
+default. The `<summary>` line must show the verdict and finding counts
+at a glance.
+
+Template:
+
+```
+<details>
+<summary><strong>pr-reviewer · PR #N · &lt;verdict emoji&gt; &lt;verdict&gt; · P0 × N · P1 × N · P2 × N</strong></summary>
+
+[full report body here]
+
+---
+_Agent: pr-reviewer subagent · Model: &lt;actual model id, e.g. claude-opus-4-7&gt;_
+
+</details>
+```
+
+The `---` attribution line inside the `<details>` block records which
+agent and model produced this review for traceability. Use the **actual
+model ID** the pr-reviewer subagent ran on (check its frontmatter:
+`model: opus` maps to `claude-opus-4-7`). Do not use a placeholder.
+
+When the **main session** posts a follow-up or fix-reply comment
+(via `add_issue_comment` or `add_reply_to_pull_request_comment`),
+append the same attribution but with the main session's model:
+
+```
+---
+_Model: &lt;actual model id, e.g. claude-sonnet-4-6&gt;_
+```
+
+Verdict emoji:
+- 🚫 有 P0（阻塞合并）
+- ⚠️ 有 P1（合并前必修）
+- ✅ 批准（无 P0/P1）
+
+Example summary line:
+```
+pr-reviewer · PR #65 · ✅ 批准（无 P0/P1）· P0 × 0 · P1 × 0 · P2 × 4
+```
+
+When a follow-up comment updates finding status (e.g. P2 resolved),
+use the same `<details>` wrapper with the same attribution footer.
+
 ## Limitations (be honest with the user)
 
 - **Same vendor**: pr-reviewer is Anthropic Claude Opus, same family
