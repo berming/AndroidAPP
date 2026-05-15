@@ -74,8 +74,11 @@ if [ -n "$bash_cmd" ]; then
      owner=berming repo=AndroidAPP pullNumber=<PR#>
 3. 等待 <github-webhook-activity> tag 到达（不要 sleep / 轮询）
 4. 事件到达后按类型处理：
-   - check_run failed → 查 PR comment 里 exfil 的 gradle 日志，定位修复，push
-   - check_run success (all green) → 汇报全绿状态，调用 unsubscribe_pr_activity
+   - check_run completed → 调用 mcp__github__pull_request_read get_check_runs
+     确认该 PR head SHA 的**所有** job 均为 completed: success 后，
+     才汇报全绿状态并调用 unsubscribe_pr_activity；
+     任何一个 job failed/cancelled → 按 CI red 路径处理
+   - check_run failed / cancelled → 查 PR comment 里 exfil 的 gradle 日志，定位修复，push
    - review_comment / review → 分析严重度；P0/P1 直接修 + commit + 回复 thread + push
 
 【本地会话 — fallback：轮询模式】

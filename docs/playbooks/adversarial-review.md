@@ -70,8 +70,7 @@ Claude Code 跑在云端（web / GitHub Action / 远程容器）时，session �
 
 | 事件类型 | 动作 |
 |---------|------|
-| `check_run` → `completed: failure` | 拉 PR comment 中 exfil 的 gradle 日志 → 定位 → 修 → push |
-| `check_run` → `completed: success`（全绿） | 汇报状态 → unsubscribe |
+| `check_run` → `completed: *` | 调用 `get_check_runs` 查该 PR head SHA 的**所有** job 状态；全部 `completed: success` → 汇报全绿 → unsubscribe；任一 `failure`/`cancelled` → 拉 PR comment 中 exfil 的 gradle 日志 → 定位 → 修 → push |
 | `pull_request_review` / `review_comment` | 分析严重度；P0/P1 → 修 + 用 `add_reply_to_pull_request_comment` 回复 thread；P2 → 评估后决定 |
 | 其他（label / assign 等） | 忽略，继续等待 |
 
