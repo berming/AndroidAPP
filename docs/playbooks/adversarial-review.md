@@ -59,18 +59,26 @@ Claude Code 跑在云端（web / GitHub Action / 远程容器）时，session �
 每次 `git push` 后，`PostToolUse.sh` hook 会注入提醒。主会话应当：
 
 ```
-1. mcp__github__list_pull_requests   → 找到当前分支对应 PR number
+1. mcp__github__list_pull_requests        → 找到当前分支对应 PR number
 2. mcp__github__subscribe_pr_activity
        owner=berming repo=AndroidAPP pullNumber=<PR#>
-3. 等待 <github-webhook-activity> 事件（不要 sleep / 轮询）
-4. 事件处理完毕后 mcp__github__unsubscribe_pr_activity
+   （订阅后 harness 将 PR 事件以 <github-webhook-activity> tag 注入 session；
+    不要 sleep / 轮询，等 tag 到达即可）
+3. 事件处理完毕后 mcp__github__unsubscribe_pr_activity
 ```
+
+> `mcp__github__subscribe_pr_activity` 是 Claude Code GitHub MCP server 的真实工具，
+> 已在本仓库会话中验证可用（PR #65，2026-05）。
 
 ### 事件类型处理矩阵
 
+结论分组（GitHub check_run conclusion 枚举）：
+- **绿色**：`success` / `skipped` / `neutral`（路径过滤未触发的 job 记为绿色）
+- **红色**：`failure` / `cancelled` / `timed_out` / `action_required`
+
 | 事件类型 | 动作 |
 |---------|------|
-| `check_run` → `completed: *` | 调用 `get_check_runs` 查该 PR head SHA 的**所有** job 状态；全部 `completed: success` → 汇报全绿 → unsubscribe；任一 `failure`/`cancelled` → 拉 PR comment 中 exfil 的 gradle 日志 → 定位 → 修 → push |
+| `check_run` → `completed: *` | 调用 `get_check_runs` 查该 PR head SHA 的**所有** job；全部结论为绿色 → 汇报全绿 → unsubscribe；任一红色 → 拉 PR comment 中 exfil 的 gradle 日志 → 定位 → 修 → push；仍有 `in_progress` → 继续等待 |
 | `pull_request_review` / `review_comment` | 分析严重度；P0/P1 → 修 + 用 `add_reply_to_pull_request_comment` 回复 thread；P2 → 评估后决定 |
 | 其他（label / assign 等） | 忽略，继续等待 |
 
