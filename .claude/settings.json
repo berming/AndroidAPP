@@ -20,7 +20,15 @@
       "Bash(wc *)",
       "Bash(./gradlew :shared:jvmTest)",
       "Bash(./gradlew :apps:communication-card:test)",
-      "Bash(./gradlew detekt)"
+      "Bash(./gradlew detekt)",
+      "mcp__github__pull_request_read",
+      "mcp__github__list_pull_requests",
+      "mcp__github__get_commit",
+      "mcp__github__subscribe_pr_activity",
+      "mcp__github__unsubscribe_pr_activity",
+      "mcp__github__add_issue_comment",
+      "mcp__github__add_reply_to_pull_request_comment",
+      "mcp__github__resolve_review_thread"
     ]
   },
   "hooks": {

@@ -68,17 +68,27 @@ if [ -n "$bash_cmd" ]; then
 
 **主会话应当主动**（不要等用户再提一次）：
 
-1. 等 60 秒（Codex bot 通常 30-90s 出 review）
-2. 拉 PR review：
-     mcp__github__pull_request_read method=get_review_comments
-     mcp__github__pull_request_read method=get_check_runs
-3. 出现 P0/P1/P2 → 直接修 + commit + 回复 thread + push
-4. 出现 CI red → 拉 PR comment 看 exfil 的 gradle 错日志（CLAUDE.md
-   docs/playbooks/ci-failure-triage.md），定位错误，修，push
-5. 全绿 → 简短报告状态给用户即可，不需要等用户问
+【云端/Web 会话 — 推荐：事件驱动模式】
+1. 用 mcp__github__list_pull_requests 找到当前分支对应的 PR number
+2. 调用 mcp__github__subscribe_pr_activity 订阅该 PR 的事件：
+     owner=berming repo=AndroidAPP pullNumber=<PR#>
+3. 等待 <github-webhook-activity> tag 到达（不要 sleep / 轮询）
+4. 事件到达后按类型处理：
+   - check_run failed → 查 PR comment 里 exfil 的 gradle 日志，定位修复，push
+   - check_run success (all green) → 汇报全绿状态，调用 unsubscribe_pr_activity
+   - review_comment / review → 分析严重度；P0/P1 直接修 + commit + 回复 thread + push
 
-依据：用户明确要求'每次 push 后都应当自动检查 Codex review 并修复'。
-不要因为'没看到用户问'就不做 —— 这是常驻行为约定。"
+【本地会话 — fallback：轮询模式】
+1. 等 60 秒（Codex bot 通常 30-90s 出 review）
+2. 用 mcp__github__pull_request_read 拉 PR 状态：
+   - pullNumber=<PR#> owner=berming repo=AndroidAPP method=get_reviews
+   - pullNumber=<PR#> owner=berming repo=AndroidAPP method=get_review_comments
+   - pullNumber=<PR#> owner=berming repo=AndroidAPP method=get_check_runs
+3. 出现 P0/P1/P2 → 直接修 + commit + 用 mcp__github__add_reply_to_pull_request_comment 回复 thread + push
+4. CI red → 查 PR comment 里 exfil 的 gradle 日志（见 docs/playbooks/ci-failure-triage.md）
+5. 全绿 → 简短报告状态给用户即可
+
+依据：CLAUDE.md 第五章「常驻行为约定」。不要等用户再提一次。"
             exit 0
             ;;
     esac
