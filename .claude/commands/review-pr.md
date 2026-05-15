@@ -98,6 +98,37 @@ P0/P1 found:
 - If on main / different branch, suggest checking out the PR branch
   first
 
+## GitHub comment format (when posting findings to the PR)
+
+When posting the pr-reviewer report to GitHub via `add_issue_comment`,
+wrap the full report in a `<details>` block so it is collapsed by
+default. The `<summary>` line must show the verdict and finding counts
+at a glance.
+
+Template:
+
+```
+<details>
+<summary><strong>pr-reviewer · PR #N · &lt;verdict emoji&gt; &lt;verdict&gt; · P0 × N · P1 × N · P2 × N</strong></summary>
+
+[full report body here]
+
+</details>
+```
+
+Verdict emoji:
+- 🚫 有 P0（阻塞合并）
+- ⚠️ 有 P1（合并前必修）
+- ✅ 批准（无 P0/P1）
+
+Example summary line:
+```
+pr-reviewer · PR #65 · ✅ 批准（无 P0/P1）· P0 × 0 · P1 × 0 · P2 × 4
+```
+
+When a follow-up comment updates finding status (e.g. P2 resolved),
+use the same `<details>` wrapper.
+
 ## Limitations (be honest with the user)
 
 - **Same vendor**: pr-reviewer is Anthropic Claude Opus, same family
