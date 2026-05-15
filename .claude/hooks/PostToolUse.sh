@@ -82,6 +82,7 @@ if [ -n "$bash_cmd" ]; then
      任一红色 → 查 PR comment 里 exfil 的 gradle 日志，定位修复，push；
      仍有 in_progress → 继续等待下一个 check_run 事件
    - review_comment / review → 分析严重度；P0/P1 直接修 + commit + 回复 thread + push
+     （回复正文末尾附：--- _Model: claude-sonnet-4-6_）
 
 【本地会话 — fallback：轮询模式】
 1. 等 60 秒（Codex bot 通常 30-90s 出 review）
