@@ -29,6 +29,21 @@ class AdminAuthServiceTest {
     }
 
     @Test
+    fun `login returns null without throwing when stored hash is malformed`() = runTest {
+        db.runMigrations()
+        // 模拟 DB 迁移 / 手动操作写入了非法 BCrypt hash 的场景
+        db.withConnection { conn ->
+            conn.prepareStatement(
+                "INSERT INTO admin_users (username, password_hash, role, is_active, created_at) " +
+                    "VALUES ('root', 'not-a-bcrypt-hash', 'SUPER_ADMIN', 1, 1700000000000)"
+            ).use { it.executeUpdate() }
+        }
+        // BCrypt.checkpw 会抛 IllegalArgumentException；login() 必须吞掉并返回 null
+        val result = service.login("root", "anyPassword", null, null)
+        assertNull(result, "malformed hash 应视为验证失败，返回 null 而非上抛异常")
+    }
+
+    @Test
     fun `bootstrap inserts initial admin on empty db then no-op`() = runTest {
         db.runMigrations()
         assertTrue(service.bootstrapInitialAdmin("root", "secret-pw-12"))

@@ -169,12 +169,14 @@ jobs:
           # 直接 SSH 到服务器 curl localhost:8080/health，绕过 Caddy 静态文件兜底。
           # 以前的 http://<IP>/ 测的是 Caddy 301 redirect，Ktor 挂掉也会通过。
           for i in $(seq 1 15); do
-            if ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'curl -fsS --max-time 3 http://127.0.0.1:8080/health' >/dev/null 2>&1; then
+            if ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'curl -fsS --max-time 3 http://127.0.0.1:8080/health' 2>/dev/null; then
               echo "✅ http://127.0.0.1:8080/health 返回 200"
               exit 0
             fi
             echo "等服务起来 ... ($i/15)"
             sleep 2
           done
-          echo "❌ Ktor 健康检查超时（服务可能未能启动，请检查 server.err.log）"
+          echo "❌ Ktor 健康检查超时（服务可能未能启动）"
+          echo "🔍 诊断（最后一次尝试，保留 curl/SSH 错误输出）："
+          ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'curl -v --max-time 3 http://127.0.0.1:8080/health || true'
           exit 1
