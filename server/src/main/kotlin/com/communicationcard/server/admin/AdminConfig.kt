@@ -1,7 +1,10 @@
 package com.communicationcard.server.admin
 
+import com.typesafe.config.ConfigFactory
 import io.ktor.server.application.Application
 import io.ktor.server.config.ApplicationConfig
+import io.ktor.server.config.ApplicationConfigurationException
+import io.ktor.server.config.HoconApplicationConfig
 
 /**
  * 包装 application.conf 中 `admin { ... }` 段的强类型读取。
@@ -18,7 +21,16 @@ data class AdminConfig(
     val initialPassword: String,
 ) {
     companion object {
-        fun fromApplication(app: Application): AdminConfig = fromConfig(app.environment.config)
+        fun fromApplication(app: Application): AdminConfig {
+            // embeddedServer doesn't load application.conf automatically — its environment.config
+            // is an empty MapApplicationConfig. Fall back to Typesafe ConfigFactory.load() so
+            // the server works regardless of whether EngineMain or embeddedServer is used.
+            return try {
+                fromConfig(app.environment.config)
+            } catch (e: ApplicationConfigurationException) {
+                fromConfig(HoconApplicationConfig(ConfigFactory.load()))
+            }
+        }
 
         fun fromConfig(config: ApplicationConfig): AdminConfig {
             val admin = config.config("admin")
