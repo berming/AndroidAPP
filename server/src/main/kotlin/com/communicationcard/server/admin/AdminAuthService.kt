@@ -71,7 +71,13 @@ class AdminAuthService(
             withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
             return null
         }
-        val ok = withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
+        val ok = try {
+            withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
+        } catch (e: IllegalArgumentException) {
+            // 极少情况：hash 格式异常（如 DB 迁移引入的格式变化），记录后视为验证失败
+            System.err.println("BCrypt.checkpw failed for user '${user.username}': ${e.message}")
+            false
+        }
         if (!ok) return null
 
         val now = clock()
