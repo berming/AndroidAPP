@@ -133,7 +133,7 @@ fi
 SUDOERS_FILE=/etc/sudoers.d/communication-card-deploy
 cat > "$SUDOERS_FILE" <<EOF
 # 由 deploy/install.sh 生成；只允许 cards 重启自己的 service
-$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server
+$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL daemon-reload, $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server
 EOF
 chmod 440 "$SUDOERS_FILE"
 # 校验语法 —— 错误的 sudoers 会让整台机的 sudo 失效，必须 visudo -c
