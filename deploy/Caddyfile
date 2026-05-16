@@ -28,6 +28,10 @@ bermin.cn {
         reverse_proxy 127.0.0.1:8080
     }
 
+    # /admin（无尾斜杠）→ /admin/，确保 handle_path /admin/* 能命中
+    @adminBare path /admin
+    redir @adminBare /admin/ 301
+
     # Admin SPA：剥前缀 /admin 后从 /var/www/communication-card-admin/ 提供。
     # try_files {path} /index.html → Vue Router history mode 兜底
     handle_path /admin/* {
