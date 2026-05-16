@@ -123,17 +123,21 @@ echo ""
 echo "    ⚠️ ufw 仅是 host 层防火墙。云厂商安全组（腾讯云 / 阿里云 / AWS）是另一层"
 echo "       网络边界防火墙，必须 ALSO 在云控制台放行 80/443，否则公网仍 timeout。"
 
-step "6/7 给 cards 用户开特定 sudo（重启 service / reload caddy）"
-# 用 command -v 找 systemctl 真实路径：Ubuntu 22.04 实际是 /usr/bin/systemctl，
-# /bin/systemctl 是 usrmerge symlink，sudo 按字符串匹配命令路径，写错了 NOPASSWD 失效
+step "6/7 给 cards 用户开特定 sudo（重启 service / reload caddy / 建 web 目录）"
+# 用 command -v 找真实路径：Ubuntu 22.04 实际是 /usr/bin/systemctl，
+# sudo 按字符串匹配命令路径，写错了 NOPASSWD 失效。mkdir/chown 同理。
 SYSCTL="$(command -v systemctl)"
 if [[ -z "$SYSCTL" || ! -x "$SYSCTL" ]]; then
     echo "找不到 systemctl 可执行文件" >&2; exit 1
 fi
+MKDIR_BIN="$(command -v mkdir)"
+CHOWN_BIN="$(command -v chown)"
 SUDOERS_FILE=/etc/sudoers.d/communication-card-deploy
 cat > "$SUDOERS_FILE" <<EOF
-# 由 deploy/install.sh 生成；只允许 cards 重启自己的 service
-$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server
+# 由 deploy/install.sh 生成；只允许 cards 重启自己的 service 和管理 web 目录
+# mkdir/chown 权限供 deploy.yml "Ensure web directories exist" 步骤使用，
+# 解决 admin 功能上线后旧服务器缺 /var/www/communication-card-admin 目录的问题。
+$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server, $MKDIR_BIN -p /var/www/communication-card-web, $MKDIR_BIN -p /var/www/communication-card-admin, $CHOWN_BIN cards:cards /var/www/communication-card-web, $CHOWN_BIN cards:cards /var/www/communication-card-admin
 EOF
 chmod 440 "$SUDOERS_FILE"
 # 校验语法 —— 错误的 sudoers 会让整台机的 sudo 失效，必须 visudo -c

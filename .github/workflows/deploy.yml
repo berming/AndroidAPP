@@ -95,6 +95,26 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
 
+      - name: Ensure web directories exist on server
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+        run: |
+          # install.sh 新版已在 sudoers 里加了 mkdir/chown 权限。
+          # 旧服务器如果目录缺失（admin 功能上线前安装的机器），在此补建。
+          ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" '
+            set -e
+            MKDIR=$(command -v mkdir)
+            CHOWN=$(command -v chown)
+            for dir in /var/www/communication-card-web /var/www/communication-card-admin; do
+              if [ ! -d "$dir" ]; then
+                echo "Creating missing directory: $dir"
+                sudo "$MKDIR" -p "$dir"
+                sudo "$CHOWN" cards:cards "$dir"
+              fi
+            done
+          '
+
       - name: Rsync web static dist
         env:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
