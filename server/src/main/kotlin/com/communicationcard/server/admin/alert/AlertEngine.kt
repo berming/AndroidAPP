@@ -74,6 +74,7 @@ class AlertEngine(
 
     suspend fun stop() {
         loopJob?.cancel()
+        loopJob?.join()  // 等当前 tick 真正完成，避免 db.close() 与进行中的 DB 写竞争
         loopJob = null
     }
 

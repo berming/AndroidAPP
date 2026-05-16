@@ -24,7 +24,8 @@ import java.sql.ResultSet
  */
 class AdminDb(private val dbPath: String) : AutoCloseable {
 
-    private val connection: Connection by lazy {
+    // lazy delegate 暴露给 close()，避免 close() 触发尚未初始化的连接（H-4）
+    private val connectionDelegate = lazy {
         // 显式加载 sqlite-jdbc driver（某些 JDK + slim classpath 环境需要）
         Class.forName("org.sqlite.JDBC")
         val url = if (dbPath == IN_MEMORY) "jdbc:sqlite::memory:" else "jdbc:sqlite:$dbPath"
@@ -40,6 +41,7 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
             }
         }
     }
+    private val connection: Connection by connectionDelegate
 
     private val mutex = Mutex()
 
@@ -93,7 +95,9 @@ class AdminDb(private val dbPath: String) : AutoCloseable {
     }
 
     override fun close() {
-        try { connection.close() } catch (_: Throwable) { /* ignore */ }
+        if (connectionDelegate.isInitialized()) {
+            try { connection.close() } catch (_: Throwable) { /* ignore */ }
+        }
     }
 
     companion object {

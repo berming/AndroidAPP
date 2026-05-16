@@ -29,6 +29,30 @@ class AdminAuthServiceTest {
     }
 
     @Test
+    fun `login rejects password longer than 72 chars without calling BCrypt`() = runTest {
+        db.runMigrations()
+        service.bootstrapInitialAdmin("root", "correct-horse-battery-staple")
+        val oversizedPassword = "a".repeat(AdminAuthService.MAX_PASSWORD_LEN + 1)
+        val result = service.login("root", oversizedPassword, null, null)
+        assertNull(result, "超长密码应直接拒绝，不进 BCrypt 运算")
+    }
+
+    @Test
+    fun `changePassword rejects oversized old or new password`() = runTest {
+        db.runMigrations()
+        service.bootstrapInitialAdmin("root", "correct-horse-battery-staple")
+        val token = service.login("root", "correct-horse-battery-staple", null, null)!!
+        val userId = service.validate(token)!!.id
+        val oversized = "a".repeat(AdminAuthService.MAX_PASSWORD_LEN + 1)
+
+        val r1 = service.changePassword(userId, token, oversized, "new-pw-12345678")
+        assertEquals(AdminAuthService.ChangePasswordResult.WrongOldPassword, r1, "超长旧密码应拒绝")
+
+        val r2 = service.changePassword(userId, token, "correct-horse-battery-staple", oversized)
+        assertEquals(AdminAuthService.ChangePasswordResult.WrongOldPassword, r2, "超长新密码应拒绝")
+    }
+
+    @Test
     fun `login returns null without throwing when stored hash is malformed`() = runTest {
         db.runMigrations()
         // 模拟 DB 迁移 / 手动操作写入了非法 BCrypt hash 的场景

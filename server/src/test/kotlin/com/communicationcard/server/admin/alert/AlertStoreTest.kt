@@ -127,6 +127,22 @@ class AlertStoreTest {
     }
 
     @Test
+    fun `acked alert does not block cooldown re-trigger for same rule and room`() = runTest {
+        // H-2 回归测试：existsRecent 必须过滤 acked_at IS NULL
+        // 否则 ack 后同条件在 cooldown 窗口内无法重新触发
+        val id1 = store.insertIfNotCoolingDown(candidate("ROOM_STUCK", roomId = "r1"), 60_000, 1000)
+        assertNotNull(id1)
+
+        // ack 掉这条告警
+        store.ack(id1!!, adminId, nowMs = 2000)
+
+        // 在 cooldown 窗口内（距 1000ms < 60s）再次触发同条件
+        val id2 = store.insertIfNotCoolingDown(candidate("ROOM_STUCK", roomId = "r1"), 60_000, 5000)
+        assertNotNull(id2, "已 ack 的告警不应占用 cooldown 窗口，同条件应能重新触发")
+        assertEquals(1, store.countUnacked(), "第二条告警是未 ack 状态")
+    }
+
+    @Test
     fun `payload survives JSON roundtrip`() = runTest {
         store.insertIfNotCoolingDown(
             candidate("ROOM_STUCK", roomId = "r1", payload = mapOf("phase" to "PLAYING", "ageMs" to "300000")),

@@ -100,10 +100,11 @@ class AlertStore(private val db: AdminDb) {
     // === internal ===
 
     private fun existsRecent(conn: Connection, rule: String, roomId: String?, sinceMs: Long): Boolean {
+        // acked_at IS NULL：已 ack 的告警不占用 cooldown 窗口，允许同条件重新触发
         val sql = if (roomId == null) {
-            "SELECT 1 FROM alerts WHERE rule = ? AND room_id IS NULL AND created_at >= ? LIMIT 1"
+            "SELECT 1 FROM alerts WHERE rule = ? AND room_id IS NULL AND created_at >= ? AND acked_at IS NULL LIMIT 1"
         } else {
-            "SELECT 1 FROM alerts WHERE rule = ? AND room_id = ? AND created_at >= ? LIMIT 1"
+            "SELECT 1 FROM alerts WHERE rule = ? AND room_id = ? AND created_at >= ? AND acked_at IS NULL LIMIT 1"
         }
         return conn.prepareStatement(sql).use { ps ->
             ps.setString(1, rule)
