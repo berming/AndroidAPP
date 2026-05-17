@@ -64,8 +64,12 @@ fun Application.gameModule(enableAdmin: Boolean = true) {
         exception<Throwable> { call, cause ->
             val uri = call.request.uri
             if (uri.startsWith("/admin-auth/")) {
-                // 敏感路径：仅记类型，不输出 message / stacktrace（防 password 入日志）
-                System.err.println("Unhandled exception on $uri (redacted): ${cause::class.simpleName}")
+                // 敏感路径：只记类型 + 栈帧，不输出 message（防 password 入日志）。
+                // 栈帧仅含类名和行号，不含用户数据，对定位 bug 足够。
+                System.err.println("Unhandled exception on $uri: ${cause::class.qualifiedName}")
+                cause.stackTrace.take(25).forEach { frame ->
+                    System.err.println("  at $frame")
+                }
             } else {
                 System.err.println("Unhandled exception on $uri: ${cause.message}")
                 cause.printStackTrace()
