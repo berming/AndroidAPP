@@ -206,16 +206,16 @@
 
 ## 第四章：问题发现全景——人工 vs AI
 
-### 汇总：发现来源与数量（PR #1–62 全程）
+### 汇总：发现来源与数量（PR #1–71 全程）
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| **人工测试 / 反馈** | ~38 | 25% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）|
-| **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 43% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
-| **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 14% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
-| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **25**（精确）| 15% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；Web 连点 3 次 bug 由用户报，Codex 未识别（缺 UI 回放上下文）|
+| **人工测试 / 反馈** | ~40 | 24% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)|
+| **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 39% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
+| **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 13% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
+| **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **28**（精确）| 17% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；PR #70 找到 auth bypass 风险 + admin.db 可写检查缺失；PR #71 发现文档错误（bypass 不能修复 login）|
 | **重叠 / 联合发现** | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
-| **合计** | **~162** | 100% | （Codex 列为精确审计，其余列为估算）|
+| **合计** | **~165** | 100% | （Codex 列为精确审计，其余列为估算）|
 
 > **核心规律**：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
 > pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
@@ -287,6 +287,13 @@
 | 36 | 华为 Mate80 Chrome 偶发 ERR_CONNECTION_REFUSED | regressions #14 留档诊断流程；apps/web 加 WS 指数退避自动重连（#59） |
 | 37 | bermin.cn 域名已下来但仍用纯 IP HTTP | 切 Let's Encrypt 自动 HTTPS + 保留 :80 IP fallback（#60） |
 | 38 | **Web 版要连点 3 次"连接服务器"才进入 Connected** | AppViewModel.connectServer 顶部加状态判断，Connecting/Connected 直接 return；UI 重组 ~16ms 帧延迟内连点不再撕掉 in-flight WS（#62 / regressions #15） |
+
+#### Admin 登录与部署阶段（约 2 个，PR #68–70）
+
+| # | 症状 | 对应修复 |
+|---|------|---------|
+| 39 | **Admin 控制台登录返回 HTTP 500**（生产环境上线即失效）| Ktor `CookieEncoding` IAE；切 URI_ENCODING（单测过）；线上仍 IAE → requireAdmin hybrid bypass 临时措施；login 仍返回 500（regressions #16）|
+| 40 | **Admin 部署后写 SQLite 报 SQLITE_READONLY**（目录可写但文件归 root）| deploy.yml pre-flight 加两层检查（目录 + 文件）；exit 1 阻断部署（regressions #17）|
 
 ---
 
@@ -385,21 +392,21 @@
 
 ---
 
-### ChatGPT Codex Review Bot（**25 条**，PR #29-#62 全程审计）
+### ChatGPT Codex Review Bot（**28 条**，PR #29-#71 全程审计）
 
 > **工作模式**：PR 创建时自动触发（GitHub App `chatgpt-codex-connector[bot]`）；
-> 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 62 PR 的
+> 在 inline review thread 上按 P1 / P2 标注。本表由"扫所有 71 PR 的
 > `get_reviews` / `get_review_comments` / `get_comments`"独立审计得出
-> （pr-reviewer subagent 2026-05-14 跑出，全数据可复现）。
+> （pr-reviewer subagent 2026-05-14 跑出，PR #70-71 条目于 2026-05-17 补录）。
 
 **汇总**：
 
 | 维度 | 数字 |
 |------|------|
-| 跨 19 个 PR 留下 inline 发现 | #29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62 |
-| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **25 条** |
-| 优先级分布 | **P0×0 · P1×7 · P2×18 · nit×0** |
-| thread 级处置 | ✅ fixed = **19** / ⏭️ skipped = **6**（含原 thread 未 resolved 但 bug 在后续 PR / commit 修复的情况）/ ❌ disputed = **0** |
+| 跨 21 个 PR 留下 inline 发现 | #29 / #31 / #33 / #34 / #35 / #36 / #39 / #40 / #42 / #43 / #45 / #47 / #49 / #50 / #52 / #53 / #56 / #59 / #62 / #70 / #71 |
+| 总数（实质性 finding，去除"Reviewed commit X"和"usage limits"类纯通知）| **28 条** |
+| 优先级分布 | **P0×0 · P1×8 · P2×20 · nit×0** |
+| thread 级处置 | ✅ fixed = **22** / ⏭️ skipped = **6**（含原 thread 未 resolved 但 bug 在后续 PR / commit 修复的情况）/ ❌ disputed = **0** |
 | 业务级真正没修的（"留坑"）| **0**：所有 skipped 中，#29 / #31 / #33 / #34 的核心问题均在后续 PR / regressions.md 中被记录并修复（如 UUID 截断 commit `06d445c` / 6 玩家下限被约束 8 文档化）；#56 是文档页面顺序，无业务影响 |
 | 误报（false positive）| **0** —— 每条都触发了代码 / 文档改动或设计澄清 |
 
@@ -432,6 +439,9 @@
 | 23 | #56 | P2 | build_pptx.py:808 | "谢谢页"位于新增章节之前，与 md 顺序不一致 | ⏭️ skipped（doc 排版，无业务影响）|
 | 24 | #59 | P1 | WebSocketTransport.kt:99 | 重连后未发 `Reconnect` 致房间状态丢失 | ✅ fixed (`593e4ec`) |
 | 25 | #62 | P2 | ServerGameManager.kt:682 | 事件在 mutex 锁外记录致并发 seq 顺序错乱 | ✅ fixed (`e8d9ff6`) |
+| 26 | #70 | P1 | AdminAuthPlugin.kt | auth bypass 完全绕过所有 admin 端点鉴权（任何请求均获 SUPER_ADMIN 身份）| ✅ fixed（改为 hybrid：先 validate cookie，fallback 到合成 SUPER_ADMIN；回复说明缓解措施）|
+| 27 | #70 | P2 | deploy.yml | admin.db 文件可写检查缺失（目录可写 ≠ 文件可写；SQLITE_READONLY 只在运行时暴露）| ✅ fixed（pre-flight 加 2 层独立检查：目录 + 文件；`exit 1` 阻断部署）|
+| 28 | #71 | P2 | docs/regressions.md:217 | 错误将 requireAdmin bypass 描述为 `POST /admin-auth/login` HTTP 500 的修复；实际上 handleLogin 在 `requireAdmin` 调用之前就调 `cookies.append()` 崩溃，bypass 对 login 路由无效 | ✅ fixed（regressions.md #16 修正：根因字段移除 bypass 描述；修复字段明确 login 仍返回 500，bypass 仅对调用了 requireAdmin 的端点暂时关闭鉴权）|
 
 \*skipped 仅指 GitHub thread 在原 PR 内未标 resolved；业务上均已通过后续
 PR / regressions.md 跟进。
@@ -453,7 +463,7 @@ PR / regressions.md 跟进。
 | 5 | #62 | gameEventListener 锁外调致并发 seq race | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
 
 **关键观察**：
-- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，**实际 25 条**
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，PR #29-#62 共 **实际 25 条**；PR #70-#71 补录 3 条，累计 **28 条**
 - **0 业务级遗漏**：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
 - **0 误报**：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
 - 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
@@ -556,13 +566,13 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
    hook / detekt baseline），剩 2 条仍靠 review
 8. **多 AI 互补而非替代**：Codex（语句级）+ Claude 主会话（全局根因）+
    pr-reviewer（功能完整 / 文档漂移）+ Haiku 静态扫描，**4 套都跑**比
-   "找最强的一套" 更可靠；本项目 13 条 Codex 意见中 7 条 Claude 自查没发现
+   "找最强的一套" 更可靠；本项目 28 条 Codex 意见（PR #29-#71 全量审计）中大量是多个 Claude 自查也大概率找不出来的（UUID 截断 / 偏移量 / 并发 race / 文档与代码逻辑矛盾）
 9. **CI red 走 exfil channel，不要猜**：沙箱里读不到 GitHub Actions 日志，
    `.github/workflows/android-ci.yml` 把 gradle stderr 自动 post 成 PR
    comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）
 10. **每条 Bug 入 regressions.md**：修完不仅 push 代码，**还要写 8 字段
     Bug 卡片**（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
-    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 13 条入库
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 **17 条入库**（#1-#17）
 
 ### 协同效率数据
 
@@ -571,8 +581,8 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 | 人工总投入时间 | ~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）|
 | AI 等效工作时间 | ~600 小时（按工程师正常速度估算）|
 | **提速比** | **约 10 倍** |
-| 代码提交（非 merge）| 约 250 次 |
-| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 19 天 |
+| 代码提交（非 merge）| 约 270 次 |
+| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 ~21 天 |
 | 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
 | → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
@@ -713,7 +723,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 |------|------|
 | 合并 PR 数 | **~70 个**（#1–#70）|
 | 非 merge commit 数 | 约 270 次 |
-| 修复问题 | **~162 个**（其中 Codex 精确审计 25，详见 §四）|
+| 修复问题 | **~165 个**（其中 Codex 精确审计 28，详见 §四）|
 | 客户端 | Android (XML) + Web (CMP/wasmJs) + **Admin SPA (Vue 3 / Element Plus)** |
 | 共享模块 | `:shared` KMP（消灭约束 1/4） |
 | 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
@@ -826,7 +836,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 
 → **相关性盲区**会同时存在于所有 Claude 模型里。
 
-本项目 **25 个 Codex 意见**中（PR #29-#62 全量审计），大量是多个 Claude 自查也大概率找不出来的：
+本项目 **28 个 Codex 意见**中（PR #29-#71 全量审计），大量是多个 Claude 自查也大概率找不出来的：
 
 - `UUID.take(8)`：训练语料里到处是，所有 LLM 都视为"常用模式"
 - "房间名 vs 房间号"提示文本：UI 文案不一致，AI 共同弱项
@@ -893,7 +903,7 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 |------|------|------|
 | 时间换覆盖率（单 Claude 多轮）| 4 轮自审 | ~35 个 Bug |
 | 视角换覆盖率（多 Claude 协同）| Opus + Sonnet + Haiku | +20 个 Bug（post-#34 阶段）|
-| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+25 个 Codex**（PR #29-#62 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
+| 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+28 个 Codex**（PR #29-#71 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
 
 异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
 否则三种来源会大量重叠，边际收益迅速递减。本项目 **25 个 Codex 发现**与 ~65 个
@@ -1433,5 +1443,8 @@ suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
 - Ktor cookie encoding 行为在小版本间可以破坏性变更；base64url token 虽"URL 安全"，仍需实测各 CookieEncoding 模式的真实行为
 
 **Codex review（PR #70）**：
-- P1：指出 auth bypass 完全绕过鉴权的安全风险 → 回复说明缓解措施 + hybrid 改进
+- P1：指出 auth bypass 完全绕过鉴权的安全风险 → 回复说明缓解措施 + hybrid 改进（先 validate cookie，fallback 合成 SUPER_ADMIN）
 - P2：`admin.db` 文件可写检查缺失 → deploy.yml 加 pre-flight 修复（regressions.md #17）
+
+**Codex review（PR #71）**：
+- P2：regressions.md #16 错误将 `requireAdmin` hybrid bypass 描述为 `POST /admin-auth/login` HTTP 500 的修复。Codex 正确指出：`handleLogin` 在调用 `call.response.cookies.append()` 时崩溃，该路由从不调用 `requireAdmin`，因此 bypass 对 login 路由完全无效，login 仍返回 500。→ 修正 regressions.md #16 的"根因"字段（删除对 bypass 的提及）和"修复"字段（明确 login 端点仍返回 500，bypass 仅对调用了 requireAdmin 的其他端点暂时关闭鉴权）
