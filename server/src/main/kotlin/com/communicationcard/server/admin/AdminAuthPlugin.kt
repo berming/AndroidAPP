@@ -47,6 +47,17 @@ fun ApplicationCall.currentAdmin(): AdminUser? =
  */
 suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
     // ===== TEMPORARY AUTH BYPASS — REMOVE BEFORE NEXT RELEASE =====
+    // Try real session validation first so operations that need the real user id
+    // (change-password, etc.) still work when a valid cookie is present.
+    // Falls back to a synthetic SUPER_ADMIN only when no valid session is found.
+    val token = adminToken()
+    if (token != null) {
+        val realUser = ctx.authService.validate(token)
+        if (realUser != null) {
+            attributes.put(ADMIN_USER_ATTR_KEY, realUser)
+            return realUser
+        }
+    }
     val bypass = AdminUser(
         id = 0L,
         username = "bypass",

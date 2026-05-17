@@ -128,6 +128,16 @@ jobs:
             else
               echo "OK: $LIB_DIR 可写（admin DB 权限正常）"
             fi
+            # Also check the DB file itself: the directory may be writable but an existing
+            # admin.db owned by root still causes SQLITE_READONLY on every write.
+            DB_FILE="$LIB_DIR/admin.db"
+            if [ -f "$DB_FILE" ] && [ ! -w "$DB_FILE" ]; then
+              echo "ERROR: $DB_FILE 存在但 $(whoami) 无写权限（SQLITE_READONLY）" >&2
+              echo "  修复：sudo chown cards:cards $DB_FILE" >&2
+              ok=false
+            else
+              echo "OK: $DB_FILE 权限正常（不存在或可写）"
+            fi
             $ok
           '
 
