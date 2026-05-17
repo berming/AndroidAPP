@@ -42,17 +42,34 @@ fun ApplicationCall.currentAdmin(): AdminUser? =
 
 /**
  * 校验登录状态；返回 AdminUser 或 null（已响应 401）。
+ *
+ * TODO: 鉴权临时关闭（bypass 模式）——登录问题修复后必须删掉此注释并恢复鉴权
  */
 suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
-    attributes.getOrNull(ADMIN_USER_ATTR_KEY)?.let { return it }
+    // ===== TEMPORARY AUTH BYPASS — REMOVE BEFORE NEXT RELEASE =====
+    // Try real session validation first so operations that need the real user id
+    // (change-password, etc.) still work when a valid cookie is present.
+    // Falls back to a synthetic SUPER_ADMIN only when no valid session is found.
     val token = adminToken()
-    val user = ctx.authService.validate(token)
-    if (user == null) {
-        respond(HttpStatusCode.Unauthorized, ErrorResponse("未登录或会话已过期"))
-        return null
+    if (token != null) {
+        val realUser = ctx.authService.validate(token)
+        if (realUser != null) {
+            attributes.put(ADMIN_USER_ATTR_KEY, realUser)
+            return realUser
+        }
     }
-    attributes.put(ADMIN_USER_ATTR_KEY, user)
-    return user
+    val bypass = AdminUser(
+        id = 0L,
+        username = "bypass",
+        passwordHash = "",
+        role = AdminRole.SUPER_ADMIN,
+        isActive = true,
+        createdAt = 0L,
+        lastLoginAt = null,
+    )
+    attributes.put(ADMIN_USER_ATTR_KEY, bypass)
+    return bypass
+    // ===== END BYPASS =====
 }
 
 /**
