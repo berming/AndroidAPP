@@ -153,24 +153,30 @@ jobs:
             # Ubuntu 22.04 是 /usr/bin/systemctl（/bin 是 usrmerge symlink，
             # sudo 字符串匹配命令路径，写错了 NOPASSWD 失效）。
             SYSCTL=$(command -v systemctl)
+            # daemon-reload 让 systemd 从磁盘重读 unit 文件（ProtectSystem 等变更才生效）
+            sudo "$SYSCTL" daemon-reload
             sudo "$SYSCTL" restart communication-card-server
             sudo "$SYSCTL" reload caddy
             sudo "$SYSCTL" status communication-card-server --no-pager | head -20
           '
 
-      - name: Health check
+      - name: Health check (Ktor /health)
         env:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
         run: |
           set -e
-          # 等服务起来；最长 30s
+          # 直接 SSH 到服务器 curl localhost:8080/health，绕过 Caddy 静态文件兜底。
+          # 以前的 http://<IP>/ 测的是 Caddy 301 redirect，Ktor 挂掉也会通过。
           for i in $(seq 1 15); do
-            if curl -fsS --max-time 3 "http://$DEPLOY_SSH_HOST/" >/dev/null; then
-              echo "✅ http://$DEPLOY_SSH_HOST/ 返回 200"
+            if ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'curl -fsS --max-time 3 http://127.0.0.1:8080/health' 2>/dev/null; then
+              echo "✅ http://127.0.0.1:8080/health 返回 200"
               exit 0
             fi
             echo "等服务起来 ... ($i/15)"
             sleep 2
           done
-          echo "❌ 健康检查超时"
+          echo "❌ Ktor 健康检查超时（服务可能未能启动）"
+          echo "🔍 诊断（最后一次尝试，保留 curl/SSH 错误输出）："
+          ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'curl -v --max-time 3 http://127.0.0.1:8080/health || true'
           exit 1

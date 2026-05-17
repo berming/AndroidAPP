@@ -66,12 +66,21 @@ class AdminAuthService(
         // 关键：bcrypt 是 **CPU-bound 同步操作**，必须 withContext(Dispatchers.Default)
         // 否则会阻塞 Ktor / Netty 的 IO 线程，登录洪泛时 N 个并发登录吃 N 个 worker
         // 250 ms（pr-reviewer PR #61 P2 #1）
+        // 超长密码直接拒绝，不进 bcrypt 运算（防 DoS）
+        if (password.length > MAX_PASSWORD_LEN) return null
+
         val user = db.withConnection { conn -> findActiveByUsername(conn, username) } ?: run {
             // 即使用户不存在也跑一次 bcrypt 防 timing attack。常数耗时即可。
             withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
             return null
         }
-        val ok = withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
+        val ok = try {
+            withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
+        } catch (e: IllegalArgumentException) {
+            // 极少情况：hash 格式异常（如 DB 迁移引入的格式变化），记录后视为验证失败
+            System.err.println("BCrypt.checkpw failed for user '${user.username}': ${e.message}")
+            false
+        }
         if (!ok) return null
 
         val now = clock()
@@ -138,6 +147,10 @@ class AdminAuthService(
     ): ChangePasswordResult {
         require(newPassword.length >= MIN_PASSWORD_LEN) {
             "new password must be at least $MIN_PASSWORD_LEN characters"
+        }
+        // 超长密码防 DoS（同 login）
+        if (oldPassword.length > MAX_PASSWORD_LEN || newPassword.length > MAX_PASSWORD_LEN) {
+            return ChangePasswordResult.WrongOldPassword
         }
         val user = db.withConnection { conn -> findAdminById(conn, adminId) }
             ?: return ChangePasswordResult.AdminNotFound
@@ -324,6 +337,9 @@ class AdminAuthService(
 
     companion object {
         const val MIN_PASSWORD_LEN = 8
+        // BCrypt 对超过 72 字节的输入会做高代价哈希（jbcrypt 不截断），
+        // 可被攻击者提交超长密码占满 CPU（拒绝服务）。72 字节 = BCrypt 原生上限。
+        const val MAX_PASSWORD_LEN = 72
         private const val USER_AGENT_MAX_LEN = 255
         private const val IP_MAX_LEN = 64
         private const val TOKEN_BYTES = 32

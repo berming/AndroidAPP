@@ -11,6 +11,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -151,7 +152,9 @@ fun Route.adminApiRoutes(ctx: AdminContext) {
                             write("data: ${SSE_JSON.encodeToString(dto)}\n\n")
                             flush()
                         }
-                    } catch (_: Throwable) {
+                    } catch (e: Throwable) {
+                        // CancellationException 是协程生命周期信号，必须重抛让框架处理
+                        if (e is CancellationException) throw e
                         // 客户端断连：write/flush 抛 IOException；正常退出 lambda
                     } finally {
                         heartbeat.cancel()

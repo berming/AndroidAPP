@@ -29,6 +29,45 @@ class AdminAuthServiceTest {
     }
 
     @Test
+    fun `login rejects password longer than 72 chars without calling BCrypt`() = runTest {
+        db.runMigrations()
+        service.bootstrapInitialAdmin("root", "correct-horse-battery-staple")
+        val oversizedPassword = "a".repeat(AdminAuthService.MAX_PASSWORD_LEN + 1)
+        val result = service.login("root", oversizedPassword, null, null)
+        assertNull(result, "超长密码应直接拒绝，不进 BCrypt 运算")
+    }
+
+    @Test
+    fun `changePassword rejects oversized old or new password`() = runTest {
+        db.runMigrations()
+        service.bootstrapInitialAdmin("root", "correct-horse-battery-staple")
+        val token = service.login("root", "correct-horse-battery-staple", null, null)!!
+        val userId = service.validate(token)!!.id
+        val oversized = "a".repeat(AdminAuthService.MAX_PASSWORD_LEN + 1)
+
+        val r1 = service.changePassword(userId, token, oversized, "new-pw-12345678")
+        assertEquals(AdminAuthService.ChangePasswordResult.WrongOldPassword, r1, "超长旧密码应拒绝")
+
+        val r2 = service.changePassword(userId, token, "correct-horse-battery-staple", oversized)
+        assertEquals(AdminAuthService.ChangePasswordResult.WrongOldPassword, r2, "超长新密码应拒绝")
+    }
+
+    @Test
+    fun `login returns null without throwing when stored hash is malformed`() = runTest {
+        db.runMigrations()
+        // 模拟 DB 迁移 / 手动操作写入了非法 BCrypt hash 的场景
+        db.withConnection { conn ->
+            conn.prepareStatement(
+                "INSERT INTO admin_users (username, password_hash, role, is_active, created_at) " +
+                    "VALUES ('root', 'not-a-bcrypt-hash', 'SUPER_ADMIN', 1, 1700000000000)"
+            ).use { it.executeUpdate() }
+        }
+        // BCrypt.checkpw 会抛 IllegalArgumentException；login() 必须吞掉并返回 null
+        val result = service.login("root", "anyPassword", null, null)
+        assertNull(result, "malformed hash 应视为验证失败，返回 null 而非上抛异常")
+    }
+
+    @Test
     fun `bootstrap inserts initial admin on empty db then no-op`() = runTest {
         db.runMigrations()
         assertTrue(service.bootstrapInitialAdmin("root", "secret-pw-12"))
