@@ -48,15 +48,24 @@ private suspend fun PipelineContext<Unit, ApplicationCall>.handleLogin(ctx: Admi
         call.respond(HttpStatusCode.Unauthorized, ErrorResponse("用户名或密码错误"))
         return
     }
-    call.response.cookies.append(buildSessionCookie(ctx, token))
-
-    val user = ctx.authService.validate(token)
-    if (user == null) {
-        // 极端情况：刚写入又被并发清理。fall through 让前端重试登录
-        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("会话创建失败，请重试"))
-        return
+    // try-catch 覆盖「验证通过后」的所有步骤，记录栈帧帮助定位反复出现的
+    // IllegalArgumentException（密码已验证完，此处可安全记录异常帧）
+    try {
+        call.response.cookies.append(buildSessionCookie(ctx, token))
+        val user = ctx.authService.validate(token)
+        if (user == null) {
+            // 极端情况：刚写入又被并发清理。fall through 让前端重试登录
+            call.respond(HttpStatusCode.Unauthorized, ErrorResponse("会话创建失败，请重试"))
+            return
+        }
+        call.respond(LoginResponse(AdminUserDto.from(user)))
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        System.err.println("[handleLogin] post-auth step threw ${e::class.qualifiedName}: ${e.message}")
+        e.stackTrace.take(20).forEach { frame -> System.err.println("  at $frame") }
+        throw e
     }
-    call.respond(LoginResponse(AdminUserDto.from(user)))
 }
 
 private suspend fun PipelineContext<Unit, ApplicationCall>.handleLogout(ctx: AdminContext) {
@@ -111,7 +120,9 @@ private fun buildSessionCookie(ctx: AdminContext, token: String): Cookie = Cooki
     secure = ctx.config.cookieSecure,
     httpOnly = true,
     extensions = mapOf("SameSite" to "Lax"),
-    encoding = CookieEncoding.RAW,
+    // URI_ENCODING（Ktor 默认）对 base64url token 无副作用（所有字符均 URL 安全），
+    // 且不会触发 RAW 编码的禁用字符校验 IllegalArgumentException（Ktor 2.3.6 known issue）
+    encoding = CookieEncoding.URI_ENCODING,
 )
 
 private fun buildExpiredCookie(ctx: AdminContext): Cookie = Cookie(
@@ -123,5 +134,5 @@ private fun buildExpiredCookie(ctx: AdminContext): Cookie = Cookie(
     secure = ctx.config.cookieSecure,
     httpOnly = true,
     extensions = mapOf("SameSite" to "Lax"),
-    encoding = CookieEncoding.RAW,
+    encoding = CookieEncoding.URI_ENCODING,
 )
