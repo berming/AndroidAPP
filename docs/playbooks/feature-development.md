@@ -147,8 +147,13 @@ git push -u origin feat/<short-name>
 |----|------|------|
 | 1 | GitHub Actions（CI） | tests + detekt 全绿 |
 | 2 | chatgpt-codex-connector[bot] | 评论无 P1 |
-| 3 | Claude `/review`（**必须新会话**，Opus 4.7） | 无 P0/P1 |
+| 3 | `/review-pr <PR#>`（pr-reviewer subagent，Opus 4.7；PR-H5 起，无需新会话） | 无 P0/P1 |
 | 4 | 真机验证 | happy path + ≥1 边界 |
+
+**等待 CI / review 期间（云端/Web 会话）**：push 后调用 `mcp__github__subscribe_pr_activity`
+订阅该 PR 的事件，等 `<github-webhook-activity>` tag 到达（不要 sleep / 轮询）。
+CI failed → 查 PR comment 里 exfil 的 gradle 日志，定位 + 修 + push；
+CI all-green → 汇报状态，结束订阅。本地会话 fallback：等 60 秒后手动拉 check_runs。
 
 任一关红：
 
