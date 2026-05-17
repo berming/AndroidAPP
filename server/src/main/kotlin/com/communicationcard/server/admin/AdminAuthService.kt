@@ -76,6 +76,7 @@ class AdminAuthService(
             try {
                 withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 System.err.println("BCrypt timing dummy failed (ignored): ${e::class.simpleName}")
             }
             return null
