@@ -71,7 +71,14 @@ class AdminAuthService(
 
         val user = db.withConnection { conn -> findActiveByUsername(conn, username) } ?: run {
             // 即使用户不存在也跑一次 bcrypt 防 timing attack。常数耗时即可。
-            withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
+            // try-catch：DUMMY_HASH_FOR_TIMING 延迟初始化时若 BCrypt.hashpw 失败，
+            // 或 checkpw 对该 hash 抛 IAE，都不应暴露给外层。
+            try {
+                withContext(Dispatchers.Default) { BCrypt.checkpw(password, DUMMY_HASH_FOR_TIMING) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                System.err.println("BCrypt timing dummy failed (ignored): ${e::class.simpleName}")
+            }
             return null
         }
         val ok = try {
@@ -155,7 +162,12 @@ class AdminAuthService(
         val user = db.withConnection { conn -> findAdminById(conn, adminId) }
             ?: return ChangePasswordResult.AdminNotFound
         // bcrypt CPU-bound → Dispatchers.Default 避免阻塞 Ktor worker（同 login）
-        val ok = withContext(Dispatchers.Default) { BCrypt.checkpw(oldPassword, user.passwordHash) }
+        val ok = try {
+            withContext(Dispatchers.Default) { BCrypt.checkpw(oldPassword, user.passwordHash) }
+        } catch (e: IllegalArgumentException) {
+            System.err.println("BCrypt.checkpw failed in changePassword: ${e.message}")
+            false
+        }
         if (!ok) {
             return ChangePasswordResult.WrongOldPassword
         }
