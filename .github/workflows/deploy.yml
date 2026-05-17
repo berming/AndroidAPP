@@ -95,16 +95,18 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
 
-      - name: Verify web directories are writable on server
+      - name: Verify directories are writable on server
         env:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
         run: |
           # 目录必须预先由 install.sh（或手动）建好并 chown cards。
-          # 如果缺失，此步报错并打印修复命令，不尝试 sudo mkdir（避免 sudoers 复杂化）。
+          # 如果缺失或权限错误，此步报错并打印修复命令，让运维手动修复后重跑。
+          # 不在 CI 里 sudo chown（避免 sudoers 权限蔓延）。
           ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" '
             set -e
             ok=true
+            # Web 静态目录
             for dir in /var/www/communication-card-web /var/www/communication-card-admin; do
               if [ ! -d "$dir" ] || [ ! -w "$dir" ]; then
                 echo "ERROR: $dir 不存在或 $(whoami) 无写权限" >&2
@@ -112,6 +114,20 @@ jobs:
                 ok=false
               fi
             done
+            # Admin DB 数据目录：权限坏掉 → SQLITE_READONLY → 登录必然失败
+            # 这是反复出现的问题根源，在此提前拦截，避免服务启动后才发现
+            LIB_DIR=/var/lib/communication-card
+            if [ ! -d "$LIB_DIR" ]; then
+              echo "ERROR: $LIB_DIR 不存在" >&2
+              echo "  修复：sudo mkdir -p $LIB_DIR && sudo chown cards:cards $LIB_DIR" >&2
+              ok=false
+            elif [ ! -w "$LIB_DIR" ]; then
+              echo "ERROR: $LIB_DIR 存在但 $(whoami) 无写权限（admin DB 将 SQLITE_READONLY）" >&2
+              echo "  修复：sudo chown -R cards:cards $LIB_DIR" >&2
+              ok=false
+            else
+              echo "OK: $LIB_DIR 可写（admin DB 权限正常）"
+            fi
             $ok
           '
 
