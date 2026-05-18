@@ -43,16 +43,19 @@ CI 仍是最终权威——本命令只是把"反馈周期从 4 分钟缩到 30 
 
 不满足 → 报具体哪个文件缺测试，附 docs/playbooks/bug-triage.md 链接。
 
-### Gate 4: 协议双端对齐（PR-H3 之后退役）
+### Gate 4: 协议版本同步（PR-H3 之后升级为 PROTOCOL_VERSION 管理）
 
 如果改动了 `shared/src/commonMain/kotlin/.../network/GameMessage.kt`：
 
-- 必须同时改动 `server/src/main/kotlin/.../Messages.kt`
-- 或 PR 描述中标注「服务端不需要变更（仅客户端 UI 字段）」
+- **non-breaking**（新字段有默认值）→ 无需升版本号
+- **breaking**（字段类型变 / 删字段 / 枚举 rename / classDiscriminator 变）→
+  **必须在同 commit 升 `PROTOCOL_VERSION`**
+- 建议调用 `protocol-syncer` subagent 自动校验
 
-不满足 → 报「协议未双端对齐」+ 提示运行 `/align-server-shared`。
+不满足 → 报「协议 breaking change 未升 PROTOCOL_VERSION」。
 
-PR-H3 合并后 server 直接依赖 :shared，本关删除。
+> `server/.../Messages.kt` 在 PR-H3 已删除；server 直接依赖 `:shared`，
+> 不再需要"双端对齐"检查。`/align-server-shared` 已废弃。
 
 ## 输出格式
 

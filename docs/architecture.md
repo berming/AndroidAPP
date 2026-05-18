@@ -1,6 +1,6 @@
 # 沟通牌项目 · 架构总览
 
-> 本文档反映 main 截至 PR #51（2026-05）的架构。任何模块边界变化必须在
+> 本文档反映 main 截至 PR #70（2026-05）的架构。任何模块边界变化必须在
 > 同 PR 内更新本文。
 
 ---
@@ -25,12 +25,21 @@ AndroidAPP/                                    Kotlin Multiplatform monorepo
 │       │   └── SettlementCalculatorTest.kt   ~15 用例
 │       └── jvmTest/...                       同 commonTest 的 JVM target 入口
 │
-├── :server/                                   Ktor + Netty 后端
+├── :server/                                   Ktor + Netty 后端（WebSocket /game + REST /admin/*）
 │   └── src/main/kotlin/com/communicationcard/server/
 │       ├── Application.kt                    主入口、WebSocket 路由、握手协议版本
 │       ├── GameSession.kt                    每连接一个会话封装
 │       ├── ServerRoomManager.kt              房间生命周期
-│       └── ServerGameManager.kt              游戏状态、AI 决策、回合计时
+│       ├── ServerGameManager.kt              游戏状态、AI 决策、回合计时
+│       └── admin/                            Admin REST API（PR #61-70）
+│           ├── AdminAuthRoutes.kt            /admin-auth/{login,logout,me,change-password}
+│           ├── AdminApiRoutes.kt             /admin/api/{overview,rooms,games,alerts}
+│           ├── AdminAuthPlugin.kt            requireAdmin / requirePermission（含临时 bypass）
+│           ├── AdminDb.kt                    SQLite（/var/lib/communication-card/admin.db）
+│           ├── AdminAuthService.kt           bcrypt 验密 + session token（URI_ENCODING）
+│           ├── GameHistoryStore.kt           游戏历史持久化（Channel 异步入库）
+│           ├── SnapshotBuilder.kt            lock-safe 快照（约束 9）
+│           └── alert/                        AlertStore + AlertEngine（监控告警）
 │
 ├── :apps:android/                  Android 客户端（XML 视图层）
 │   └── src/main/java/com/communicationcard/game/
@@ -52,6 +61,9 @@ AndroidAPP/                                    Kotlin Multiplatform monorepo
 │       └── resources/
 │           ├── index.html                    + #loader 加载提示
 │           └── fonts/NotoSansSC-Subset.ttf   GB2312 + 项目符号子集 (~3 MB)
+│
+├── apps/admin/                                Admin 控制台 SPA（Vue 3 + Element Plus）
+│   └── dist/                                 npm run build 产物（rsync → /var/www/communication-card-admin/）
 │
 ├── deploy/                                    自有服务器部署脚手架
 │   ├── install.sh                            Ubuntu 22.04 一次性 bootstrap
@@ -311,22 +323,28 @@ Android 客户端 UI 已经经过若干轮优化，是各端布局的事实基�
   ▼
 GitHub Actions (.github/workflows/deploy.yml)
   │ - if vars.DEPLOY_ENABLED == 'true'
-  │ - paths filter（apps/web/** | shared/** | server/** | deploy/**）
+  │ - paths filter（apps/web/** | apps/admin/** | shared/** | server/** | deploy/**）
+  │ - pre-flight: 验证 /var/lib/communication-card/ 目录 + admin.db 文件均可写
+  │               （cards 用户；不可写则 exit 1 并打印 chown 修复命令）
   ▼
-build :apps:web:wasmJsBrowserDistribution + :server:installDist
+build :apps:web:wasmJsBrowserDistribution + apps/admin npm ci && npm run build + :server:installDist
   │
   ▼ rsync via SSH (DEPLOY_SSH_KEY)
 腾讯云 Ubuntu 22.04（用户的服务器）
   │
-  ├── /var/www/communication-card-web/   (Web 静态产物)
-  └── /opt/communication-card/server/    (Ktor server installDist)
-       │
-       └── systemd: communication-card-server.service
-                 (cards 用户 / SERVER_OPTS / 重启策略)
+  ├── /var/www/communication-card-web/   (Web 客户端静态产物)
+  ├── /var/www/communication-card-admin/ (Admin SPA 静态产物)
+  ├── /opt/communication-card/server/    (Ktor server installDist)
+  │    └── systemd: communication-card-server.service
+  │              (cards 用户 / SERVER_OPTS / 重启策略)
+  └── /var/lib/communication-card/admin.db  (SQLite Admin DB；cards 用户写权限 — SQLITE_READONLY 根源)
 
 服务器对外（Caddy 监听 80/443）：
-  /          → 静态文件 /var/www/communication-card-web/
-  /game      → reverse_proxy 127.0.0.1:8080 (Upgrade ws)
+  /              → 静态文件 /var/www/communication-card-web/
+  /game          → reverse_proxy 127.0.0.1:8080 (Upgrade ws)
+  /admin/*       → 静态文件 /var/www/communication-card-admin/
+  /admin-auth/*  → reverse_proxy 127.0.0.1:8080
+  /admin/api/*   → reverse_proxy 127.0.0.1:8080
 
 防火墙双层（缺一不可，详见 web-deploy.md §3）：
   ufw       (host 层，install.sh 自动配 80/443/22)
@@ -350,10 +368,11 @@ CLAUDE.md 第七章列了完整清单。摘要：
 | Subagent | `tdd-scaffolder` | 关键路径函数生成失败测试骨架 |
 | Subagent | `pr-reviewer` | 独立 context 拉 PR diff 跑 8 桶 P0/P1/P2 rubric |
 | Hook | `SessionStart` | 启动时印分支 + commit + 关键文档提示 |
-| Hook | `PostToolUse` | (a) Edit 关键路径 → TDD 提醒; (b) Bash `git push` → "主动查 review" 提醒 |
+| Hook | `PostToolUse` | (a) Edit 关键路径 → TDD 提醒; (b) Bash `git push` → "subscribe_pr_activity 订阅 / 主动查 review" 提醒 |
 | Hook | `UserPromptSubmit` | 检测 push 关键词 → ship-check 提醒 |
 | GitHub Action | `update-ci-checkbox` | CI 终态自动勾 PR 描述里 "CI 绿" 那格 |
 | GitHub Action | exfil 失败日志为 PR 评论 | 沙箱无法读 CI 日志时的反向通道；评论默认折叠（PR #51）|
+| `settings.json` allowlist | GitHub MCP 只读工具 + subscribe / ack 工具（PR-H5）| 允许 pr-reviewer subagent 无需每次审批直接调用 GitHub MCP |
 
 ---
 
@@ -366,7 +385,7 @@ CLAUDE.md 第七章列了完整清单。摘要：
 3. **Claude PR review**：`/review-pr <PR#>`（pr-reviewer subagent）输出无 P0/P1
 4. **真机验证**：覆盖 happy path + 至少 1 个边界场景
 
-> 每次 push 后 Claude Code 主会话**应主动**：等 60s → 拉 review_comments + check_runs → 出现 P0/P1/P2 直接修 + 回复 + push。详见 CLAUDE.md 第五章常驻行为约定。
+> 每次 push 后 Claude Code 主会话**应主动**：云端会话调用 `subscribe_pr_activity` 订阅 PR 事件，等 `<github-webhook-activity>` 到达（不轮询）；本地会话 fallback 等 60s 后拉 check_runs + review_comments。出现 P0/P1/P2 → 直接修 + 回复 + push。详见 CLAUDE.md 第五章常驻行为约定 + `docs/playbooks/adversarial-review.md` §1.5。
 
 ---
 

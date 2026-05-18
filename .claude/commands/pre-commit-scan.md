@@ -20,7 +20,7 @@ model: claude-haiku-4-5
 ### P0（提交阻塞）
 - [ ] 修改了 `engine/CardRules.kt::canBeat` → 是否同步了 `server/.../ServerGameManager.kt::canBeat`？
 - [ ] 修改了 `engine/SettlementCalculator.kt` → 是否同步了 `server/.../computeAllFinishedScores`？
-- [ ] 修改了 `network/GameMessage.kt`（客户端协议）→ 是否同步了 `server/.../Messages.kt`？
+- [ ] 修改了 `shared/.../network/GameMessage.kt` → 是否用 `protocol-syncer` subagent 校验了 `PROTOCOL_VERSION` 是否需要升？（PR-H3 后 `server/.../Messages.kt` 已删除，不再需要"双端对齐"；breaking change 必须升版本号）
 - [ ] 服务端修改了 `state.hands / playerScores / currentPlayerIndex` → 是否在 `mutexFor(room).withLock` 内？
 - [ ] WebSocket 首次发送（`Reconnect` 等）→ 是否在 `onOpen` 回调内（不是 `newWebSocket()` 之后）？
 
