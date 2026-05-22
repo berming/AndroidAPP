@@ -93,12 +93,7 @@ fun Application.gameModule(enableAdmin: Boolean = true) {
         startedAtEpochMs = System.currentTimeMillis(),
     )
 
-    // Admin 后台（PR 1+）：SQLite 持久化 + bcrypt + session cookie 鉴权 +
-    // /admin-auth/{login,logout,me,change-password}（PR 2 起追加 /admin/api/*）。
-    // testApplication 跑测试时可以通过 `application { gameModule(enableAdmin = false) }`
-    // 关闭，避免每个测试都要建 SQLite。
-    if (enableAdmin) installAdmin(serverContext)
-
+    // 游戏路由必须先注册——admin 初始化失败不能影响游戏 WebSocket 的可用性。
     routing {
         get("/") {
             call.respondText("OK", ContentType.Text.Plain)
@@ -129,6 +124,23 @@ fun Application.gameModule(enableAdmin: Boolean = true) {
     }
 
     println("=== Routing configured ===")
+
+    // Admin 后台（PR 1+）：SQLite 持久化 + bcrypt + session cookie 鉴权 +
+    // /admin-auth/{login,logout,me,change-password}（PR 2 起追加 /admin/api/*）。
+    // testApplication 跑测试时可以通过 `application { gameModule(enableAdmin = false) }`
+    // 关闭，避免每个测试都要建 SQLite。
+    // 重要：放在 routing{} 之后，确保 admin 初始化异常（SQLITE_READONLY / 空表等）
+    // 不会阻止游戏 WebSocket /game 端点的注册（regressions #18）。
+    if (enableAdmin) {
+        try {
+            installAdmin(serverContext)
+        } catch (e: Exception) {
+            System.err.println("=== Admin module failed to start: ${e.message} ===")
+            System.err.println("=== Game WebSocket /game is still available. Admin routes are disabled. ===")
+            e.printStackTrace()
+        }
+    }
+
     println("=== Server ready on port 8080 ===")
 }
 
