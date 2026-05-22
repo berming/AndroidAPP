@@ -717,7 +717,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
      拆分；single-purpose commit 让 review 焦点不会被淹没
    - **原则**：commit 粒度 = review 粒度；不是"PR = review 单元"
 
-### 交付成果（PR #1–#62 全程）
+### 交付成果（PR #1–#70 全程）
 
 | 指标 | 数值 |
 |------|------|
@@ -906,7 +906,7 @@ PR #35 wasmJs 8 层是工具链问题不算"修了又坏"，PR #53 phase 3 因�
 | 异构换覆盖率（Codex + 真机）| 自动 + 季度手动 | **+28 个 Codex**（PR #29-#71 全量审计；详见 §四"Codex Review Bot"）+ 5 个真机；**90% 是前两者找不到的** |
 
 异构换覆盖率不只是"多找 Bug"，更重要的是它**找的是另一类 Bug**——
-否则三种来源会大量重叠，边际收益迅速递减。本项目 **25 个 Codex 发现**与 ~65 个
+否则三种来源会大量重叠，边际收益迅速递减。本项目 **28 个 Codex 发现**与 ~65 个
 Claude 发现几乎不重叠，正是异构有效的实证。
 
 ---
