@@ -80,9 +80,10 @@
 | **Admin 后台 MVP**（5 段 PR）| 2026-05-13 | #61 | PR 0 骨架（bind 127.0.0.1）/ PR 1 SQLite + bcrypt + RBAC 鉴权 / PR 2 监控 API（overview/rooms/players/sessions/games）+ GameHistoryStore / PR 3 告警引擎（3 内置规则）/ PR 4 Vue 3 + Element Plus SPA + Caddy /admin/ 子路径；CLAUDE.md 约束 9/10 |
 | **Admin 优化收尾**（4 段 PR 5）| 2026-05-13 | #62 | 5a SSE 替代 30s 轮询 / 5b Dashboard 7 天 ECharts 趋势图 / 5c logstash JSON 日志 / 5d game_events 表 + 逐手出牌持久化；同期修 Codex P2（gameEventListener 锁内调用）+ Web 连点 3 次幂等 |
 | **Admin 登录 IAE + auth bypass + 部署权限修复** | 2026-05-17 | #68–#70 | Ktor `CookieEncoding.RAW` → URI_ENCODING（单测通过）；线上 `ResponseCookies.append` 仍抛 IAE → `requireAdmin` 临时 hybrid bypass；3 个 @Ignore 测试待恢复；deploy.yml 加 `admin.db` 文件可写 pre-flight；Codex P1/P2 回复 + 文档全面刷新（architecture / regressions / playbooks / harness）|
+| **客户端连接故障排查 + server 关键路径解耦** | 2026-05-22 | 分支 `claude/setup-pr-review-process-FZwHM`（commit `519a65b`）| Android 连不上服务器根因排查；Web 5+ 次点击才连上根因分析；定位 `installAdmin before routing` 根因 → `routing{}` 先注册 + `installAdmin` 包入 `try-catch`，game WebSocket 与 admin 故障隔离；regressions #18 入库；DT FUZZ 高风险模块测试方案规划（暂未实施，见 §9.21）|
 
 ### 版本总量
-- 总 PR：**~70 个** | 总 commit：**约 270 次（非 merge）** | **有效开发 ~21 天**
+- 总 PR：**~71 个** | 总 commit：**约 281 次（非 merge）** | **有效开发 ~22 天**
 
 ### Admin 后台路线图（5 段 ship 在 #61 + #62）
 
@@ -210,12 +211,12 @@
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| **人工测试 / 反馈** | ~40 | 24% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)|
+| **人工测试 / 反馈** | ~42 | 24% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)；客户端连接故障 Android + Web 5+ 次点击（2026-05-22）|
 | **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 39% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
 | **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 13% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
 | **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **28**（精确）| 17% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；PR #70 找到 auth bypass 风险 + admin.db 可写检查缺失；PR #71 发现文档错误（bypass 不能修复 login）|
 | **重叠 / 联合发现** | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
-| **合计** | **~165** | 100% | （Codex 列为精确审计，其余列为估算）|
+| **合计** | **~167** | 100% | （Codex 列为精确审计，其余列为估算）|
 
 > **核心规律**：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
 > pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
@@ -294,6 +295,13 @@
 |---|------|---------|
 | 39 | **Admin 控制台登录返回 HTTP 500**（生产环境上线即失效）| Ktor `CookieEncoding` IAE；切 URI_ENCODING（单测过）；线上仍 IAE → requireAdmin hybrid bypass 临时措施；login 仍返回 500（regressions #16）|
 | 40 | **Admin 部署后写 SQLite 报 SQLITE_READONLY**（目录可写但文件归 root）| deploy.yml pre-flight 加两层检查（目录 + 文件）；exit 1 阻断部署（regressions #17）|
+
+#### 连接故障排查阶段（约 2 个，2026-05-22）
+
+| # | 症状 | 对应修复 |
+|---|------|---------|
+| 41 | **Android 客户端无法连接服务器**（WebSocket 握手持续失败）| 根因：`installAdmin` 在 `routing{}` 之前调用，admin 初始化异常时 `/game` 未注册；修复：`routing{}` 先执行，`installAdmin` 包入 `try-catch`（commit `519a65b`；regressions #18）|
+| 42 | **Web 版要点 5+ 次"连接服务器"才能进 Connected**（每次均 Connecting→Error→Disconnected）| 同 #41 根因（服务端 `/game` 未注册导致每次握手失败）；AppViewModel 幂等保护正确；服务端修复部署后首次点击即可连上，无需改动客户端 |
 
 ---
 
@@ -572,7 +580,7 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
    comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）
 10. **每条 Bug 入 regressions.md**：修完不仅 push 代码，**还要写 8 字段
     Bug 卡片**（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
-    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 **17 条入库**（#1-#17）
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 **18 条入库**（#1-#18）
 
 ### 协同效率数据
 
@@ -581,8 +589,8 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 | 人工总投入时间 | ~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）|
 | AI 等效工作时间 | ~600 小时（按工程师正常速度估算）|
 | **提速比** | **约 10 倍** |
-| 代码提交（非 merge）| 约 270 次 |
-| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 ~21 天 |
+| 代码提交（非 merge）| 约 281 次 |
+| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 ~22 天 |
 | 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
 | → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
@@ -717,13 +725,13 @@ override fun onOpen(ws: WebSocket, response: Response) {
      拆分；single-purpose commit 让 review 焦点不会被淹没
    - **原则**：commit 粒度 = review 粒度；不是"PR = review 单元"
 
-### 交付成果（PR #1–#70 全程）
+### 交付成果（PR #1–#71 全程）
 
 | 指标 | 数值 |
 |------|------|
-| 合并 PR 数 | **~70 个**（#1–#70）|
-| 非 merge commit 数 | 约 270 次 |
-| 修复问题 | **~165 个**（其中 Codex 精确审计 28，详见 §四）|
+| 合并 PR 数 | **~71 个**（#1–#71）|
+| 非 merge commit 数 | 约 281 次 |
+| 修复问题 | **~167 个**（其中 Codex 精确审计 28，详见 §四）|
 | 客户端 | Android (XML) + Web (CMP/wasmJs) + **Admin SPA (Vue 3 / Element Plus)** |
 | 共享模块 | `:shared` KMP（消灭约束 1/4） |
 | 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
@@ -742,6 +750,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md` 路径扩展，目前无规划
 8. ⚪ **逐手出牌 step-through 回放 UI**：PR #62 / 5d 已铺 `game_events` 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件
 9. ⚪ **玩家账号系统**：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做
+10. ⚪ **DT FUZZ 测试**：高风险模块（CardRules / SettlementCalculator / ServerGameManager 类型转换链）引入属性不变量测试 + 差分测试；方案已规划（`/root/.claude/plans/pr-piped-parrot.md`），零新 Gradle 依赖（纯 `kotlin.random.Random + repeat(N)`），4 个新测试文件，待实施
 
 ---
 
@@ -1448,3 +1457,78 @@ suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
 
 **Codex review（PR #71）**：
 - P2：regressions.md #16 错误将 `requireAdmin` hybrid bypass 描述为 `POST /admin-auth/login` HTTP 500 的修复。Codex 正确指出：`handleLogin` 在调用 `call.response.cookies.append()` 时崩溃，该路由从不调用 `requireAdmin`，因此 bypass 对 login 路由完全无效，login 仍返回 500。→ 修正 regressions.md #16 的"根因"字段（删除对 bypass 的提及）和"修复"字段（明确 login 端点仍返回 500，bypass 仅对调用了 requireAdmin 的其他端点暂时关闭鉴权）
+
+---
+
+### 9.20 Android/Web 客户端连接根因：installAdmin before routing（regressions #18）
+
+**症状**：Android 无法连接服务器（WebSocket 握手持续报失败）；Web 版要连点 5+ 次
+才进入 Connected（每次均 Connecting → Error → Disconnected）。
+
+**排查路径**：
+
+| 步骤 | 检查点 | 结论 |
+|------|--------|------|
+| 1 | 客户端 URL、TLS、Caddy 配置 | 正确；`curl wss://bermin.cn/game` 握手也失败 |
+| 2 | Web `AppViewModel.connectServer()` 幂等保护 | 正确（PR #62 / regressions #15 已修）|
+| 3 | Android `NetworkManager` 幂等保护 | 正确 |
+| 4 | **服务端启动顺序**（关键）| `Application.kt`：`installAdmin(serverContext)` 在 `routing{}` 之前；admin 初始化抛异常时 `routing{}` 永不执行，`/game` 未注册 |
+
+**根因**：
+
+```kotlin
+// ❌ 修复前：admin 初始化失败 → routing{} 不执行 → /game 从未注册
+if (enableAdmin) installAdmin(serverContext)   // 可能抛异常
+routing {
+    webSocket("/game") { ... }                 // 永不执行
+}
+
+// ✅ 修复后：game WebSocket 无论 admin 是否成功都先注册
+routing {
+    webSocket("/game") { ... }                 // 必先注册
+}
+if (enableAdmin) {
+    try { installAdmin(serverContext) }
+    catch (e: Exception) { application.log.error("Admin init failed", e) }
+}
+```
+
+**Web 端 "5+ 次点击" 行为解释**：客户端的幂等保护本身正确。
+"5+ 次"是因为每次握手被服务端拒绝（`/game` 未注册），连接回到 Disconnected 后
+用户继续点击。服务端修复部署后，首次点击即可连上。**无需修改客户端代码**。
+
+**修复 commit**：`519a65b` | **regressions #18** | 修复文件：`server/src/main/kotlin/.../Application.kt`
+
+**教训**：
+- 游戏关键路径（WebSocket /game）的注册**不得依赖**运维模块（admin）的成功初始化
+- 运维层故障必须与业务层严格隔离；启动顺序是隐性的依赖关系，比代码 bug 更难察觉
+- 部署后应先用 `curl wss://<host>/game` 验证 WebSocket 握手，再开 admin 测试；
+  这一步加入 `docs/playbooks/feature-development.md` 的"部署验证"检查项
+
+---
+
+### 9.21 DT FUZZ 高风险模块测试方案（已规划，待实施）
+
+**背景**：当前 186 个测试全部使用硬编码输入，边界覆盖依赖人工猜测。
+CardRules / SettlementCalculator / ServerGameManager 的类型转换链（ServerCard ↔ shared Card）
+无系统化往返验证。方案已规划，零新 Gradle 依赖。
+
+**两大测试方向**：
+- **属性不变量（Fuzz）**：对随机生成输入断言数学不变量，而非对比参考输出
+  （炸弹单调性 / 分数守恒 / 类型守恒 / 无崩保证）
+- **差分测试（DT）**：验证 shared 路径与 server 路径对同一逻辑输入给出相同结果
+  （`canBeat` shared vs server 委托 / `computeAllFinishedScores` vs 手算公式）
+
+**方案摘要**（完整见 `/root/.claude/plans/pr-piped-parrot.md`）：
+
+| 文件（新建）| 测试目标 |
+|------------|---------|
+| `shared/.../CardFuzzGenerators.kt` | 随机输入生成器（供所有 fuzz 测试共用）|
+| `shared/.../CardRulesFuzzTest.kt` | P1–P6：无崩 / 炸弹单调 / 炸弹压非炸弹 / 类型守恒 / findValidPlays 子集 |
+| `shared/.../SettlementCalculatorFuzzTest.kt` | P7–P10：无崩 / 分数守恒 / 赢家得分 ≥ 输家 / null 条件 |
+| `server/.../ServerDifferentialFuzzTest.kt` | DT-1/2/3：类型转换往返保真 / canBeat 两路径一致 / computeAllFinishedScores 公式一致 |
+
+**技术约束**：纯 `kotlin.random.Random`；固定种子 42 保证 CI 可重现；
+CI 迭代 200 次（< 2 秒/测试），本地 soak 覆写 `FUZZ_ITERATIONS=5000`。
+
+**当前状态**：规划完成，暂未实施。实施后测试用例数将从 **186 → ~220**。
