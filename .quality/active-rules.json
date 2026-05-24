@@ -1,480 +1,918 @@
 {
-  "dispatch_id": "DISP-QP-v1.26-SWD-001",
-  "dispatched_at": "2026-05-24T15:27:57Z",
+  "dispatch_id": "DISP-QP-v1.27-SWD-001",
+  "dispatched_at": "2026-05-24T16:30:00Z",
   "dispatched_by": "quality-planning-agent",
+  "supersedes": "DISP-QP-v1.26-SWD-001",
+  "supersession_reason": "scope_resolution_feedback_addressed_via_AQR_rev3_and_QP_v1.27",
+  "feedback_ref": "FB-DISP-QP-v1.26-SWD-001-scope-resolution",
   "source": {
-    "version_plan_ref": "QP-v1.26-AndroidAPP",
+    "version_plan_ref": "QP-v1.27-AndroidAPP",
     "aqr_reference": "AQR-2026-AndroidAPP",
-    "aqr_revision_inherited": 2,
+    "aqr_revision_inherited": 3,
     "pcb_reference": "PCB-2026-AndroidAPP"
   },
   "target": {
     "repo": "berming/AndroidAPP",
     "subagent": "software-quality-agent",
     "domain": "SWD",
-    "deploy_to": ".quality/active-rules.json （目标仓库内）"
+    "deploy_to": ".quality/active-rules.json （目标仓库内，整体覆盖写入；不要与 v1.26 active-rules 合并）"
   },
   "binding_policy": "late_binding_at_checkpoint",
   "requirement_id": "QR-2026-AndroidAPP-SWD",
-  "version": "v1.26",
+  "version": "v1.27",
   "spec_version": "v0.4.3",
-  "scope_resolution": {
-    "resolved_at": "2026-05-24T16:10:00Z",
-    "resolved_by": "software-quality-agent",
-    "checkpoint": "planning-late-binding",
-    "trigger": "user_request_identify_high_risk_modules_for_DT_FUZZ",
-    "planning_snapshot_status": "STALE_MISMATCH",
-    "actual_repo_modules": [":shared", ":apps:android", ":apps:web", ":server", "apps/admin (Vue)"],
-    "scope_changes": {
-      "fuzz_instances_retargeted": ["INST-v1.26-001", "INST-v1.26-002", "INST-v1.26-003"],
-      "instances_downgraded_to_not_applicable": ["INST-v1.26-016"],
-      "pending_unresolved_due_to_user_scope": [
-        "INST-v1.26-005", "INST-v1.26-006", "INST-v1.26-007",
-        "INST-v1.26-013", "INST-v1.26-014", "INST-v1.26-015",
-        "INST-v1.26-017", "INST-v1.26-018", "INST-v1.26-019",
-        "INST-v1.26-025", "INST-v1.26-026"
-      ],
-      "pending_unresolved_note": "本轮用户仅授权解析 DT FUZZ 与 JNI 失配；COV/CMPLX/MEM/PERF 的高风险覆写实例（11 个）尚引用陈旧 planning snapshot，将在 v1.27 dispatch 中由 quality-planning-agent 整体重定。详见 QAgent feedback 文件。"
-    }
-  },
   "rules": [
     {
-      "instance_id": "INST-v1.26-001",
+      "instance_id": "INST-v1.27-001",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
-      "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "shared-game-engine"},
+      "scope_strategy": "dynamic_reference (high_risk_modules_only) → expanded per high-risk module",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": true,
+        "module_id": "shared-game-engine"
+      },
       "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
-      "resolution_inputs": {
-        "module_boundary_source": "CLAUDE.md_section_three_TDD_table + settings.gradle.kts",
-        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
-        "resolved_by": "software-quality-agent",
-        "rationale": "CLAUDE.md §三 强制 TDD：SettlementCalculator/CardRules；§约束 1 客户端共享逻辑单源",
-        "files_in_scope": ["CardRules.kt(218)", "GameEngine.kt(550)", "SettlementCalculator.kt(125)", "SettlementVerification.kt(376)"],
-        "applied_overrides": ["planning_snapshot_apps_communication-card_not_found"],
-        "planning_snapshot_evaluation": "MISMATCH"
-      }
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-fuzz"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-002",
+      "instance_id": "INST-v1.27-002",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
-      "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "shared-network-protocol"},
+      "scope_strategy": "dynamic_reference (high_risk_modules_only) → expanded per high-risk module",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": true,
+        "module_id": "shared-network-protocol"
+      },
       "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
-      "resolution_inputs": {
-        "module_boundary_source": "CLAUDE.md_section_two_constraint_4 + settings.gradle.kts",
-        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
-        "resolved_by": "software-quality-agent",
-        "rationale": "CLAUDE.md §约束 4 协议双端对齐；GameMessage.kt 是反序列化入口 — Fuzz 经典目标",
-        "files_in_scope": ["GameMessage.kt(419)"],
-        "applied_overrides": ["planning_snapshot_apps_security_not_found"],
-        "planning_snapshot_evaluation": "MISMATCH"
-      }
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-fuzz"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-003",
+      "instance_id": "INST-v1.27-003",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
-      "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "server-game-manager"},
+      "scope_strategy": "dynamic_reference (high_risk_modules_only) → expanded per high-risk module",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": true,
+        "module_id": "server-game-manager"
+      },
       "target_path": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
-      "resolution_inputs": {
-        "module_boundary_source": "CLAUDE.md_section_three_TDD_table + section_two_constraint_2",
-        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
-        "resolved_by": "software-quality-agent",
-        "rationale": "CLAUDE.md §三 强制 TDD（canBeat/handleRoundEnd/computeAllFinishedScores）+ §约束 2 并发安全 + §约束 1 与 shared 等价",
-        "files_in_scope": ["ServerGameManager.kt(1109)"],
-        "applied_overrides": ["planning_snapshot_apps_core_algorithm_not_found"],
-        "planning_snapshot_evaluation": "MISMATCH"
-      }
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-fuzz"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-004",
+      "instance_id": "INST-v1.27-004",
+      "rule_ref": "SWD-DT-FUZZ-001",
+      "check_type": "ut_fuzz",
+      "scope_strategy": "dynamic_reference (high_risk_modules_only) → expanded per high-risk module",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": true,
+        "module_id": "server-admin"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/admin/**",
+      "exclude_paths": [],
+      "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
+      "pass_criteria_overrides": null,
+      "enforcement": "blocking",
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-fuzz"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ]
+    },
+    {
+      "instance_id": "INST-v1.27-005",
+      "rule_ref": "SWD-DT-FUZZ-001",
+      "check_type": "ut_fuzz",
+      "scope_strategy": "dynamic_reference (high_risk_modules_only) → expanded per high-risk module",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": true,
+        "module_id": "shared-ai"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**",
+      "exclude_paths": [],
+      "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
+      "pass_criteria_overrides": null,
+      "enforcement": "blocking",
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-fuzz"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ]
+    },
+    {
+      "instance_id": "INST-v1.27-006",
       "rule_ref": "SWD-DT-COV-001",
       "check_type": "ut_coverage",
       "scope_strategy": "all_with_high_risk_override (default instance)",
-      "scope_hints": {"source": "all", "high_risk_excluded": true},
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false
+      },
       "target_path": "**",
-      "exclude_paths": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "exclude_paths": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ],
       "pass_criteria": "≥ 75%（年度目标，高风险模块走独立 instance 强阈值）",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:check-coverage"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-005",
+      "instance_id": "INST-v1.27-007",
       "rule_ref": "SWD-DT-COV-001",
       "check_type": "ut_coverage",
       "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "communication-card"},
-      "target_path": "apps/communication-card/**",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-game-engine"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
       "exclude_paths": [],
       "pass_criteria": "≥ 85%（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≥ 75%", "override_reason": "high_risk_module"},
+      "pass_criteria_overrides": {
+        "base": "≥ 75%",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:check-coverage"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-006",
+      "instance_id": "INST-v1.27-008",
       "rule_ref": "SWD-DT-COV-001",
       "check_type": "ut_coverage",
       "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "security"},
-      "target_path": "apps/security/**",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-network-protocol"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
       "pass_criteria": "≥ 85%（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≥ 75%", "override_reason": "high_risk_module"},
+      "pass_criteria_overrides": {
+        "base": "≥ 75%",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:check-coverage"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-007",
+      "instance_id": "INST-v1.27-009",
       "rule_ref": "SWD-DT-COV-001",
       "check_type": "ut_coverage",
       "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "core-algorithm"},
-      "target_path": "apps/core/algorithm/**",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "server-game-manager"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
       "exclude_paths": [],
       "pass_criteria": "≥ 85%（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≥ 75%", "override_reason": "high_risk_module"},
+      "pass_criteria_overrides": {
+        "base": "≥ 75%",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:check-coverage"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-008",
+      "instance_id": "INST-v1.27-010",
+      "rule_ref": "SWD-DT-COV-001",
+      "check_type": "ut_coverage",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "server-admin"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/admin/**",
+      "exclude_paths": [],
+      "pass_criteria": "≥ 85%（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≥ 75%",
+        "override_reason": "high_risk_module"
+      },
+      "enforcement": "blocking",
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
+    },
+    {
+      "instance_id": "INST-v1.27-011",
+      "rule_ref": "SWD-DT-COV-001",
+      "check_type": "ut_coverage",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-ai"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**",
+      "exclude_paths": [],
+      "pass_criteria": "≥ 85%（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≥ 75%",
+        "override_reason": "high_risk_module"
+      },
+      "enforcement": "blocking",
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-coverage"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
+    },
+    {
+      "instance_id": "INST-v1.27-012",
       "rule_ref": "SWD-CR-EXEC-001",
       "check_type": "code_review",
       "scope_strategy": "all (with in-instance high-risk override semantic)",
-      "scope_hints": {"source": "all", "review_bot_path_aware": true},
+      "scope_hints": {
+        "source": "all",
+        "expanded_per_module": false
+      },
       "target_path": "**",
       "exclude_paths": [],
       "pass_criteria": "PR 须至少一人 Approve；高风险模块须双人评审（high_risk_modules override: ≥2 名评审人 Approve）",
-      "pass_criteria_overrides": {"high_risk_modules": "≥ 2 Approve"},
+      "pass_criteria_overrides": {
+        "high_risk_modules": "≥ 2 Approve"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "iteration-exit"],
-      "skills": ["skill:check-review"],
-      "dynamic_reference_snapshot_at_planning": ["**/*"]
+      "checkpoints": [
+        "pr-check",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:check-review"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "**/*"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-009",
+      "instance_id": "INST-v1.27-013",
       "rule_ref": "SWD-CICD-SAST-001",
       "check_type": "sast",
       "scope_strategy": "all",
-      "scope_hints": {"source": "all"},
+      "scope_hints": {
+        "source": "all",
+        "expanded_per_module": false
+      },
       "target_path": "**",
       "exclude_paths": [],
       "pass_criteria": "高危告警数 = 0；中危 ≤ 5",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-sast"],
-      "dynamic_reference_snapshot_at_planning": ["**/*"]
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-sast"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "**/*"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-010",
+      "instance_id": "INST-v1.27-014",
       "rule_ref": "SWD-CICD-SCA-001",
       "check_type": "dependency_scan",
       "scope_strategy": "all",
-      "scope_hints": {"source": "all"},
+      "scope_hints": {
+        "source": "all",
+        "expanded_per_module": false
+      },
       "target_path": "**",
       "exclude_paths": [],
       "pass_criteria": "无已知高危 CVE；中危 ≤ 3 且有缓解方案",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit", "release-gate"],
-      "skills": ["skill:scan-deps"],
-      "dynamic_reference_snapshot_at_planning": ["**/*"]
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit",
+        "release-gate"
+      ],
+      "skills": [
+        "skill:scan-deps"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "**/*"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-011",
+      "instance_id": "INST-v1.27-015",
       "rule_ref": "SWD-CICD-LINT-001",
       "check_type": "lint",
       "scope_strategy": "all",
-      "scope_hints": {"source": "all"},
+      "scope_hints": {
+        "source": "all",
+        "expanded_per_module": false
+      },
       "target_path": "**",
       "exclude_paths": [],
       "pass_criteria": "Lint error = 0；warning ≤ 团队约定阈值",
       "pass_criteria_overrides": null,
       "enforcement": "warning",
-      "checkpoints": ["pre-commit", "pr-check", "ci-pipeline"],
-      "skills": ["skill:run-lint"],
-      "dynamic_reference_snapshot_at_planning": ["**/*"]
+      "checkpoints": [
+        "pre-commit",
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:run-lint"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "**/*"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-012",
+      "instance_id": "INST-v1.27-016",
       "rule_ref": "SWD-CICD-CMPLX-001",
       "check_type": "complexity",
       "scope_strategy": "all_with_high_risk_override (default instance)",
-      "scope_hints": {"source": "all", "high_risk_excluded": true},
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false
+      },
       "target_path": "**",
-      "exclude_paths": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "exclude_paths": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+        "server/src/main/kotlin/com/communicationcard/server/admin/**",
+        "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+      ],
       "pass_criteria": "全量函数级 ≤ 15（高风险模块走独立 instance 强阈值）",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline"],
-      "skills": ["skill:check-complexity"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
-    },
-    {
-      "instance_id": "INST-v1.26-013",
-      "rule_ref": "SWD-CICD-CMPLX-001",
-      "check_type": "complexity",
-      "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "communication-card"},
-      "target_path": "apps/communication-card/**",
-      "exclude_paths": [],
-      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≤ 15", "override_reason": "high_risk_module"},
-      "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline"],
-      "skills": ["skill:check-complexity"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
-    },
-    {
-      "instance_id": "INST-v1.26-014",
-      "rule_ref": "SWD-CICD-CMPLX-001",
-      "check_type": "complexity",
-      "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "security"},
-      "target_path": "apps/security/**",
-      "exclude_paths": [],
-      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≤ 15", "override_reason": "high_risk_module"},
-      "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline"],
-      "skills": ["skill:check-complexity"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
-    },
-    {
-      "instance_id": "INST-v1.26-015",
-      "rule_ref": "SWD-CICD-CMPLX-001",
-      "check_type": "complexity",
-      "scope_strategy": "all_with_high_risk_override (high-risk override)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "core-algorithm"},
-      "target_path": "apps/core/algorithm/**",
-      "exclude_paths": [],
-      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
-      "pass_criteria_overrides": {"base": "≤ 15", "override_reason": "high_risk_module"},
-      "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline"],
-      "skills": ["skill:check-complexity"],
-      "dynamic_reference_snapshot_at_planning": {"all": ["**/*"], "high_risk_modules": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]}
-    },
-    {
-      "instance_id": "INST-v1.26-016",
-      "rule_ref": "SWD-CICD-MEM-001",
-      "check_type": "memory_safety",
-      "scope_strategy": "dynamic_reference (native_and_high_risk_modules)",
-      "scope_hints": {"source": "native_jni", "module_id": "native-jni"},
-      "target_path": "apps/**/jni/**",
-      "exclude_paths": [],
-      "pass_criteria": "ASAN/MSAN 零错误",
-      "pass_criteria_overrides": null,
-      "enforcement": "not_applicable",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-asan"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
-      "resolution_inputs": {
-        "module_boundary_source": "filesystem_scan",
-        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
-        "resolved_by": "software-quality-agent",
-        "rationale": "本仓库无 JNI / native 代码（无 cpp/c/CMakeLists.txt/jni 目录）；纯 Kotlin Multiplatform",
-        "files_in_scope": [],
-        "applied_overrides": ["jni_instance_skipped_no_native_code", "enforcement_downgraded_blocking_to_not_applicable"],
-        "planning_snapshot_evaluation": "NOT_APPLICABLE"
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
       }
     },
     {
-      "instance_id": "INST-v1.26-017",
-      "rule_ref": "SWD-CICD-MEM-001",
-      "check_type": "memory_safety",
-      "scope_strategy": "dynamic_reference (native_and_high_risk_modules)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "communication-card"},
-      "target_path": "apps/communication-card/**",
+      "instance_id": "INST-v1.27-017",
+      "rule_ref": "SWD-CICD-CMPLX-001",
+      "check_type": "complexity",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-game-engine"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
       "exclude_paths": [],
-      "pass_criteria": "ASAN/MSAN 零错误",
-      "pass_criteria_overrides": null,
+      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≤ 15",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-asan"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-018",
-      "rule_ref": "SWD-CICD-MEM-001",
-      "check_type": "memory_safety",
-      "scope_strategy": "dynamic_reference (native_and_high_risk_modules)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "security"},
-      "target_path": "apps/security/**",
+      "instance_id": "INST-v1.27-018",
+      "rule_ref": "SWD-CICD-CMPLX-001",
+      "check_type": "complexity",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-network-protocol"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
-      "pass_criteria": "ASAN/MSAN 零错误",
-      "pass_criteria_overrides": null,
+      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≤ 15",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-asan"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-019",
-      "rule_ref": "SWD-CICD-MEM-001",
-      "check_type": "memory_safety",
-      "scope_strategy": "dynamic_reference (native_and_high_risk_modules)",
-      "scope_hints": {"source": "high_risk_modules", "module_id": "core-algorithm"},
-      "target_path": "apps/core/algorithm/**",
+      "instance_id": "INST-v1.27-019",
+      "rule_ref": "SWD-CICD-CMPLX-001",
+      "check_type": "complexity",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "server-game-manager"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
       "exclude_paths": [],
-      "pass_criteria": "ASAN/MSAN 零错误",
-      "pass_criteria_overrides": null,
+      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≤ 15",
+        "override_reason": "high_risk_module"
+      },
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-asan"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
     },
     {
-      "instance_id": "INST-v1.26-020",
+      "instance_id": "INST-v1.27-020",
+      "rule_ref": "SWD-CICD-CMPLX-001",
+      "check_type": "complexity",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "server-admin"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/admin/**",
+      "exclude_paths": [],
+      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≤ 15",
+        "override_reason": "high_risk_module"
+      },
+      "enforcement": "blocking",
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
+    },
+    {
+      "instance_id": "INST-v1.27-021",
+      "rule_ref": "SWD-CICD-CMPLX-001",
+      "check_type": "complexity",
+      "scope_strategy": "all_with_high_risk_override (high-risk override)",
+      "scope_hints": {
+        "source": "high_risk_modules",
+        "expanded_per_module": false,
+        "module_id": "shared-ai"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**",
+      "exclude_paths": [],
+      "pass_criteria": "函数级 ≤ 12（高风险模块覆写）",
+      "pass_criteria_overrides": {
+        "base": "≤ 15",
+        "override_reason": "high_risk_module"
+      },
+      "enforcement": "blocking",
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline"
+      ],
+      "skills": [
+        "skill:check-complexity"
+      ],
+      "dynamic_reference_snapshot_at_planning": {
+        "all": [
+          "**/*"
+        ],
+        "high_risk_modules": [
+          "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+          "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+          "server/src/main/kotlin/com/communicationcard/server/admin/**",
+          "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+        ]
+      }
+    },
+    {
+      "instance_id": "INST-v1.27-022",
       "rule_ref": "SWD-CICD-INT-001",
       "check_type": "integration_test",
       "scope_strategy": "all",
-      "scope_hints": {"source": "all"},
+      "scope_hints": {
+        "source": "all",
+        "expanded_per_module": false
+      },
       "target_path": "**",
       "exclude_paths": [],
       "pass_criteria": "集成测试通过率 ≥ 95%",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["ci-pipeline", "iteration-exit"],
-      "skills": ["skill:run-integration-test"],
-      "dynamic_reference_snapshot_at_planning": ["**/*"]
+      "checkpoints": [
+        "ci-pipeline",
+        "iteration-exit"
+      ],
+      "skills": [
+        "skill:run-integration-test"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "**/*"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-021",
+      "instance_id": "INST-v1.27-023",
       "rule_ref": "SWD-CICD-API-001",
       "check_type": "api_contract",
       "scope_strategy": "whitelist (public_api_modules)",
-      "scope_hints": {"source": "public_api_modules", "module_id": "apps-public-api"},
-      "target_path": "apps/**/api/**",
+      "scope_hints": {
+        "source": "whitelist",
+        "expanded_per_module": false,
+        "module_id": "shared-network-protocol"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
       "pass_criteria": "无 breaking change；如有须提供版本兼容方案与 Deprecation 周期",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "release-gate"],
-      "skills": ["skill:check-api"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/api/**", "libs/**/public/**"]
+      "checkpoints": [
+        "pr-check",
+        "ci-pipeline",
+        "release-gate"
+      ],
+      "skills": [
+        "skill:check-api"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-022",
-      "rule_ref": "SWD-CICD-API-001",
-      "check_type": "api_contract",
-      "scope_strategy": "whitelist (public_api_modules)",
-      "scope_hints": {"source": "public_api_modules", "module_id": "libs-public-api"},
-      "target_path": "libs/**/public/**",
-      "exclude_paths": [],
-      "pass_criteria": "无 breaking change；如有须提供版本兼容方案与 Deprecation 周期",
-      "pass_criteria_overrides": null,
-      "enforcement": "blocking",
-      "checkpoints": ["pr-check", "ci-pipeline", "release-gate"],
-      "skills": ["skill:check-api"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/api/**", "libs/**/public/**"]
-    },
-    {
-      "instance_id": "INST-v1.26-023",
+      "instance_id": "INST-v1.27-024",
       "rule_ref": "SWD-DOC-API-001",
       "check_type": "doc_review",
       "scope_strategy": "whitelist (public_api_modules)",
-      "scope_hints": {"source": "public_api_modules", "module_id": "apps-public-api"},
-      "target_path": "apps/**/api/**",
+      "scope_hints": {
+        "source": "whitelist",
+        "expanded_per_module": false,
+        "module_id": "shared-network-protocol"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
       "pass_criteria": "公开 API 100% 有 KDoc/JavaDoc；含参数、返回值、异常、示例",
       "pass_criteria_overrides": null,
       "enforcement": "warning",
-      "checkpoints": ["pr-check", "release-gate"],
-      "skills": ["skill:check-doc"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/api/**", "libs/**/public/**"]
+      "checkpoints": [
+        "pr-check",
+        "release-gate"
+      ],
+      "skills": [
+        "skill:check-doc"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/network/**"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-024",
-      "rule_ref": "SWD-DOC-API-001",
-      "check_type": "doc_review",
-      "scope_strategy": "whitelist (public_api_modules)",
-      "scope_hints": {"source": "public_api_modules", "module_id": "libs-public-api"},
-      "target_path": "libs/**/public/**",
-      "exclude_paths": [],
-      "pass_criteria": "公开 API 100% 有 KDoc/JavaDoc；含参数、返回值、异常、示例",
-      "pass_criteria_overrides": null,
-      "enforcement": "warning",
-      "checkpoints": ["pr-check", "release-gate"],
-      "skills": ["skill:check-doc"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/api/**", "libs/**/public/**"]
-    },
-    {
-      "instance_id": "INST-v1.26-025",
+      "instance_id": "INST-v1.27-025",
       "rule_ref": "SWD-PERF-BENCH-001",
       "check_type": "benchmark",
       "scope_strategy": "whitelist (performance_critical_modules)",
-      "scope_hints": {"source": "performance_critical_modules", "module_id": "communication-card"},
-      "target_path": "apps/communication-card/**",
+      "scope_hints": {
+        "source": "whitelist",
+        "expanded_per_module": false,
+        "module_id": "shared-game-engine"
+      },
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
       "exclude_paths": [],
       "pass_criteria": "核心性能指标不劣化超过 5%",
       "pass_criteria_overrides": null,
       "enforcement": "warning",
-      "checkpoints": ["ci-pipeline", "release-gate"],
-      "skills": ["skill:run-benchmark"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/core/algorithm/**"]
+      "checkpoints": [
+        "ci-pipeline",
+        "release-gate"
+      ],
+      "skills": [
+        "skill:run-benchmark"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt"
+      ]
     },
     {
-      "instance_id": "INST-v1.26-026",
+      "instance_id": "INST-v1.27-026",
       "rule_ref": "SWD-PERF-BENCH-001",
       "check_type": "benchmark",
       "scope_strategy": "whitelist (performance_critical_modules)",
-      "scope_hints": {"source": "performance_critical_modules", "module_id": "core-algorithm"},
-      "target_path": "apps/core/algorithm/**",
+      "scope_hints": {
+        "source": "whitelist",
+        "expanded_per_module": false,
+        "module_id": "server-game-manager"
+      },
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
       "exclude_paths": [],
       "pass_criteria": "核心性能指标不劣化超过 5%",
       "pass_criteria_overrides": null,
       "enforcement": "warning",
-      "checkpoints": ["ci-pipeline", "release-gate"],
-      "skills": ["skill:run-benchmark"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/core/algorithm/**"]
+      "checkpoints": [
+        "ci-pipeline",
+        "release-gate"
+      ],
+      "skills": [
+        "skill:run-benchmark"
+      ],
+      "dynamic_reference_snapshot_at_planning": [
+        "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+        "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt"
+      ]
     }
   ],
   "rule_distribution": {
     "SWD": 26,
-    "by_activity": {"DT": 7, "CR": 1, "CICD": 15, "DOC": 2, "PERF": 2},
-    "by_enforcement": {"blocking": 21, "warning": 5}
+    "by_activity": {
+      "DT": 11,
+      "CR": 1,
+      "CICD": 11,
+      "DOC": 1,
+      "PERF": 2
+    },
+    "by_enforcement": {
+      "blocking": 22,
+      "warning": 4
+    }
+  },
+  "changes_from_v1.26": {
+    "high_risk_modules_repointed": true,
+    "old_high_risk_patterns": [
+      "apps/communication-card/**",
+      "apps/security/**",
+      "apps/core/algorithm/**"
+    ],
+    "new_high_risk_patterns": [
+      "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
+      "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
+      "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+      "server/src/main/kotlin/com/communicationcard/server/admin/**",
+      "shared/src/commonMain/kotlin/com/communicationcard/game/ai/**"
+    ],
+    "rule_dropped": "SWD-CICD-MEM-001 (4 instances removed)",
+    "rule_dropped_reason": "no_native_code_in_androidapp_product_line",
+    "instances_count_v1.26": 26,
+    "instances_count_v1.27": 26
   },
   "instructions_for_consumer": [
-    "1. 在 berming/AndroidAPP 仓库根目录执行：mkdir -p .claude/agents .quality/reports",
-    "2. 复制 software-quality-agent.md 定义到 .claude/agents/（见 docs/guide/deploy-to-androidapp-guide.md）",
-    "3. 将本 dispatch 包的 rules 写入 .quality/active-rules.json（覆盖部署）",
-    "4. 在 .quality/deployment-log.jsonl 追加 deployment_received 事件",
+    "1. software-quality-agent 在收到本 dispatch 后必须执行**覆盖写入** .quality/active-rules.json（不要与 v1.26 active-rules 合并）",
+    "2. 追加 deployment_received 事件到 .quality/deployment-log.jsonl，显式记录 superseded_dispatch_id=DISP-QP-v1.26-SWD-001",
+    "3. 保留 .quality/check-records.jsonl 中 v1.26 的 scope_resolution 历史事件（审计需要）",
+    "4. v1.27 不再含 SWD-CICD-MEM-001；如本仓库后续引入 JNI/native 代码，请反馈 quality-planning-agent 触发新一轮 AQR/QP 评估",
     "5. 由 software-quality-agent 在 pre-commit / pr-check / ci-pipeline / iteration-exit 等检查点拉取仓库 HEAD 后按 §8.8 晚绑定实际匹配"
   ],
   "status": "dispatched"
