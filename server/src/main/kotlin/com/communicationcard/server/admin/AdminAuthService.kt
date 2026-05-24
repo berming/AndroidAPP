@@ -83,9 +83,15 @@ class AdminAuthService(
         }
         val ok = try {
             withContext(Dispatchers.Default) { BCrypt.checkpw(password, user.passwordHash) }
-        } catch (e: IllegalArgumentException) {
-            // 极少情况：hash 格式异常（如 DB 迁移引入的格式变化），记录后视为验证失败
-            System.err.println("BCrypt.checkpw failed for user '${user.username}': ${e.message}")
+        } catch (e: Exception) {
+            // 极少情况：hash 格式异常（如 DB 迁移引入的格式变化），记录后视为验证失败。
+            // jbcrypt 0.4 在不同畸形输入下抛 IllegalArgumentException（Invalid salt
+            // version / Missing salt rounds / Bad salt length 等）或
+            // StringIndexOutOfBoundsException（空串、截断到 length < 29 时
+            // String.substring 越界）；统一按"验证失败"处理，避免任何登录请求 500。
+            // CancellationException 必须保持原语义（结构化并发 cancel 不能被吞）。
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            System.err.println("BCrypt.checkpw failed for user '${user.username}': ${e::class.simpleName}: ${e.message}")
             false
         }
         if (!ok) return null
@@ -162,10 +168,12 @@ class AdminAuthService(
         val user = db.withConnection { conn -> findAdminById(conn, adminId) }
             ?: return ChangePasswordResult.AdminNotFound
         // bcrypt CPU-bound → Dispatchers.Default 避免阻塞 Ktor worker（同 login）
+        // catch Exception 而非仅 IAE：jbcrypt 对空串 / 截断 hash 抛 StringIndexOutOfBoundsException
         val ok = try {
             withContext(Dispatchers.Default) { BCrypt.checkpw(oldPassword, user.passwordHash) }
-        } catch (e: IllegalArgumentException) {
-            System.err.println("BCrypt.checkpw failed in changePassword: ${e.message}")
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            System.err.println("BCrypt.checkpw failed in changePassword: ${e::class.simpleName}: ${e.message}")
             false
         }
         if (!ok) {
