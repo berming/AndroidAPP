@@ -222,12 +222,18 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
             }
         }
 
+        // 随机 cookie value 需限制到 RFC 6265 cookie-octet 集合，否则 Ktor 客户端
+        // 预校验抛 IAE → 请求未到 server，无法验证 bypass 行为。
+        // RFC 6265: cookie-octet 排除 CTL, SP, `"`, `,`, `;`, `\`
+        val forbiddenInCookie = setOf('"', ',', ';', '\\', ' ')
+        fun randomCookieToken(maxLen: Int): String =
+            randomAsciiString(maxLen).filter { it !in forbiddenInCookie }
         val invalidCookies = listOf(
             "",
             "not-a-real-token",
             "abc=def",
-            randomAsciiString(44),
-            randomAsciiString(44),
+            randomCookieToken(44),
+            randomCookieToken(44),
         )
         for (cookie in invalidCookies) {
             val (ok, detail) = runCatching {
