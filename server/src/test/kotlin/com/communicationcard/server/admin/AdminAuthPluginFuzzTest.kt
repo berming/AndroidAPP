@@ -54,9 +54,10 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
         )
     }
 
-    private fun track(dim: String, ok: Boolean) {
+    private fun track(dim: String, ok: Boolean, detail: String? = null) {
         totalCases.merge(dim, 1, Int::plus)
         if (ok) passCases.merge(dim, 1, Int::plus)
+        else println("[FAIL $dim] ${detail ?: "(no detail)"}")
     }
 
     // -----------------------------------------------------------------
@@ -108,13 +109,13 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
             }
             val trusted = "trusted-${seededRandom.nextInt(0, 1000)}"
             val xff = if (prefix.isEmpty()) trusted else "$prefix, $trusted"
-            val ok = runCatching {
+            val (ok, detail) = runCatching {
                 val resp = client.get("/_test/audit") { header("X-Forwarded-For", xff) }
                 val body = resp.bodyAsText()
                 val ip = body.split("|").getOrNull(1) ?: ""
-                ip == trusted
-            }.getOrElse { false }
-            track("xff_random_chains", ok)
+                (ip == trusted) to "status=${resp.status} xff='$xff' expected='$trusted' got='$ip'"
+            }.getOrElse { false to "threw ${it::class.simpleName}: ${it.message} xff='$xff'" }
+            track("xff_random_chains", ok, detail)
         }
         assertNoFailures("xff_random_chains")
     }
@@ -141,18 +142,17 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
                 3 -> "Mozilla/5.0"                 // 典型
                 else -> randomAsciiString(40)
             }
-            val ok = runCatching {
+            val (ok, detail) = runCatching {
                 val resp = client.get("/_test/audit") {
                     if (ua.isNotEmpty()) header("User-Agent", ua)
                     // 不带 XFF
                 }
-                // 不抛；body 至少返回 2 段
-                resp.status == HttpStatusCode.OK && resp.bodyAsText().split("|").size == 2
+                val ok = resp.status == HttpStatusCode.OK && resp.bodyAsText().split("|").size == 2
+                ok to "status=${resp.status} ua_len=${ua.length} ua_head=${ua.take(20)}"
             }.getOrElse {
-                println("[FAIL UA] ua=${ua.take(30)} threw ${it::class.simpleName}")
-                false
+                false to "threw ${it::class.simpleName}: ${it.message} ua_len=${ua.length}"
             }
-            track("ua_random", ok)
+            track("ua_random", ok, detail)
         }
         assertNoFailures("ua_random")
     }
@@ -180,18 +180,18 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
                 4 -> "valid-looking-token-${seededRandom.nextInt(0, 999999)}"
                 else -> randomAsciiString(44)
             }
-            val ok = runCatching {
+            val (ok, detail) = runCatching {
                 val resp = client.get("/_test/token") {
                     if (cookieValue.isNotEmpty()) {
                         header("Cookie", "$ADMIN_COOKIE_NAME=$cookieValue")
                     }
                 }
-                resp.status == HttpStatusCode.OK
+                (resp.status == HttpStatusCode.OK) to
+                    "status=${resp.status} cookie_len=${cookieValue.length} head=${cookieValue.take(20)}"
             }.getOrElse {
-                println("[FAIL cookie] '${cookieValue.take(30)}' threw ${it::class.simpleName}")
-                false
+                false to "threw ${it::class.simpleName}: ${it.message} cookie_len=${cookieValue.length}"
             }
-            track("cookie_random", ok)
+            track("cookie_random", ok, detail)
         }
         assertNoFailures("cookie_random")
     }
@@ -225,17 +225,17 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
             randomAsciiString(44),
         )
         for (cookie in invalidCookies) {
-            val ok = runCatching {
+            val (ok, detail) = runCatching {
                 val resp = client.get("/_test/whoami") {
                     if (cookie.isNotEmpty()) header("Cookie", "$ADMIN_COOKIE_NAME=$cookie")
                 }
-                resp.status == HttpStatusCode.OK &&
-                    resp.bodyAsText() == "bypass|SUPER_ADMIN"  // 当前 bypass 行为
+                val body = resp.bodyAsText()
+                val ok = resp.status == HttpStatusCode.OK && body == "bypass|SUPER_ADMIN"
+                ok to "status=${resp.status} cookie='${cookie.take(30)}' body='$body'"
             }.getOrElse {
-                println("[FAIL bypass] cookie='${cookie.take(20)}' threw ${it::class.simpleName}")
-                false
+                false to "threw ${it::class.simpleName}: ${it.message} cookie='${cookie.take(20)}'"
             }
-            track("bypass_invalid_cookie", ok)
+            track("bypass_invalid_cookie", ok, detail)
         }
         assertNoFailures("bypass_invalid_cookie")
     }
@@ -327,6 +327,9 @@ class AdminAuthPluginFuzzTest : FuzzTestBase() {
     private fun assertNoFailures(dimension: String) {
         val total = totalCases[dimension] ?: 0
         val pass = passCases[dimension] ?: 0
+        if (pass != total) {
+            System.err.println("[ASSERT-FAIL $dimension] $pass / $total (seed=$seed)")
+        }
         assertTrue(pass == total, "[$dimension] $pass / $total passed (seed=$seed)")
     }
 }
