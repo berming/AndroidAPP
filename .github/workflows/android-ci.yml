@@ -147,6 +147,54 @@ jobs:
           {
             echo "## ❌ :server:test 失败"
             echo ""
+            echo "<details open><summary>JUnit XML 失败摘要（最权威，含 [FAIL …] 输出）</summary>"
+            echo ""
+            echo '```'
+            python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          xmls = sorted(glob.glob('server/build/test-results/test/*.xml'))
+          if not xmls:
+              print("(no JUnit XML — test process never produced results)")
+          else:
+              total_failed = 0
+              for path in xmls:
+                  try:
+                      root = ET.parse(path).getroot()
+                  except Exception as e:
+                      print(f"(failed parsing {path}: {e})")
+                      continue
+                  for tc in root.iter('testcase'):
+                      cls = tc.attrib.get('classname', '?')
+                      name = tc.attrib.get('name', '?')
+                      for fail in tc.iter('failure'):
+                          total_failed += 1
+                          msg = (fail.attrib.get('message') or '').strip()
+                          ftxt = (fail.text or '').strip()
+                          print(f"=== FAILED: {cls} > {name}")
+                          if msg:
+                              for line in msg.splitlines()[:8]:
+                                  print(f"  {line}")
+                          # also print captured stdout if any (often holds [FAIL ...] lines)
+                          for sysout in tc.iter('system-out'):
+                              text = (sysout.text or '').strip()
+                              fail_lines = [l for l in text.splitlines() if '[FAIL' in l or '[ASSERT-FAIL' in l]
+                              if fail_lines:
+                                  print("  --- captured stdout [FAIL] markers ---")
+                                  for l in fail_lines[:20]:
+                                      print(f"  {l}")
+                          for syserr in tc.iter('system-err'):
+                              text = (syserr.text or '').strip()
+                              fail_lines = [l for l in text.splitlines() if '[FAIL' in l or '[ASSERT-FAIL' in l]
+                              if fail_lines:
+                                  print("  --- captured stderr [FAIL/ASSERT-FAIL] markers ---")
+                                  for l in fail_lines[:20]:
+                                      print(f"  {l}")
+                          print()
+              print(f"Total failures: {total_failed}")
+          PY
+            echo '```'
+            echo "</details>"
+            echo ""
             echo "<details><summary>关键错误片段（grep）— 点击展开</summary>"
             echo ""
             echo '```'
