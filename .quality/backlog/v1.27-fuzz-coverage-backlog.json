@@ -1,0 +1,214 @@
+{
+  "backlog_id": "FUZZ-BACKLOG-v1.27-001",
+  "generated_at": "2026-05-24T16:37:28Z",
+  "generated_by": "software-quality-agent",
+  "trigger": "validation-v1.27 Double Check HOLD (0 fuzz records for 22 high-risk commits)",
+  "dispatch_ref": "DISP-QP-v1.27-SWD-001",
+  "scope": {
+    "git_range": "HEAD~15..HEAD",
+    "high_risk_files_total": 13,
+    "high_risk_commits_total": 22
+  },
+  "executor_choice": "kotest-property (5.9.x)",
+  "ci_integration": "new :server:fuzzTest gradle task + GitHub Actions fuzz-tests job",
+  "report_writeback": ".quality/check-records.jsonl (event=ut_fuzz_record)",
+  "tasks": [
+    {
+      "id": "F-AUTH-01",
+      "pri": "P0",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminAuthService.kt",
+      "loc": 376,
+      "touch_count": 5,
+      "estimate_days": 1.0,
+      "test_location": "server/src/test/kotlin/com/communicationcard/server/admin/AdminAuthServiceFuzzTest.kt",
+      "fuzz_dimensions": [
+        "verifyPassword malformed bcrypt",
+        "createSession userId edges",
+        "validateSession arbitrary bytes",
+        "DUMMY_HASH catch regression cc8515de"
+      ]
+    },
+    {
+      "id": "F-AUTH-02",
+      "pri": "P0",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminAuthPlugin.kt",
+      "loc": 108,
+      "touch_count": 3,
+      "estimate_days": 0.5,
+      "test_location": "AdminAuthPluginFuzzTest.kt",
+      "fuzz_dimensions": [
+        "cookie header combos",
+        "hybrid bypass state machine b34808fc/c5ba575a"
+      ]
+    },
+    {
+      "id": "F-AUTH-03",
+      "pri": "P0",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminAuthRoutes.kt",
+      "loc": 138,
+      "touch_count": 1,
+      "estimate_days": 0.5,
+      "test_location": "AdminAuthRoutesFuzzTest.kt (extend e705d515)",
+      "fuzz_dimensions": [
+        "login body Unicode NFC/NFD",
+        "URI vs RAW cookie encoding 519498ef regression"
+      ]
+    },
+    {
+      "id": "F-GAME-01",
+      "pri": "P0",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
+      "loc": 1109,
+      "touch_count": 4,
+      "estimate_days": 2.0,
+      "test_location": "server/src/test/kotlin/com/communicationcard/server/ServerGameManagerFuzzTest.kt",
+      "fuzz_dimensions": [
+        "canBeat property fuzz",
+        "settlement equivalence with :shared",
+        "concurrent mutex stress",
+        "Codex P2 regressions 024512ae/e8d9ff67/ffeeb8b3/5ddb0351"
+      ]
+    },
+    {
+      "id": "F-DB-01",
+      "pri": "P1",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminDb.kt",
+      "loc": 222,
+      "touch_count": 2,
+      "estimate_days": 1.0,
+      "fuzz_dimensions": [
+        "withConnection mutex nesting",
+        "OWASP SQL injection corpus"
+      ]
+    },
+    {
+      "id": "F-HIST-01",
+      "pri": "P1",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/GameHistoryStore.kt",
+      "loc": 374,
+      "touch_count": 3,
+      "estimate_days": 1.0,
+      "fuzz_dimensions": [
+        "listSummaries tiebreaker 53eb3324",
+        "pagination boundary",
+        "insertSync concurrent enqueue"
+      ]
+    },
+    {
+      "id": "F-ALERT-01",
+      "pri": "P1",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/alert/AlertEngine.kt",
+      "loc": 133,
+      "touch_count": 2,
+      "estimate_days": 1.0,
+      "fuzz_dimensions": [
+        "evaluate(state,rule) arbitrary inputs",
+        "no throws/no deadlock/no IO under lock"
+      ]
+    },
+    {
+      "id": "F-ALERT-02",
+      "pri": "P1",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/alert/AlertStore.kt",
+      "loc": 145,
+      "touch_count": 1,
+      "estimate_days": 0.5,
+      "fuzz_dimensions": [
+        "SSE serialize round-trip",
+        "time-window query boundary"
+      ]
+    },
+    {
+      "id": "F-API-01",
+      "pri": "P2",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminApiRoutes.kt",
+      "loc": 170,
+      "touch_count": 5,
+      "estimate_days": 1.0,
+      "fuzz_dimensions": [
+        "route param injection",
+        "DTO render outside lock",
+        "SSE Content-Type charset 584e18a0"
+      ]
+    },
+    {
+      "id": "F-API-02",
+      "pri": "P2",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminRoutes.kt",
+      "loc": 131,
+      "touch_count": 2,
+      "estimate_days": 0.5,
+      "fuzz_dimensions": [
+        "route template matching priority"
+      ]
+    },
+    {
+      "id": "F-DTO-01",
+      "pri": "P2",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminDto.kt",
+      "loc": 222,
+      "touch_count": 1,
+      "estimate_days": 0.5,
+      "fuzz_dimensions": [
+        "CLAUDE.md §约束 10 redaction assert: no password_hash/full-UUID/hands leaked"
+      ]
+    },
+    {
+      "id": "F-CONFIG-01",
+      "pri": "P3",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/AdminConfig.kt",
+      "loc": 49,
+      "touch_count": 1,
+      "estimate_days": 0.5,
+      "fuzz_dimensions": [
+        "embeddedServer vs ConfigFactory fallback equivalence de0c57af"
+      ]
+    },
+    {
+      "id": "F-EVENT-01",
+      "pri": "P3",
+      "target_file": "server/src/main/kotlin/com/communicationcard/server/admin/GameEventRecord.kt",
+      "loc": 47,
+      "touch_count": 1,
+      "estimate_days": 0.5,
+      "fuzz_dimensions": [
+        "event JSON serialize round-trip"
+      ]
+    }
+  ],
+  "estimate_totals_days": {
+    "P0": 4.0,
+    "P1": 3.5,
+    "P2": 2.0,
+    "P3": 1.0,
+    "total": 10.5
+  },
+  "sprint_plan": {
+    "Sprint A (current)": [
+      "F-AUTH-01",
+      "F-AUTH-02",
+      "F-AUTH-03",
+      "F-GAME-01",
+      "CI integration"
+    ],
+    "Sprint B": [
+      "F-DB-01",
+      "F-HIST-01",
+      "F-ALERT-01",
+      "F-ALERT-02"
+    ],
+    "Sprint C": [
+      "F-API-01",
+      "F-API-02",
+      "F-DTO-01",
+      "F-CONFIG-01",
+      "F-EVENT-01"
+    ]
+  },
+  "exit_criteria_for_v1.27_pass": {
+    "min_completion": "Sprint A (P0 only)",
+    "expected_double_check_outcome_after_sprint_a": "PASS for the subset of P0 commits"
+  },
+  "human_readable_doc": ".quality/backlog/v1.27-fuzz-coverage-backlog.md",
+  "status": "open"
+}
