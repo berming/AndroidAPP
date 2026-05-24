@@ -18,51 +18,97 @@
   "requirement_id": "QR-2026-AndroidAPP-SWD",
   "version": "v1.26",
   "spec_version": "v0.4.3",
+  "scope_resolution": {
+    "resolved_at": "2026-05-24T16:10:00Z",
+    "resolved_by": "software-quality-agent",
+    "checkpoint": "planning-late-binding",
+    "trigger": "user_request_identify_high_risk_modules_for_DT_FUZZ",
+    "planning_snapshot_status": "STALE_MISMATCH",
+    "actual_repo_modules": [":shared", ":apps:android", ":apps:web", ":server", "apps/admin (Vue)"],
+    "scope_changes": {
+      "fuzz_instances_retargeted": ["INST-v1.26-001", "INST-v1.26-002", "INST-v1.26-003"],
+      "instances_downgraded_to_not_applicable": ["INST-v1.26-016"],
+      "pending_unresolved_due_to_user_scope": [
+        "INST-v1.26-005", "INST-v1.26-006", "INST-v1.26-007",
+        "INST-v1.26-013", "INST-v1.26-014", "INST-v1.26-015",
+        "INST-v1.26-017", "INST-v1.26-018", "INST-v1.26-019",
+        "INST-v1.26-025", "INST-v1.26-026"
+      ],
+      "pending_unresolved_note": "本轮用户仅授权解析 DT FUZZ 与 JNI 失配；COV/CMPLX/MEM/PERF 的高风险覆写实例（11 个）尚引用陈旧 planning snapshot，将在 v1.27 dispatch 中由 quality-planning-agent 整体重定。详见 QAgent feedback 文件。"
+    }
+  },
   "rules": [
     {
       "instance_id": "INST-v1.26-001",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
       "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true},
-      "target_path": "apps/communication-card/**",
+      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "shared-game-engine"},
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/engine/**",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
       "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
       "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "resolution_inputs": {
+        "module_boundary_source": "CLAUDE.md_section_three_TDD_table + settings.gradle.kts",
+        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
+        "resolved_by": "software-quality-agent",
+        "rationale": "CLAUDE.md §三 强制 TDD：SettlementCalculator/CardRules；§约束 1 客户端共享逻辑单源",
+        "files_in_scope": ["CardRules.kt(218)", "GameEngine.kt(550)", "SettlementCalculator.kt(125)", "SettlementVerification.kt(376)"],
+        "applied_overrides": ["planning_snapshot_apps_communication-card_not_found"],
+        "planning_snapshot_evaluation": "MISMATCH"
+      }
     },
     {
       "instance_id": "INST-v1.26-002",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
       "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true},
-      "target_path": "apps/security/**",
+      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "shared-network-protocol"},
+      "target_path": "shared/src/commonMain/kotlin/com/communicationcard/game/network/**",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
       "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
       "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "resolution_inputs": {
+        "module_boundary_source": "CLAUDE.md_section_two_constraint_4 + settings.gradle.kts",
+        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
+        "resolved_by": "software-quality-agent",
+        "rationale": "CLAUDE.md §约束 4 协议双端对齐；GameMessage.kt 是反序列化入口 — Fuzz 经典目标",
+        "files_in_scope": ["GameMessage.kt(419)"],
+        "applied_overrides": ["planning_snapshot_apps_security_not_found"],
+        "planning_snapshot_evaluation": "MISMATCH"
+      }
     },
     {
       "instance_id": "INST-v1.26-003",
       "rule_ref": "SWD-DT-FUZZ-001",
       "check_type": "ut_fuzz",
       "scope_strategy": "dynamic_reference (high_risk_modules_only)",
-      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true},
-      "target_path": "apps/core/algorithm/**",
+      "scope_hints": {"source": "high_risk_modules", "expanded_per_module": true, "module_id": "server-game-manager"},
+      "target_path": "server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt",
       "exclude_paths": [],
       "pass_criteria": "100% 通过，无崩溃，无未捕获异常",
       "pass_criteria_overrides": null,
       "enforcement": "blocking",
       "checkpoints": ["pr-check", "ci-pipeline", "iteration-exit"],
       "skills": ["skill:run-fuzz"],
-      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "dynamic_reference_snapshot_at_planning": ["apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "resolution_inputs": {
+        "module_boundary_source": "CLAUDE.md_section_three_TDD_table + section_two_constraint_2",
+        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
+        "resolved_by": "software-quality-agent",
+        "rationale": "CLAUDE.md §三 强制 TDD（canBeat/handleRoundEnd/computeAllFinishedScores）+ §约束 2 并发安全 + §约束 1 与 shared 等价",
+        "files_in_scope": ["ServerGameManager.kt(1109)"],
+        "applied_overrides": ["planning_snapshot_apps_core_algorithm_not_found"],
+        "planning_snapshot_evaluation": "MISMATCH"
+      }
     },
     {
       "instance_id": "INST-v1.26-004",
@@ -254,10 +300,19 @@
       "exclude_paths": [],
       "pass_criteria": "ASAN/MSAN 零错误",
       "pass_criteria_overrides": null,
-      "enforcement": "blocking",
+      "enforcement": "not_applicable",
       "checkpoints": ["ci-pipeline", "iteration-exit"],
       "skills": ["skill:run-asan"],
-      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"]
+      "dynamic_reference_snapshot_at_planning": ["apps/**/jni/**", "apps/communication-card/**", "apps/security/**", "apps/core/algorithm/**"],
+      "resolution_inputs": {
+        "module_boundary_source": "filesystem_scan",
+        "dynamic_reference_resolved_at_checkpoint": "planning-late-binding @ 2026-05-24T16:10:00Z",
+        "resolved_by": "software-quality-agent",
+        "rationale": "本仓库无 JNI / native 代码（无 cpp/c/CMakeLists.txt/jni 目录）；纯 Kotlin Multiplatform",
+        "files_in_scope": [],
+        "applied_overrides": ["jni_instance_skipped_no_native_code", "enforcement_downgraded_blocking_to_not_applicable"],
+        "planning_snapshot_evaluation": "NOT_APPLICABLE"
+      }
     },
     {
       "instance_id": "INST-v1.26-017",
