@@ -91,7 +91,9 @@ val detektHighRisk by tasks.registering(io.gitlab.arturbosch.detekt.Detekt::clas
 //   2. ./gradlew :shared:apiDump → 生成 shared/api/shared.api
 //   3. 提交该文件 → 后续 apiCheck 自动比对
 apiValidation {
-    ignoredProjects.addAll(listOf("apps", "android", "web", "admin", "shared", "server"))
+    // ignoredProjects 必须用 Gradle 实际的 project name（叶子名）
+    // 本仓库实际 project 列表：apps, server, shared, android, web
+    ignoredProjects.addAll(listOf("apps", "android", "web", "shared", "server"))
     nonPublicMarkers.add("kotlin.PublishedApi")
 }
 
