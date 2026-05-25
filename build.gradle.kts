@@ -20,6 +20,9 @@ plugins {
     id("org.jetbrains.kotlinx.binary-compatibility-validator") version "0.14.0"
     // Issue #80 — OWASP Dependency-Check
     id("org.owasp.dependencycheck") version "9.2.0"
+    // Issue #83 — 基准测试（KMP 友好；kotlinx.benchmark）
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.10" apply false
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.24" apply false
 }
 
 // Issue #79 — detekt-formatting plugin（ktlint 集成）

@@ -2,6 +2,14 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.android.library")
+    // Issue #83 — kotlinx.benchmark + allopen（kotlinx.benchmark 需要 @State 类为 open）
+    id("org.jetbrains.kotlinx.benchmark")
+    id("org.jetbrains.kotlin.plugin.allopen")
+}
+
+// 让 kotlinx.benchmark 的 @State 注解类被 allopen 标记为 open（JMH 反射要求）
+allOpen {
+    annotation("org.openjdk.jmh.annotations.State")
 }
 
 @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
@@ -58,7 +66,32 @@ kotlin {
             }
         }
 
+        // Issue #83 — benchmark source set（只针对 JVM target；KMP wasmJs/Native 不支持 JMH）
+        val jvmBenchmark by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.10")
+            }
+        }
+        getByName("jvmMain").dependsOn(commonMain)  // 保持原依赖关系
+
         val wasmJsMain by getting
+    }
+}
+
+// Issue #83 — kotlinx.benchmark 配置
+benchmark {
+    targets {
+        register("jvmBenchmark")  // 注册上面新建的 source set
+    }
+    configurations {
+        named("main") {
+            warmups = 3
+            iterations = 5
+            iterationTime = 1
+            iterationTimeUnit = "s"
+            reportFormat = "json"  // 便于 CI 解析做回归对比
+        }
     }
 }
 
