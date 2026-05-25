@@ -29,7 +29,14 @@ kotlin {
         publishLibraryVariants("release", "debug")
     }
 
-    jvm()
+    jvm {
+        // Issue #83 — kotlinx.benchmark 推荐的 KMP pattern：
+        // 创建专门的 "benchmark" compilation 关联到 main，
+        // 自动产出 jvmBenchmark source set + jvmBenchmark Kotlin compilation
+        compilations.create("benchmark") {
+            associateWith(compilations.getByName("main"))
+        }
+    }
 
     wasmJs {
         browser()
@@ -66,14 +73,13 @@ kotlin {
             }
         }
 
-        // Issue #83 — benchmark source set（只针对 JVM target；KMP wasmJs/Native 不支持 JMH）
-        val jvmBenchmark by creating {
-            dependsOn(commonMain)
+        // Issue #83 — jvmBenchmark source set 由 jvm { compilations.create("benchmark") }
+        // 自动创建；这里只是 retrieve 并加 benchmark runtime 依赖
+        val jvmBenchmark by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.10")
             }
         }
-        getByName("jvmMain").dependsOn(commonMain)  // 保持原依赖关系
 
         val wasmJsMain by getting
     }

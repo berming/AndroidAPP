@@ -17,8 +17,8 @@ import java.util.concurrent.TimeUnit
  * 当前只覆盖 SettlementCalculator.calculate 的几个代表性场景；后续 Sprint B/C
  * 应补：CardRules.canBeat、ServerGameManager.computeAllFinishedScores、AI 决策。
  *
- * 跑法：
- *   ./gradlew :shared:jvmBenchmark
+ * 跑法（kotlinx.benchmark plugin 自动在 task 名加 Benchmark 后缀）：
+ *   ./gradlew :shared:jvmBenchmarkBenchmark
  *
  * 输出：shared/build/reports/benchmarks/main/<timestamp>/main.json
  *
