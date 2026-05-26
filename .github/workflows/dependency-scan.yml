@@ -1,0 +1,93 @@
+name: Dependency security scan
+
+# Issue #80 (UC11 Critical 整改 #4) — OWASP Dependency-Check 定时扫描
+#
+# 触发：
+#  - weekly cron（周一 04:00 UTC）
+#  - workflow_dispatch（手动）
+#  - PR 标 `security-scan` label
+#
+# NOT in regular PR CI（NVD 数据库首次下载 ~10min，会拖累所有 PR）。
+#
+# 配置：在 repo Secrets 中加 `NVD_API_KEY`（[免费申请](https://nvd.nist.gov/developers/request-an-api-key)）
+# 加速 NVD 数据库下载；无 key 也能跑，但首次扫描时间长且可能被 rate-limit。
+#
+# 失败条件：任一依赖 CVSS ≥ 7（在 build.gradle.kts `failBuildOnCVSS = 7.0f` 配置）
+# 误报抑制：编辑 `config/owasp-suppressions.xml`
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"  # 周一 04:00 UTC
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  dependency-scan:
+    # PR-triggered 时只在 `security-scan` label 时跑；其它触发器（cron / dispatch）始终跑
+    if: github.event_name != 'pull_request' || github.event.label.name == 'security-scan'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache OWASP NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: owasp-nvd-${{ runner.os }}-v1
+          restore-keys: |
+            owasp-nvd-${{ runner.os }}-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -n "$NVD_API_KEY" ]; then
+            ./gradlew dependencyCheckAnalyze --no-daemon -PnvdApiKey="$NVD_API_KEY"
+          else
+            echo "⚠️ NVD_API_KEY not set; download will be slower / rate-limited"
+            ./gradlew dependencyCheckAnalyze --no-daemon
+          fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: |
+            build/reports/dependency-check-report.html
+            build/reports/dependency-check-report.json
+            build/reports/dependency-check-report.xml
+          retention-days: 30
+
+      - name: Comment summary on PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## ❌ OWASP Dependency-Check 失败"
+            echo ""
+            echo "至少 1 个依赖含 CVSS ≥ 7 的高危 CVE。"
+            echo ""
+            echo "**查看完整报告**：[Actions artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) → \`dependency-check-report\`"
+            echo ""
+            echo "**处理方式**："
+            echo "1. 升级有漏洞的依赖到非 vulnerable 版本"
+            echo "2. 若 CVE 不适用本项目，在 \`config/owasp-suppressions.xml\` 添加 suppression"
+          } > comment.md
+          gh pr comment "$PR_NUMBER" --body-file comment.md
