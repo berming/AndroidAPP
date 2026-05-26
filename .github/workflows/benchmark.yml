@@ -17,6 +17,13 @@ on:
     types: [labeled]
   workflow_dispatch:
 
+# fork PR 上 GITHUB_TOKEN 默认是 read-only；显式声明 pull-requests: write
+# 让 same-repo PR 能 comment。fork PR 仍然不能 comment（GitHub 安全限制），
+# 此时 gh 命令会失败 — 用 `|| echo` 兜底，不让 comment 失败拖垮整个 job。
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   benchmark:
     if: github.event_name != 'pull_request' || github.event.label.name == 'bench'
@@ -78,4 +85,7 @@ jobs:
             echo ""
             echo "**回归阈值**：AQR rev=3 要求核心性能指标劣化 ≤ 5%（baseline 比对脚本待 follow-up；当前只产出绝对值）"
           } > comment.md
-          gh pr comment "$PR_NUMBER" --body-file comment.md
+          # 非致命：fork PR / Dependabot PR 上 token 是 read-only，comment 会失败；
+          # 不让评论失败拖垮整个 benchmark job（结果已上传 artifact，仍然可访问）
+          gh pr comment "$PR_NUMBER" --body-file comment.md \
+            || echo "(PR comment failed — likely read-only token on fork PR; report is in artifacts)"

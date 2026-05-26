@@ -22,6 +22,12 @@ on:
   pull_request:
     types: [labeled]
 
+# fork PR 上 GITHUB_TOKEN 默认是 read-only；显式声明 pull-requests: write
+# 让 same-repo PR 能 comment。fork PR 仍受 GitHub 安全限制 — gh 命令用 `|| echo` 兜底。
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   dependency-scan:
     # PR-triggered 时只在 `security-scan` label 时跑；其它触发器（cron / dispatch）始终跑
@@ -90,4 +96,6 @@ jobs:
             echo "1. 升级有漏洞的依赖到非 vulnerable 版本"
             echo "2. 若 CVE 不适用本项目，在 \`config/owasp-suppressions.xml\` 添加 suppression"
           } > comment.md
-          gh pr comment "$PR_NUMBER" --body-file comment.md
+          # 非致命：fork PR / Dependabot PR 上 token 是 read-only；不让评论失败掩盖真正的扫描失败
+          gh pr comment "$PR_NUMBER" --body-file comment.md \
+            || echo "(PR comment failed — likely read-only token; full report is in artifacts)"
