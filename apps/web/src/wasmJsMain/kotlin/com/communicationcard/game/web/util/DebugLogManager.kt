@@ -122,9 +122,18 @@ object DebugLogManager {
         LocalStorage.setString(STORAGE_KEY, truncated)
     }
 
-    fun getLogs(): List<LogEntry> = logs.toList()
+    fun getLogs(): List<LogEntry> {
+        // Codex P2 (PR #86)：每次读取时排空 pending errors，让运行时（init 之后）
+        // 抛出的 window.error / unhandledrejection 在用户点"刷新"时立即可见，
+        // 不必等到下次刷页。drainPendingErrors() 内部幂等：无 pending 时为 no-op。
+        drainPendingErrors()
+        return logs.toList()
+    }
 
-    fun getLogsAsString(): String = logs.joinToString("\n") { it.toString() }
+    fun getLogsAsString(): String {
+        drainPendingErrors()  // 同上：复制按钮也读最新
+        return logs.joinToString("\n") { it.toString() }
+    }
 
     fun clear() {
         logs.clear()
