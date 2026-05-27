@@ -1,0 +1,28 @@
+# detekt 高风险模块 override 配置（Issue #82 / UC11 Critical 整改 #6）
+#
+# 此文件**叠加**在 detekt.yml 之上，仅由 `detektHighRisk` task 加载。
+# AQR-2026-AndroidAPP rev=3 要求高风险模块更严格的复杂度阈值。
+#
+# 高风险模块清单（5 个，由 QAgent quality-planning-agent 在 v1.27 dispatch 中定义）：
+#   - shared/src/commonMain/kotlin/com/communicationcard/game/engine/**
+#   - shared/src/commonMain/kotlin/com/communicationcard/game/network/**
+#   - shared/src/commonMain/kotlin/com/communicationcard/game/ai/**
+#   - server/src/main/kotlin/com/communicationcard/server/admin/**
+#   - server/src/main/kotlin/com/communicationcard/server/ServerGameManager.kt
+
+complexity:
+  active: true
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 12  # AQR rev=3 高风险模块覆写值（默认 25）
+  ComplexCondition:
+    active: true
+    threshold: 4   # 高风险模块条件复杂度更严
+  NestedBlockDepth:
+    active: true
+    threshold: 4   # 默认 6 → 高风险 4
+  LongMethod:
+    active: true
+    threshold: 60  # 默认 120 → 高风险 60
+
+# 其他规则保持 detekt.yml 默认

@@ -189,6 +189,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <li><a href="#web-5-pr-3554">Web / 部署 / 功能阶段（约 5 个，PR #35–54）</a></li>
 <li><a href="#admin-web-3-pr-5862">Admin / Web 体验阶段（约 3 个，PR #58–62）</a></li>
 <li><a href="#admin-2-pr-6870">Admin 登录与部署阶段（约 2 个，PR #68–70）</a></li>
+<li><a href="#2-2026-05-22">连接故障排查阶段（约 2 个，2026-05-22）</a></li>
 </ul>
 </li>
 <li><a href="#aiclaude-65-4-post-34-admin-5">AI（Claude 主会话）自主发现的问题（~65 个，跨 4 轮深度审查 + post-#34 持续 + admin 5 段建设）</a><ul>
@@ -230,7 +231,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </li>
 <li><a href="#_25">第七章：工程经验与后续建议</a><ul>
 <li><a href="#_26">核心经验</a></li>
-<li><a href="#pr-170">交付成果（PR #1–#70 全程）</a></li>
+<li><a href="#pr-171_1">交付成果（PR #1–#71 全程）</a></li>
 <li><a href="#_27">后续建议行动</a></li>
 </ul>
 </li>
@@ -566,11 +567,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <td>#68–#70</td>
 <td>Ktor <code>CookieEncoding.RAW</code> → URI_ENCODING（单测通过）；线上 <code>ResponseCookies.append</code> 仍抛 IAE → <code>requireAdmin</code> 临时 hybrid bypass；3 个 @Ignore 测试待恢复；deploy.yml 加 <code>admin.db</code> 文件可写 pre-flight；Codex P1/P2 回复 + 文档全面刷新（architecture / regressions / playbooks / harness）</td>
 </tr>
+<tr>
+<td><strong>客户端连接故障排查 + server 关键路径解耦</strong></td>
+<td>2026-05-22</td>
+<td>分支 <code>claude/setup-pr-review-process-FZwHM</code>（commit <code>519a65b</code>）</td>
+<td>Android 连不上服务器根因排查；Web 5+ 次点击才连上根因分析；定位 <code>installAdmin before routing</code> 根因 → <code>routing{}</code> 先注册 + <code>installAdmin</code> 包入 <code>try-catch</code>，game WebSocket 与 admin 故障隔离；regressions #18 入库；DT FUZZ 高风险模块测试方案规划（暂未实施，见 §9.21）</td>
+</tr>
 </tbody>
 </table>
 <h3 id="_6">版本总量</h3>
 <ul>
-<li>总 PR：<strong>~70 个</strong> | 总 commit：<strong>约 270 次（非 merge）</strong> | <strong>有效开发 ~21 天</strong></li>
+<li>总 PR：<strong>~71 个</strong> | 总 commit：<strong>约 281 次（非 merge）</strong> | <strong>有效开发 ~22 天</strong></li>
 </ul>
 <h3 id="admin-5-ship-61-62">Admin 后台路线图（5 段 ship 在 #61 + #62）</h3>
 <table>
@@ -856,9 +863,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <tbody>
 <tr>
 <td><strong>人工测试 / 反馈</strong></td>
-<td>~40</td>
+<td>~42</td>
 <td>24%</td>
-<td>UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)</td>
+<td>UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)；客户端连接故障 Android + Web 5+ 次点击（2026-05-22）</td>
 </tr>
 <tr>
 <td><strong>Claude Code（主会话）</strong><br/>claude-opus-4-7 / sonnet-4-6</td>
@@ -886,7 +893,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </tr>
 <tr>
 <td><strong>合计</strong></td>
-<td><strong>~165</strong></td>
+<td><strong>~167</strong></td>
 <td>100%</td>
 <td>（Codex 列为精确审计，其余列为估算）</td>
 </tr>
@@ -1168,6 +1175,28 @@ pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级�
 <td>40</td>
 <td><strong>Admin 部署后写 SQLite 报 SQLITE_READONLY</strong>（目录可写但文件归 root）</td>
 <td>deploy.yml pre-flight 加两层检查（目录 + 文件）；exit 1 阻断部署（regressions #17）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="2-2026-05-22">连接故障排查阶段（约 2 个，2026-05-22）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>症状</th>
+<th>对应修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>41</td>
+<td><strong>Android 客户端无法连接服务器</strong>（WebSocket 握手持续失败）</td>
+<td>根因：<code>installAdmin</code> 在 <code>routing{}</code> 之前调用，admin 初始化异常时 <code>/game</code> 未注册；修复：<code>routing{}</code> 先执行，<code>installAdmin</code> 包入 <code>try-catch</code>（commit <code>519a65b</code>；regressions #18）</td>
+</tr>
+<tr>
+<td>42</td>
+<td><strong>Web 版要点 5+ 次"连接服务器"才能进 Connected</strong>（每次均 Connecting→Error→Disconnected）</td>
+<td>同 #41 根因（服务端 <code>/game</code> 未注册导致每次握手失败）；AppViewModel 幂等保护正确；服务端修复部署后首次点击即可连上，无需改动客户端</td>
 </tr>
 </tbody>
 </table>
@@ -2324,7 +2353,7 @@ PR / regressions.md 跟进。</p>
    comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）</li>
 <li><strong>每条 Bug 入 regressions.md</strong>：修完不仅 push 代码，<strong>还要写 8 字段
     Bug 卡片</strong>（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
-    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 <strong>17 条入库</strong>（#1-#17）</li>
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 <strong>18 条入库</strong>（#1-#18）</li>
 </ol>
 <h3 id="_19">协同效率数据</h3>
 <table>
@@ -2349,11 +2378,11 @@ PR / regressions.md 跟进。</p>
 </tr>
 <tr>
 <td>代码提交（非 merge）</td>
-<td>约 270 次</td>
+<td>约 281 次</td>
 </tr>
 <tr>
 <td>从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"</td>
-<td>有效开发 ~21 天</td>
+<td>有效开发 ~22 天</td>
 </tr>
 <tr>
 <td>单次修复成功率</td>
@@ -2576,7 +2605,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
      拆分；single-purpose commit 让 review 焦点不会被淹没</li>
 <li><strong>原则</strong>：commit 粒度 = review 粒度；不是"PR = review 单元"</li>
 </ol>
-<h3 id="pr-170">交付成果（PR #1–#70 全程）</h3>
+<h3 id="pr-171_1">交付成果（PR #1–#71 全程）</h3>
 <table>
 <thead>
 <tr>
@@ -2587,15 +2616,15 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <tbody>
 <tr>
 <td>合并 PR 数</td>
-<td><strong>~70 个</strong>（#1–#70）</td>
+<td><strong>~71 个</strong>（#1–#71）</td>
 </tr>
 <tr>
 <td>非 merge commit 数</td>
-<td>约 270 次</td>
+<td>约 281 次</td>
 </tr>
 <tr>
 <td>修复问题</td>
-<td><strong>~165 个</strong>（其中 Codex 精确审计 28，详见 §四）</td>
+<td><strong>~167 个</strong>（其中 Codex 精确审计 28，详见 §四）</td>
 </tr>
 <tr>
 <td>客户端</td>

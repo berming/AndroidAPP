@@ -1,0 +1,91 @@
+name: Performance benchmark
+
+# Issue #83 (UC11 Critical 整改 #7) — kotlinx.benchmark 性能基准
+#
+# 触发：
+#  - PR 标 `bench` label
+#  - workflow_dispatch（手动）
+#
+# NOT in regular PR CI（benchmark 慢，~30s 以上；只在需要时跑）。
+#
+# 输出：
+#  - Artifact `benchmark-report`：JSON + HTML（kotlinx.benchmark 生成）
+#  - PR 评论：摘要 + 与上次基准对比（如果有 baseline）
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+
+# fork PR 上 GITHUB_TOKEN 默认是 read-only；显式声明 pull-requests: write
+# 让 same-repo PR 能 comment。fork PR 仍然不能 comment（GitHub 安全限制），
+# 此时 gh 命令会失败 — 用 `|| echo` 兜底，不让 comment 失败拖垮整个 job。
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    if: github.event_name != 'pull_request' || github.event.label.name == 'bench'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 需要 git history 找 baseline commit
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Run benchmarks (PR)
+        run: |
+          set -o pipefail
+          ./gradlew :shared:jvmBenchmarkBenchmark --no-daemon 2>&1 | tee benchmark.log
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report
+          path: |
+            shared/build/reports/benchmarks/
+            benchmark.log
+          retention-days: 30
+
+      - name: Comment summary on PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## 📊 性能基准测试结果"
+            echo ""
+            echo "<details><summary>kotlinx.benchmark 输出（点击展开）</summary>"
+            echo ""
+            echo '```'
+            # 提取 benchmark 结果块（kotlinx.benchmark 标准输出格式）
+            grep -E "Benchmark|^[a-zA-Z].*\\.(throughput|avgt|sample|ss|sample|us|ns|ms|s)/op" benchmark.log \
+              | head -50 \
+              || echo "(no benchmark output captured)"
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "**完整 HTML 报告**：[Actions artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) → \`benchmark-report\`"
+            echo ""
+            echo "**回归阈值**：AQR rev=3 要求核心性能指标劣化 ≤ 5%（baseline 比对脚本待 follow-up；当前只产出绝对值）"
+          } > comment.md
+          # 非致命：fork PR / Dependabot PR 上 token 是 read-only，comment 会失败；
+          # 不让评论失败拖垮整个 benchmark job（结果已上传 artifact，仍然可访问）
+          gh pr comment "$PR_NUMBER" --body-file comment.md \
+            || echo "(PR comment failed — likely read-only token on fork PR; report is in artifacts)"

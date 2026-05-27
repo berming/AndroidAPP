@@ -3,6 +3,7 @@ plugins {
     kotlin("plugin.serialization")
     id("io.gitlab.arturbosch.detekt")
     application
+    jacoco
 }
 
 group = "com.communicationcard"
@@ -65,4 +66,37 @@ tasks.withType<JavaCompile> {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions.jvmTarget = "17"
+}
+
+// SWD-DT-COV-001 — JaCoCo 覆盖率（Issue #78）
+// 目标值见 AQR rev=3：全量 ≥75%，高风险模块 ≥85%。
+// 当前仅产出报告，不阻断 PR；接到 CI artifact 后由 software-quality-agent
+// 在 checkpoint 比较实际值，违阈值才返回 HOLD。
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)   // CI 上传 / software-quality-agent 解析
+        html.required.set(true)  // 本地 dev 查看
+        csv.required.set(false)
+    }
+    // 排除生成代码 + 测试代码本身
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                exclude(
+                    "**/*Test*.class",
+                    "**/*\$Companion.class",
+                    "**/*\$*\$serializer.class"
+                )
+            }
+        })
+    )
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
 }

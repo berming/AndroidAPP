@@ -81,9 +81,10 @@
 | **Admin 后台 MVP**（5 段 PR）| 2026-05-13 | #61 | PR 0 骨架（bind 127.0.0.1）/ PR 1 SQLite + bcrypt + RBAC 鉴权 / PR 2 监控 API（overview/rooms/players/sessions/games）+ GameHistoryStore / PR 3 告警引擎（3 内置规则）/ PR 4 Vue 3 + Element Plus SPA + Caddy /admin/ 子路径；CLAUDE.md 约束 9/10 |
 | **Admin 优化收尾**（4 段 PR 5）| 2026-05-13 | #62 | 5a SSE 替代 30s 轮询 / 5b Dashboard 7 天 ECharts 趋势图 / 5c logstash JSON 日志 / 5d game_events 表 + 逐手出牌持久化；同期修 Codex P2（gameEventListener 锁内调用）+ Web 连点 3 次幂等 |
 | **Admin 登录 IAE + auth bypass + 部署权限修复** | 2026-05-17 | #68–#70 | Ktor `CookieEncoding.RAW` → URI_ENCODING（单测通过）；线上 `ResponseCookies.append` 仍抛 IAE → `requireAdmin` 临时 hybrid bypass；3 个 @Ignore 测试待恢复；deploy.yml 加 `admin.db` 文件可写 pre-flight；Codex P1/P2 回复 + 文档全面刷新（architecture / regressions / playbooks / harness）|
+| **客户端连接故障排查 + server 关键路径解耦** | 2026-05-22 | 分支 `claude/setup-pr-review-process-FZwHM`（commit `519a65b`）| Android 连不上服务器根因排查；Web 5+ 次点击才连上根因分析；定位 `installAdmin before routing` 根因 → `routing{}` 先注册 + `installAdmin` 包入 `try-catch`，game WebSocket 与 admin 故障隔离；regressions #18 入库；DT FUZZ 高风险模块测试方案规划（暂未实施，见 §9.21）|
 
 ### 版本总量
-- 总 PR：**~70 个** | 总 commit：**约 270 次（非 merge）** | **有效开发 ~21 天**
+- 总 PR：**~71 个** | 总 commit：**约 281 次（非 merge）** | **有效开发 ~22 天**
 
 ### Admin 后台路线图（5 段 ship 在 #61 + #62）
 
@@ -211,12 +212,12 @@
 
 | 来源 | 数量 | 占比 | 特点 |
 |------|------|------|------|
-| **人工测试 / 反馈** | ~40 | 24% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)|
+| **人工测试 / 反馈** | ~42 | 24% | UI 体验、部署环境、运行时崩溃；真机发现（PR #62 起含 web 连点 bug、admin 真机验证）；生产环境发现 admin 登录 HTTP 500 (#68-70) + SQLITE_READONLY (#70)；客户端连接故障 Android + Web 5+ 次点击（2026-05-22）|
 | **Claude Code（主会话）**<br/>claude-opus-4-7 / sonnet-4-6 | ~65 | 39% | 全量扫描、跨文件链路、并发/工具链陷阱；PR #61–62 期间 4 次 CI 修复回路（Kotlin 嵌套块注释 / arrayOf+= / runTest 虚拟时钟 / withCharset）|
 | **Claude pr-reviewer**<br/>（Opus 4.7 独立 context，PR-H5 后）| ~22 | 13% | PR #61 一次审出 1 P0（AlertDto class 没定义但被 import 用）+ 4 P1（race / router timing / chmod / 文档），都在合并前修了 |
 | **ChatGPT Codex Review Bot**<br/>chatgpt-codex-connector[bot] | **28**（精确）| 17% | 全量审计（详见 §四"Codex Review Bot"）；PR #62 找到关键 P2：gameEventListener 锁外调用导致并发 action seq 倒置；PR #70 找到 auth bypass 风险 + admin.db 可写检查缺失；PR #71 发现文档错误（bypass 不能修复 login）|
 | **重叠 / 联合发现** | ~12 | 7% | Codex 标记 → Claude 深挖根因 |
-| **合计** | **~165** | 100% | （Codex 列为精确审计，其余列为估算）|
+| **合计** | **~167** | 100% | （Codex 列为精确审计，其余列为估算）|
 
 > **核心规律**：人工发现"能看见的问题"，Claude 主会话发现"藏在代码里的问题"，
 > pr-reviewer 发现"功能完整性 + 跨文件契约"，Codex 发现"语句级细粒度风险"。
@@ -295,6 +296,13 @@
 |---|------|---------|
 | 39 | **Admin 控制台登录返回 HTTP 500**（生产环境上线即失效）| Ktor `CookieEncoding` IAE；切 URI_ENCODING（单测过）；线上仍 IAE → requireAdmin hybrid bypass 临时措施；login 仍返回 500（regressions #16）|
 | 40 | **Admin 部署后写 SQLite 报 SQLITE_READONLY**（目录可写但文件归 root）| deploy.yml pre-flight 加两层检查（目录 + 文件）；exit 1 阻断部署（regressions #17）|
+
+#### 连接故障排查阶段（约 2 个，2026-05-22）
+
+| # | 症状 | 对应修复 |
+|---|------|---------|
+| 41 | **Android 客户端无法连接服务器**（WebSocket 握手持续失败）| 根因：`installAdmin` 在 `routing{}` 之前调用，admin 初始化异常时 `/game` 未注册；修复：`routing{}` 先执行，`installAdmin` 包入 `try-catch`（commit `519a65b`；regressions #18）|
+| 42 | **Web 版要点 5+ 次"连接服务器"才能进 Connected**（每次均 Connecting→Error→Disconnected）| 同 #41 根因（服务端 `/game` 未注册导致每次握手失败）；AppViewModel 幂等保护正确；服务端修复部署后首次点击即可连上，无需改动客户端 |
 
 ---
 
@@ -649,7 +657,7 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
    comment；AI 拉 comment = 远程读 CI 日志（详见 §9.9.5 + ci-failure-triage.md §5）
 10. **每条 Bug 入 regressions.md**：修完不仅 push 代码，**还要写 8 字段
     Bug 卡片**（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
-    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 **17 条入库**（#1-#17）
+    扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 **18 条入库**（#1-#18）
 
 ### 协同效率数据
 
@@ -658,8 +666,8 @@ Level 4：AI 主动审查，人工验证  ← 最高效模式
 | 人工总投入时间 | ~60 小时（需求 + 反馈 + 真机测试 + 跨多个会话）|
 | AI 等效工作时间 | ~600 小时（按工程师正常速度估算）|
 | **提速比** | **约 10 倍** |
-| 代码提交（非 merge）| 约 270 次 |
-| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 ~21 天 |
+| 代码提交（非 merge）| 约 281 次 |
+| 从"单机 Android"到"双端 + 服务端 + Admin SPA + Harness"| 有效开发 ~22 天 |
 | 单次修复成功率 | ~12%（卡死问题 8 次 commit 才彻底解决） |
 | → 启示 | 提速的代价是迭代次数增加，需要轻量 review 流程 + harness 兜底 |
 
@@ -794,13 +802,13 @@ override fun onOpen(ws: WebSocket, response: Response) {
      拆分；single-purpose commit 让 review 焦点不会被淹没
    - **原则**：commit 粒度 = review 粒度；不是"PR = review 单元"
 
-### 交付成果（PR #1–#70 全程）
+### 交付成果（PR #1–#71 全程）
 
 | 指标 | 数值 |
 |------|------|
-| 合并 PR 数 | **~70 个**（#1–#70）|
-| 非 merge commit 数 | 约 270 次 |
-| 修复问题 | **~165 个**（其中 Codex 精确审计 28，详见 §四）|
+| 合并 PR 数 | **~71 个**（#1–#71）|
+| 非 merge commit 数 | 约 281 次 |
+| 修复问题 | **~167 个**（其中 Codex 精确审计 28，详见 §四）|
 | 客户端 | Android (XML) + Web (CMP/wasmJs) + **Admin SPA (Vue 3 / Element Plus)** |
 | 共享模块 | `:shared` KMP（消灭约束 1/4） |
 | 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|

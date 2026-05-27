@@ -58,7 +58,11 @@ fun App() {
                             onReset = vm::resetStats,
                             onBack = vm::goHome,
                         )
-                        is Screen.Help -> HelpScreen(onBack = vm::goHome)
+                        is Screen.Help -> HelpScreen(
+                            onBack = vm::goHome,
+                            onOpenDebugLog = vm::openDebugLog,
+                        )
+                        is Screen.DebugLog -> DebugLogScreen(onBack = vm::openHelp)
                         is Screen.Lobby -> LobbyScreen(
                             state = s,
                             onCreateRoom = vm::createRoom,

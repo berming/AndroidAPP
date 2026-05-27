@@ -233,6 +233,18 @@
 
 ---
 
+## #18  Admin 初始化失败导致游戏 WebSocket /game 端点未注册
+
+| 字段 | 内容 |
+|------|------|
+| 症状 | Android / Web 客户端无法连接服务器；服务器日志显示 admin 模块报错（SQLITE_READONLY / `admin_users` 空但 `ADMIN_INITIAL_PASSWORD` 未配置等），但服务进程仍在运行 |
+| 根因 | `Application.gameModule()` 中 `installAdmin(serverContext)` 在 `routing {}` 块之前调用。若 `installAdmin` 抛出异常（如 `AdminDb.runMigrations()` 因 SQLITE_READONLY 失败、或 fail-fast 检查认为管理员表为空），则其后的 `routing {}` 块**永不执行**，导致 `GET /`、`GET /health`、`webSocket("/game")` 均未注册。Caddy 反代到 `:8080` 时找不到路由，客户端握手失败 |
+| 修复 | 重排 `Application.kt`：`routing {}` 移到 `installAdmin` 之前；`installAdmin` 包入 `try-catch(Exception)`——异常时打印错误日志但继续运行，游戏 WebSocket 不受 admin 模块故障影响 |
+| 教训 | (1) **关键路径（游戏 WebSocket）和可选模块（admin）之间必须有故障隔离**：可选模块的初始化异常不能阻断关键路径。(2) **启动时的顺序依赖是隐形 P0**：`installAdmin` 后调 `routing {}` 在代码里看起来是顺序，但 `installAdmin` 内部有大量可能失败的 IO 操作（SQLite open / migrate / bootstrap）。(3) 下次看到"服务进程还在但客户端连不上"时，第一步应检查服务端日志里有没有**启动阶段的异常**（区别于请求阶段异常） |
+| 防回归测试 | `ApplicationBootstrapTest`：补一个测试——`gameModule(enableAdmin = true)` 在 `installAdmin` 抛异常时，`GET /health` 仍返回 200（需要 mock 或条件触发）。当前无此测试；短期靠代码结构（routing 先于 try-catch admin）保证 |
+
+---
+
 ## 防回归策略（PR-H2 起逐步落地）
 
 | 类别 | 落地点 |

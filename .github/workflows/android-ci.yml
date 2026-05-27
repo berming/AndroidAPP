@@ -133,6 +133,11 @@ jobs:
       # 服务端单元测试（含 ServerGameManagerTest）
       # PR-H3 起 server 是 :server 子项目，不再需要 working-directory。
       - name: Run server unit tests
+        env:
+          # 让 FuzzTestBase.recordResult() 把 ut_fuzz_record 事件写到
+          # .quality/check-records.jsonl，供下次 UC9/UC10 出口评估消费。
+          # 本地 IDE 默认不写盘（避免污染审计文件），CI 显式开启。
+          WRITE_FUZZ_RECORDS: "1"
         run: |
           set -o pipefail
           ./gradlew :server:test --info --stacktrace 2>&1 \
