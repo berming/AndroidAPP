@@ -476,6 +476,82 @@ PR / regressions.md 跟进。
 
 ## 第五章：人工与 AI 协同模式深度解析
 
+### 5.0 实际授权分布（commit 级别真实数据，PR #1–#86）
+
+> 本节数据来自 `git log` 实测 + commit message 中的 `AI-Assisted-By:` 行（CLAUDE.md
+> §八 强制规范的署名）。**不是估算**——是按每条 commit 精确归口的统计结果。
+
+#### Commit author 分布
+
+```
+AUTHORSHIP_PIE
+total: 285 commits
+  Claude (AI 直接产出):   224 commits   79%
+  berming (人工合并 PR):   56 merge     20%   ← 仅点 merge 按钮，不含代码改动
+  berming (人工写代码):     2 commits   <1%   ← LobbyActivity URL 更新 + dev_summary 错字
+  bermin (legacy):          1 commit    <1%
+```
+
+**结论**：除 2 个 trivial 改动（合计 ~5 行），本仓所有 Kotlin / Vue / TS / XML / YAML 代码
+**都是 AI 写的**。人工角色 ≈ **产品经理 + 测试员 + 合并按钮**：报 bug、选方向、跑真机、点 merge。
+
+#### AI 写的部分——按模型版本（从 `AI-Assisted-By:` 字段精确统计）
+
+```
+MODEL_BAR
+Claude Opus 4.7 (1M context):    114 commits   ████████████████████████  架构 / 协议 / harness / 质量体系 / Admin SPA
+Claude Opus 4.7 (200K):            32 commits   ███████                   review 修复 / 小特性
+Claude Sonnet 4.6:                 31 commits   ███████                   review 修复 / CI 修绿 / 文档刷新
+Claude Haiku 4.5:                  隐性          (/pre-commit-scan 调用)    静态扫描 / 测试用例生成
+ChatGPT Codex:                      2 直接 + 34 finding                    跨 vendor 审查（不写主代码）
+```
+
+#### 按模块的实际承担
+
+| 模块 | 行数 | AI 占比 | 主要产出模型 | 协同 agent / 命令 |
+|------|------|--------|------------|------------------|
+| `:apps:android` | ~10.3K | 100% | Opus 4.7 (1M) 主写 + Sonnet 4.6 修补 | 主会话 + Codex review |
+| `:apps:web`（Compose MP / wasmJs）| ~4.3K | 100% | Opus 4.7 (1M)（PR #35 KMP 重构）| 主会话 |
+| `:shared`（KMP commonMain）| ~3.7K | 100% | Opus 4.7 (1M) 抽取 + 协议 DTO 设计 | 主会话 + `protocol-syncer` subagent |
+| `:server`（Ktor + admin）| ~8.6K | 100% | Opus 4.7 (1M)（架构）+ Sonnet 4.6（细节）| 主会话 + `pr-reviewer` |
+| `apps/admin`（Vue 3 SPA）| ~1.5K | 100% | Opus 4.7 (1M)（PR #61–62 一次成型）| 主会话 |
+| 测试（17 文件 / 195+ 用例）| ~4.6K | 100% | Haiku 4.5（红测试）→ Sonnet 4.6（实现）→ Opus 4.7（审查覆盖）| `tdd-scaffolder` + `/pre-commit-scan` |
+| Fuzz 测试（PR #74）| ~940 | 100% | Opus 4.7 (1M) | `software-quality-agent` |
+| CI / 部署 / playbook | — | 100% | Opus 4.7 (1M) | 主会话 |
+| **人工 commit** | ~5 行 | — | — | `LobbyActivity` SERVER_URL 字符串 + dev_summary 错字 |
+
+#### AI Agent 角色分工（`.claude/agents/` + `.claude/commands/` 实际配置）
+
+| Agent / 命令 | 模型 | 触发方式 | 职责 |
+|------------|------|---------|------|
+| **主会话** | Opus 4.7 (1M) / Sonnet 4.6 | 默认 | 全局开发，跨文件改动 |
+| **`pr-reviewer`** | Opus 4.7（独立 context）| `/review-pr <#>` | PR 对抗审查（4 关之第 3 关）|
+| **`protocol-syncer`** | Sonnet 4.6 | GameMessage 改动时自动 | 校验 `PROTOCOL_VERSION` bump |
+| **`tdd-scaffolder`** | Haiku 4.5 | 被 `/trace-bug` 调用 | 关键路径函数 → 失败测试骨架 |
+| **`software-quality-agent`** | Opus 4.7 (1M) | UC9 双仓评估 | v1.26/v1.27 质量计划 + fuzz backlog |
+| **`/pre-commit-scan`** | Haiku 4.5 | 提交前 | 批量扫 null safety / 异常路径 / 共享逻辑一致 |
+| **Codex Bot**（外部 vendor）| ChatGPT Codex | 每个 PR 自动 | 跨 vendor 审查（4 关之第 4 关）|
+
+#### 4 关 PR 流程里的 AI 分工（再次强调）
+
+```
+LANE_4GATES
+gate 1: CI                     机器（tdd-gate + detekt + tests + JaCoCo + dep-scan）
+gate 2: Codex Bot              ChatGPT Codex（跨 vendor，34 条 finding，0 误报）
+gate 3: Claude /review-pr      Claude Opus 4.7（pr-reviewer subagent，独立 context）
+gate 4: 真机验证 (manual)      ← 唯一必须人工的关
+```
+
+#### 量化推论
+
+- **224 / 285 ≈ 79% commit 由 AI 完成**；人工的 2 个非 merge commit 加起来 < 10 行
+- **Opus 4.7 是主力**（146 / 177 ≈ 83% AI commit）；Sonnet 处理碎活 / 修红 CI；
+  Haiku 不直接产出 commit，但通过 `/pre-commit-scan` + `tdd-scaffolder` 隐性贡献
+- **跨 vendor 不可省**：Codex 的 34 条 finding 里有 **1 条 P0 真 bug**（BCrypt SIOOBE），
+  同 vendor 的 Claude 自查（pr-reviewer）没发现——印证 "再强的 AI 也存在系统性盲区"
+
+---
+
 ### 协同的四个层次
 
 ```

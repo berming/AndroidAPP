@@ -201,34 +201,43 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 </ul>
 </li>
 <li><a href="#ai_1">第五章：人工与 AI 协同模式深度解析</a><ul>
-<li><a href="#_12">协同的四个层次</a></li>
-<li><a href="#_13">实际分工矩阵</a></li>
-<li><a href="#ai_2">AI 显著优于人工的场景</a></li>
-<li><a href="#_14">人工不可替代的场景</a></li>
-<li><a href="#_15">协同反模式（要避免）</a></li>
-<li><a href="#_16">高效协同最佳实践</a></li>
-<li><a href="#_17">协同效率数据</a></li>
+<li><a href="#50-commit-pr-186">5.0 实际授权分布（commit 级别真实数据，PR #1–#86）</a><ul>
+<li><a href="#commit-author">Commit author 分布</a></li>
+<li><a href="#ai-ai-assisted-by">AI 写的部分——按模型版本（从 AI-Assisted-By: 字段精确统计）</a></li>
+<li><a href="#_12">按模块的实际承担</a></li>
+<li><a href="#ai-agent-claudeagents-claudecommands">AI Agent 角色分工（.claude/agents/ + .claude/commands/ 实际配置）</a></li>
+<li><a href="#4-pr-ai">4 关 PR 流程里的 AI 分工（再次强调）</a></li>
+<li><a href="#_13">量化推论</a></li>
 </ul>
 </li>
-<li><a href="#_18">第六章：关键技术修复</a><ul>
-<li><a href="#_19">游戏卡死——四层防御</a></li>
-<li><a href="#_20">重连失效——异步时序陷阱</a></li>
-<li><a href="#_21">两端结算不一致——统一公式</a></li>
+<li><a href="#_14">协同的四个层次</a></li>
+<li><a href="#_15">实际分工矩阵</a></li>
+<li><a href="#ai_2">AI 显著优于人工的场景</a></li>
+<li><a href="#_16">人工不可替代的场景</a></li>
+<li><a href="#_17">协同反模式（要避免）</a></li>
+<li><a href="#_18">高效协同最佳实践</a></li>
+<li><a href="#_19">协同效率数据</a></li>
+</ul>
+</li>
+<li><a href="#_20">第六章：关键技术修复</a><ul>
+<li><a href="#_21">游戏卡死——四层防御</a></li>
+<li><a href="#_22">重连失效——异步时序陷阱</a></li>
+<li><a href="#_23">两端结算不一致——统一公式</a></li>
 <li><a href="#web-cjk">Web 中文字体（CJK 豆腐块）</a></li>
-<li><a href="#_22">双层防火墙——部署对称陷阱</a></li>
+<li><a href="#_24">双层防火墙——部署对称陷阱</a></li>
 <li><a href="#android-url">Android URL 漂移——拓扑变更盲区</a></li>
 </ul>
 </li>
-<li><a href="#_23">第七章：工程经验与后续建议</a><ul>
-<li><a href="#_24">核心经验</a></li>
+<li><a href="#_25">第七章：工程经验与后续建议</a><ul>
+<li><a href="#_26">核心经验</a></li>
 <li><a href="#pr-170">交付成果（PR #1–#70 全程）</a></li>
-<li><a href="#_25">后续建议行动</a></li>
+<li><a href="#_27">后续建议行动</a></li>
 </ul>
 </li>
 <li><a href="#ai-claude">第八章：AI 质量改进路径——多 Claude 模型协同</a><ul>
 <li><a href="#81-ai-bug">8.1 反思：为什么 AI 写的代码 Bug 不少？</a><ul>
 <li><a href="#bug">生成阶段必然有 Bug 的结构性原因</a></li>
-<li><a href="#_26">多轮自审仍能发现新问题的原因</a></li>
+<li><a href="#_28">多轮自审仍能发现新问题的原因</a></li>
 </ul>
 </li>
 <li><a href="#82-claude">8.2 多 Claude 模型协同</a></li>
@@ -268,10 +277,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
 <li><a href="#916-admin-spa-npm-caddy-pr-61-4">9.16 Admin SPA 部署链路：纯 npm 子项目 + Caddy 路由顺序（PR #61 / 4 实战）</a></li>
 <li><a href="#917-admin-claudemd-9">9.17 Admin 与游戏关键路径的"运维层不阻塞业务层"分离（CLAUDE.md 约束 9）</a></li>
 <li><a href="#918-pr-58-62">9.18 质量金字塔：PR #58-62 五层审查的量化实证</a><ul>
-<li><a href="#_27">五层各自的本期产出</a></li>
-<li><a href="#_28">每层的"独占"作用</a></li>
+<li><a href="#_29">五层各自的本期产出</a></li>
+<li><a href="#_30">每层的"独占"作用</a></li>
 <li><a href="#5">反推：哪些问题不能被这 5 层覆盖</a></li>
-<li><a href="#_29">三个量化指标作为"质量基线"</a></li>
+<li><a href="#_31">三个量化指标作为"质量基线"</a></li>
 </ul>
 </li>
 <li><a href="#919-admin-http-500-auth-bypasspr-6870">9.19 Admin 登录 HTTP 500 与临时 Auth Bypass（PR #68–70 实战）</a></li>
@@ -1844,7 +1853,266 @@ PR / regressions.md 跟进。</p>
   跨 vendor 在并发场景尤其值钱</p>
 <hr>
 <h2 id="ai_1">第五章：人工与 AI 协同模式深度解析</h2>
-<h3 id="_12">协同的四个层次</h3>
+<h3 id="50-commit-pr-186">5.0 实际授权分布（commit 级别真实数据，PR #1–#86）</h3>
+<blockquote>
+<p>本节数据来自 <code>git log</code> 实测 + commit message 中的 <code>AI-Assisted-By:</code> 行（CLAUDE.md
+§八 强制规范的署名）。<strong>不是估算</strong>——是按每条 commit 精确归口的统计结果。</p>
+</blockquote>
+<h4 id="commit-author">Commit author 分布</h4>
+<svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="Commit 授权分布">
+<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Commit author 分布（PR #1–#86 全程，共 285 commit）</text>
+<path d="M 220 200 L 220.00 50.00 A 150 150 0 1 1 75.08 161.31 Z" fill="#2563eb" stroke="#fff" stroke-width="2"/>
+<text x="279" y="277" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">79%</text>
+<path d="M 220 200 L 75.08 161.31 A 150 150 0 0 1 210.02 50.33 Z" fill="#94a3b8" stroke="#fff" stroke-width="2"/>
+<text x="158" y="125" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">20%</text>
+<path d="M 220 200 L 210.02 50.33 A 150 150 0 0 1 216.67 50.04 Z" fill="#dc2626" stroke="#fff" stroke-width="2"/>
+<path d="M 220 200 L 216.67 50.04 A 150 150 0 0 1 220.00 50.00 Z" fill="#94a3b8" stroke="#fff" stroke-width="2"/>
+<g transform="translate(440 90)">
+  <rect width="18" height="18" rx="3" fill="#2563eb"/>
+  <text x="28" y="14" font-size="13" fill="#111827">Claude（AI 直接产出 commit）</text>
+  <text x="28" y="32" font-size="12" fill="#475569">224 commit · 79.2%</text>
+</g>
+<g transform="translate(440 146)">
+  <rect width="18" height="18" rx="3" fill="#94a3b8"/>
+  <text x="28" y="14" font-size="13" fill="#111827">berming（仅 PR merge 按钮）</text>
+  <text x="28" y="32" font-size="12" fill="#475569">56 commit · 19.8%</text>
+</g>
+<g transform="translate(440 202)">
+  <rect width="18" height="18" rx="3" fill="#dc2626"/>
+  <text x="28" y="14" font-size="13" fill="#111827">berming（人工写代码 commit）</text>
+  <text x="28" y="32" font-size="12" fill="#475569">2 commit · 0.7%</text>
+</g>
+<g transform="translate(440 258)">
+  <rect width="18" height="18" rx="3" fill="#94a3b8"/>
+  <text x="28" y="14" font-size="13" fill="#111827">bermin（legacy）</text>
+  <text x="28" y="32" font-size="12" fill="#475569">1 commit · 0.4%</text>
+</g>
+<text x="220" y="380" text-anchor="middle" font-size="12" fill="#475569">人工 2 个非 merge commit 合计 ~5 行代码 — 其余 99%+ 代码由 AI 产出</text>
+</svg>
+
+<p><strong>结论</strong>：除 2 个 trivial 改动（合计 ~5 行），本仓所有 Kotlin / Vue / TS / XML / YAML 代码
+<strong>都是 AI 写的</strong>。人工角色 ≈ <strong>产品经理 + 测试员 + 合并按钮</strong>：报 bug、选方向、跑真机、点 merge。</p>
+<h4 id="ai-ai-assisted-by">AI 写的部分——按模型版本（从 <code>AI-Assisted-By:</code> 字段精确统计）</h4>
+<svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="AI 模型版本分布">
+<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">AI 写的 commit — 按模型版本（from AI-Assisted-By 字段）</text>
+<g transform="translate(20 60)">
+  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">Claude Opus 4.7 (1M context)</text>
+  <rect x="280" y="0" width="360" height="22" rx="3" fill="#7c3aed"/>
+  <text x="648" y="16" font-size="13" font-weight="700" fill="#111827">114 commit</text>
+  <text x="0" y="36" font-size="11" fill="#475569">架构 / 协议 / harness / 质量体系 / Admin SPA</text>
+</g>
+<g transform="translate(20 116)">
+  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">Claude Opus 4.7 (200K)</text>
+  <rect x="280" y="0" width="101" height="22" rx="3" fill="#a78bfa"/>
+  <text x="389" y="16" font-size="13" font-weight="700" fill="#111827">32 commit</text>
+  <text x="0" y="36" font-size="11" fill="#475569">review 修复 / 小特性</text>
+</g>
+<g transform="translate(20 172)">
+  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">Claude Sonnet 4.6</text>
+  <rect x="280" y="0" width="98" height="22" rx="3" fill="#2563eb"/>
+  <text x="386" y="16" font-size="13" font-weight="700" fill="#111827">31 commit</text>
+  <text x="0" y="36" font-size="11" fill="#475569">review 修复 / CI 修绿 / 文档刷新</text>
+</g>
+<g transform="translate(20 228)">
+  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">Claude Haiku 4.5 (隐性)</text>
+  <rect x="280" y="0" width="6" height="22" rx="3" fill="#94a3b8" opacity="0.4"/>
+  <text x="294" y="16" font-size="13" font-style="italic" fill="#94a3b8">不直接产 commit</text>
+  <text x="0" y="36" font-size="11" fill="#475569">/pre-commit-scan + tdd-scaffolder 调用</text>
+</g>
+<g transform="translate(20 284)">
+  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">ChatGPT Codex (review only)</text>
+  <rect x="280" y="0" width="6" height="22" rx="3" fill="#16a34a"/>
+  <text x="294" y="16" font-size="13" font-weight="700" fill="#111827">2 commit</text>
+  <text x="0" y="36" font-size="11" fill="#475569">跨 vendor 审查 · 34 finding · 1 P0 真 bug</text>
+</g>
+</svg>
+
+<h4 id="_12">按模块的实际承担</h4>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>行数</th>
+<th>AI 占比</th>
+<th>主要产出模型</th>
+<th>协同 agent / 命令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>:apps:android</code></td>
+<td>~10.3K</td>
+<td>100%</td>
+<td>Opus 4.7 (1M) 主写 + Sonnet 4.6 修补</td>
+<td>主会话 + Codex review</td>
+</tr>
+<tr>
+<td><code>:apps:web</code>（Compose MP / wasmJs）</td>
+<td>~4.3K</td>
+<td>100%</td>
+<td>Opus 4.7 (1M)（PR #35 KMP 重构）</td>
+<td>主会话</td>
+</tr>
+<tr>
+<td><code>:shared</code>（KMP commonMain）</td>
+<td>~3.7K</td>
+<td>100%</td>
+<td>Opus 4.7 (1M) 抽取 + 协议 DTO 设计</td>
+<td>主会话 + <code>protocol-syncer</code> subagent</td>
+</tr>
+<tr>
+<td><code>:server</code>（Ktor + admin）</td>
+<td>~8.6K</td>
+<td>100%</td>
+<td>Opus 4.7 (1M)（架构）+ Sonnet 4.6（细节）</td>
+<td>主会话 + <code>pr-reviewer</code></td>
+</tr>
+<tr>
+<td><code>apps/admin</code>（Vue 3 SPA）</td>
+<td>~1.5K</td>
+<td>100%</td>
+<td>Opus 4.7 (1M)（PR #61–62 一次成型）</td>
+<td>主会话</td>
+</tr>
+<tr>
+<td>测试（17 文件 / 195+ 用例）</td>
+<td>~4.6K</td>
+<td>100%</td>
+<td>Haiku 4.5（红测试）→ Sonnet 4.6（实现）→ Opus 4.7（审查覆盖）</td>
+<td><code>tdd-scaffolder</code> + <code>/pre-commit-scan</code></td>
+</tr>
+<tr>
+<td>Fuzz 测试（PR #74）</td>
+<td>~940</td>
+<td>100%</td>
+<td>Opus 4.7 (1M)</td>
+<td><code>software-quality-agent</code></td>
+</tr>
+<tr>
+<td>CI / 部署 / playbook</td>
+<td>—</td>
+<td>100%</td>
+<td>Opus 4.7 (1M)</td>
+<td>主会话</td>
+</tr>
+<tr>
+<td><strong>人工 commit</strong></td>
+<td>~5 行</td>
+<td>—</td>
+<td>—</td>
+<td><code>LobbyActivity</code> SERVER_URL 字符串 + dev_summary 错字</td>
+</tr>
+</tbody>
+</table>
+<h4 id="ai-agent-claudeagents-claudecommands">AI Agent 角色分工（<code>.claude/agents/</code> + <code>.claude/commands/</code> 实际配置）</h4>
+<table>
+<thead>
+<tr>
+<th>Agent / 命令</th>
+<th>模型</th>
+<th>触发方式</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>主会话</strong></td>
+<td>Opus 4.7 (1M) / Sonnet 4.6</td>
+<td>默认</td>
+<td>全局开发，跨文件改动</td>
+</tr>
+<tr>
+<td><strong><code>pr-reviewer</code></strong></td>
+<td>Opus 4.7（独立 context）</td>
+<td><code>/review-pr &lt;#&gt;</code></td>
+<td>PR 对抗审查（4 关之第 3 关）</td>
+</tr>
+<tr>
+<td><strong><code>protocol-syncer</code></strong></td>
+<td>Sonnet 4.6</td>
+<td>GameMessage 改动时自动</td>
+<td>校验 <code>PROTOCOL_VERSION</code> bump</td>
+</tr>
+<tr>
+<td><strong><code>tdd-scaffolder</code></strong></td>
+<td>Haiku 4.5</td>
+<td>被 <code>/trace-bug</code> 调用</td>
+<td>关键路径函数 → 失败测试骨架</td>
+</tr>
+<tr>
+<td><strong><code>software-quality-agent</code></strong></td>
+<td>Opus 4.7 (1M)</td>
+<td>UC9 双仓评估</td>
+<td>v1.26/v1.27 质量计划 + fuzz backlog</td>
+</tr>
+<tr>
+<td><strong><code>/pre-commit-scan</code></strong></td>
+<td>Haiku 4.5</td>
+<td>提交前</td>
+<td>批量扫 null safety / 异常路径 / 共享逻辑一致</td>
+</tr>
+<tr>
+<td><strong>Codex Bot</strong>（外部 vendor）</td>
+<td>ChatGPT Codex</td>
+<td>每个 PR 自动</td>
+<td>跨 vendor 审查（4 关之第 4 关）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="4-pr-ai">4 关 PR 流程里的 AI 分工（再次强调）</h4>
+<svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="4 关 PR 流程">
+<defs><marker id="arr_g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/></marker></defs>
+<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">PR 流程 4 关 · 3 关 AI + 1 关人工</text>
+<g transform="translate(30 60)">
+  <rect width="195" height="170" rx="10" fill="#fef3c7" stroke="#a16207" stroke-width="1.8"/>
+  <text x="97.5" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#a16207">Gate 1</text>
+  <text x="97.5" y="52" text-anchor="middle" font-size="15" font-weight="700" fill="#a16207">CI</text>
+  <text x="97.5" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">机器自动</text>
+  <text x="97.5" y="110" text-anchor="middle" font-size="11" fill="#1f2937">tdd-gate · detekt · te</text>
+  <text x="97.5" y="126" text-anchor="middle" font-size="11" fill="#1f2937">sts · JaCoCo · dep-sca</text>
+  <text x="97.5" y="142" text-anchor="middle" font-size="11" fill="#1f2937">n</text>
+</g>
+<line x1="225" y1="145" x2="245" y2="145" stroke="#1f2937" stroke-width="1.8" marker-end="url(#arr_g)"/>
+<g transform="translate(245 60)">
+  <rect width="195" height="170" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.8"/>
+  <text x="97.5" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#16a34a">Gate 2</text>
+  <text x="97.5" y="52" text-anchor="middle" font-size="15" font-weight="700" fill="#16a34a">Codex Bot</text>
+  <text x="97.5" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">AI · 跨 vendor</text>
+  <text x="97.5" y="110" text-anchor="middle" font-size="11" fill="#1f2937">ChatGPT Codex · 34 fin</text>
+  <text x="97.5" y="126" text-anchor="middle" font-size="11" fill="#1f2937">ding · 0 误报 · 抓 BCrypt</text>
+  <text x="97.5" y="142" text-anchor="middle" font-size="11" fill="#1f2937"> SIOOBE</text>
+</g>
+<line x1="440" y1="145" x2="460" y2="145" stroke="#1f2937" stroke-width="1.8" marker-end="url(#arr_g)"/>
+<g transform="translate(460 60)">
+  <rect width="195" height="170" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.8"/>
+  <text x="97.5" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#2563eb">Gate 3</text>
+  <text x="97.5" y="52" text-anchor="middle" font-size="15" font-weight="700" fill="#2563eb">/review-pr</text>
+  <text x="97.5" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">AI · 同 vendor 新会话</text>
+  <text x="97.5" y="110" text-anchor="middle" font-size="11" fill="#1f2937">Claude Opus 4.7 (pr-re</text>
+  <text x="97.5" y="126" text-anchor="middle" font-size="11" fill="#1f2937">viewer subagent · 独立 c</text>
+  <text x="97.5" y="142" text-anchor="middle" font-size="11" fill="#1f2937">ontext)</text>
+</g>
+<line x1="655" y1="145" x2="675" y2="145" stroke="#1f2937" stroke-width="1.8" marker-end="url(#arr_g)"/>
+<g transform="translate(675 60)">
+  <rect width="195" height="170" rx="10" fill="#fee2e2" stroke="#dc2626" stroke-width="1.8"/>
+  <text x="97.5" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#dc2626">Gate 4</text>
+  <text x="97.5" y="52" text-anchor="middle" font-size="15" font-weight="700" fill="#dc2626">真机验证</text>
+  <text x="97.5" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">人工 · 不可替代</text>
+  <text x="97.5" y="110" text-anchor="middle" font-size="11" fill="#1f2937">happy path + 1 个边界 · 唯</text>
+  <text x="97.5" y="126" text-anchor="middle" font-size="11" fill="#1f2937">一必须人工的关</text>
+</g>
+</svg>
+
+<h4 id="_13">量化推论</h4>
+<ul>
+<li><strong>224 / 285 ≈ 79% commit 由 AI 完成</strong>；人工的 2 个非 merge commit 加起来 &lt; 10 行</li>
+<li><strong>Opus 4.7 是主力</strong>（146 / 177 ≈ 83% AI commit）；Sonnet 处理碎活 / 修红 CI；
+  Haiku 不直接产出 commit，但通过 <code>/pre-commit-scan</code> + <code>tdd-scaffolder</code> 隐性贡献</li>
+<li><strong>跨 vendor 不可省</strong>：Codex 的 34 条 finding 里有 <strong>1 条 P0 真 bug</strong>（BCrypt SIOOBE），
+  同 vendor 的 Claude 自查（pr-reviewer）没发现——印证 "再强的 AI 也存在系统性盲区"</li>
+</ul>
+<hr>
+<h3 id="_14">协同的四个层次</h3>
 <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="协同的四个层次">
 <g transform="translate(40 20)">
   <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.5"/>
@@ -1868,7 +2136,7 @@ PR / regressions.md 跟进。</p>
 </g>
 </svg>
 
-<h3 id="_13">实际分工矩阵</h3>
+<h3 id="_15">实际分工矩阵</h3>
 <table>
 <thead>
 <tr>
@@ -1960,7 +2228,7 @@ PR / regressions.md 跟进。</p>
 </tr>
 </tbody>
 </table>
-<h3 id="_14">人工不可替代的场景</h3>
+<h3 id="_16">人工不可替代的场景</h3>
 <table>
 <thead>
 <tr>
@@ -1991,7 +2259,7 @@ PR / regressions.md 跟进。</p>
 </tr>
 </tbody>
 </table>
-<h3 id="_15">协同反模式（要避免）</h3>
+<h3 id="_17">协同反模式（要避免）</h3>
 <table>
 <thead>
 <tr>
@@ -2022,7 +2290,7 @@ PR / regressions.md 跟进。</p>
 </tr>
 </tbody>
 </table>
-<h3 id="_16">高效协同最佳实践</h3>
+<h3 id="_18">高效协同最佳实践</h3>
 <blockquote>
 <p>6 条经验自原 PR #1-34 阶段沉淀；PR #35-54 阶段加入 4 条 harness-era 补充。</p>
 </blockquote>
@@ -2058,7 +2326,7 @@ PR / regressions.md 跟进。</p>
     Bug 卡片</strong>（症状 / 根因 / commit / 教训 / 防回归测试）；新会话开局即可
     扫一遍，杜绝重复踩坑；本项目从 PR-H1 起共 <strong>17 条入库</strong>（#1-#17）</li>
 </ol>
-<h3 id="_17">协同效率数据</h3>
+<h3 id="_19">协同效率数据</h3>
 <table>
 <thead>
 <tr>
@@ -2098,8 +2366,8 @@ PR / regressions.md 跟进。</p>
 </tbody>
 </table>
 <hr>
-<h2 id="_18">第六章：关键技术修复</h2>
-<h3 id="_19">游戏卡死——四层防御</h3>
+<h2 id="_20">第六章：关键技术修复</h2>
+<h3 id="_21">游戏卡死——四层防御</h3>
 <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="游戏卡死 4 层防御">
 <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker></defs>
 <g transform="translate(60 20)">
@@ -2133,7 +2401,7 @@ PR / regressions.md 跟进。</p>
 </g>
 </svg>
 
-<h3 id="_20">重连失效——异步时序陷阱</h3>
+<h3 id="_22">重连失效——异步时序陷阱</h3>
 <pre><code class="language-kotlin">// ❌ 修复前：ws 还在 CONNECTING，send() 返回 false 被静默丢弃
 ws = client.newWebSocket(request, listener)
 sessionToken?.let { send(Reconnect(it)) }   // BUG
@@ -2146,7 +2414,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 <blockquote>
 <p><strong>教训</strong>：WebSocket 异步 API 中，"创建连接" ≠ "连接已建立"</p>
 </blockquote>
-<h3 id="_21">两端结算不一致——统一公式</h3>
+<h3 id="_23">两端结算不一致——统一公式</h3>
 
 <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="结算公式">
   <g transform="translate(40 30)">
@@ -2193,7 +2461,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </g>
 </svg>
 
-<h3 id="_22">双层防火墙——部署对称陷阱</h3>
+<h3 id="_24">双层防火墙——部署对称陷阱</h3>
 <svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img">
 <g transform="translate(40 15)">
   <rect width="800" height="64" rx="8" fill="#fee2e2" stroke="#dc2626" stroke-width="1.4"/>
@@ -2243,8 +2511,8 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </svg>
 
 <hr>
-<h2 id="_23">第七章：工程经验与后续建议</h2>
-<h3 id="_24">核心经验</h3>
+<h2 id="_25">第七章：工程经验与后续建议</h2>
+<h3 id="_26">核心经验</h3>
 <ol>
 <li><strong>"修了又坏"的根因</strong>：只修表层症状，没往深挖根因</li>
 <li>卡死历经 4 层才彻底解决</li>
@@ -2355,7 +2623,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </tr>
 </tbody>
 </table>
-<h3 id="_25">后续建议行动</h3>
+<h3 id="_27">后续建议行动</h3>
 <ol>
 <li>✅ <strong>自动化集成测试</strong>：PR-H2 落地 — <code>CardRulesTest.kt</code> 33 + <code>ServerGameManagerTest.kt</code> 48 + <code>SettlementCalculatorTest.kt</code> 18 + admin 76 + 其他 11 = <strong>186 用例</strong>；CI tdd-gate 硬关</li>
 <li>✅ <strong>共享规则层</strong>：PR #35 + PR-H3 落地 — <code>:shared</code> KMP；约束 1/4 编译期消除</li>
@@ -2408,7 +2676,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 </tr>
 </tbody>
 </table>
-<h4 id="_26">多轮自审仍能发现新问题的原因</h4>
+<h4 id="_28">多轮自审仍能发现新问题的原因</h4>
 <table>
 <thead>
 <tr>
@@ -3167,7 +3435,7 @@ historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
 <h3 id="918-pr-58-62">9.18 质量金字塔：PR #58-62 五层审查的量化实证</h3>
 <p>PR #58-62 是项目密度最高的 5 个 PR（admin 9 段功能 + 4 次 CI 修复 +
 3 类 AI review + 用户真机反馈）。本节用具体数字盘点"五层审查"各自的贡献。</p>
-<h4 id="_27">五层各自的本期产出</h4>
+<h4 id="_29">五层各自的本期产出</h4>
 <table>
 <thead>
 <tr>
@@ -3210,7 +3478,7 @@ historyStore.enqueue(record)          // 锁外 Channel send，纳秒级
 </tr>
 </tbody>
 </table>
-<h4 id="_28">每层的"独占"作用</h4>
+<h4 id="_30">每层的"独占"作用</h4>
 <table>
 <thead>
 <tr>
@@ -3262,7 +3530,7 @@ context + 独立 vendor + 独立审查 rubric</strong> 才让它们各自抓到�
   iOS WebView 未覆盖
 - <strong>数据迁移</strong>：admin SQLite schema 变更目前靠 <code>ALTER TABLE ... IF NOT EXISTS</code>
   人工幂等，没自动化测试。下次大改 schema 需要补 <code>migration_test</code></p>
-<h4 id="_29">三个量化指标作为"质量基线"</h4>
+<h4 id="_31">三个量化指标作为"质量基线"</h4>
 <p>PR #58-62 阶段稳定下来的可量化质量指标：</p>
 <table>
 <thead>
