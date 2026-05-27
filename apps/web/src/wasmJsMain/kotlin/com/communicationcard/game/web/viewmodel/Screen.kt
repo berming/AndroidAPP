@@ -29,6 +29,9 @@ sealed class Screen {
     /** 帮助：规则 / 关于 / 项目链接。 */
     data object Help : Screen()
 
+    /** 调试日志查看器（feature_spec N6，对齐 Android `LogViewerActivity`）。 */
+    data object DebugLog : Screen()
+
     /** 联网模式：服务端 URL / 昵称输入 + 房间列表 + 创建/加入。 */
     data class Lobby(
         val serverUrl: String,

@@ -142,6 +142,10 @@ class AppViewModel {
         _screen.value = Screen.Help
     }
 
+    fun openDebugLog() {
+        _screen.value = Screen.DebugLog
+    }
+
     fun goHome() {
         sessionJob?.cancel()
         sessionJob = null

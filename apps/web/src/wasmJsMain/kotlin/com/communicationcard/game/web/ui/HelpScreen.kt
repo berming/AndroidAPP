@@ -31,7 +31,10 @@ import com.communicationcard.game.network.GameMessage
  * 链接打开走 [openUrl] @JsFun（window.open(...)）—— 不依赖 kotlinx-browser。
  */
 @Composable
-fun HelpScreen(onBack: () -> Unit) {
+fun HelpScreen(
+    onBack: () -> Unit,
+    onOpenDebugLog: () -> Unit,
+) {
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1B5E20))) {
         Column(
             modifier = Modifier
@@ -71,6 +74,11 @@ fun HelpScreen(onBack: () -> Unit) {
                 Spacer(Modifier.padding(top = 8.dp))
                 LinkButton("源代码 / Issues  ↗") {
                     openUrl("https://github.com/berming/AndroidAPP")
+                }
+                Spacer(Modifier.padding(top = 4.dp))
+                // feature_spec N6：应用内日志查看器（对齐 Android LogViewerActivity）
+                LinkButton("调试日志（应用内查看）") {
+                    onOpenDebugLog()
                 }
                 Spacer(Modifier.padding(top = 4.dp))
                 LinkButton("调试日志（浏览器 DevTools Console）") {
