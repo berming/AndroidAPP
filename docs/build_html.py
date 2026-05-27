@@ -334,6 +334,125 @@ def svg_harness_l0_l4() -> str:
     return '\n'.join(out)
 
 
+def svg_authorship_pie() -> str:
+    """Commit 授权分布饼图：Claude 224 / berming 56 merge / berming 2 code / bermin 1。"""
+    # data: (label, count, color)
+    data = [
+        ("Claude（AI 直接产出 commit）", 224, "#2563eb"),
+        ("berming（仅 PR merge 按钮）", 58, "#94a3b8"),
+        ("berming（人工写代码 commit）", 2, "#dc2626"),
+        ("bermin（legacy）", 1, "#94a3b8"),
+    ]
+    total = sum(c for _, c, _ in data)
+    # Build pie via arcs
+    import math
+    cx, cy, r = 220, 200, 150
+    out = ['<svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="Commit 授权分布">']
+    # Title
+    out.append(f'<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Commit author 分布（PR #1–#88 全程，共 {total} commit）</text>')
+    # Pie
+    angle_start = -math.pi / 2  # start at top
+    for label, count, color in data:
+        angle_end = angle_start + (count / total) * 2 * math.pi
+        x1 = cx + r * math.cos(angle_start)
+        y1 = cy + r * math.sin(angle_start)
+        x2 = cx + r * math.cos(angle_end)
+        y2 = cy + r * math.sin(angle_end)
+        large = 1 if (angle_end - angle_start) > math.pi else 0
+        path = f"M {cx} {cy} L {x1:.2f} {y1:.2f} A {r} {r} 0 {large} 1 {x2:.2f} {y2:.2f} Z"
+        out.append(f'<path d="{path}" fill="{color}" stroke="#fff" stroke-width="2"/>')
+        # label percentage (only if slice large enough)
+        if count / total >= 0.05:
+            mid = (angle_start + angle_end) / 2
+            tx = cx + (r * 0.65) * math.cos(mid)
+            ty = cy + (r * 0.65) * math.sin(mid)
+            pct = count * 100 / total
+            out.append(f'<text x="{tx:.0f}" y="{ty:.0f}" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">{pct:.0f}%</text>')
+        angle_start = angle_end
+    # Legend
+    ly = 90
+    for label, count, color in data:
+        out.append(f'<g transform="translate(440 {ly})">')
+        out.append(f'  <rect width="18" height="18" rx="3" fill="{color}"/>')
+        out.append(f'  <text x="28" y="14" font-size="13" fill="#111827">{label}</text>')
+        out.append(f'  <text x="28" y="32" font-size="12" fill="#475569">{count} commit · {count*100/total:.1f}%</text>')
+        out.append('</g>')
+        ly += 56
+    # Bottom note
+    out.append('<text x="220" y="380" text-anchor="middle" font-size="12" fill="#475569">人工 2 个非 merge commit 合计 ~5 行代码 — 其余 99%+ 代码由 AI 产出</text>')
+    out.append('</svg>')
+    return '\n'.join(out)
+
+
+def svg_model_bar() -> str:
+    """模型版本分布水平条形图。"""
+    data = [
+        ("Claude Opus 4.7 (1M context)", 114, "#7c3aed", "架构 / 协议 / harness / 质量体系 / Admin SPA"),
+        ("Claude Opus 4.7 (200K)", 32, "#a78bfa", "review 修复 / 小特性"),
+        ("Claude Sonnet 4.6", 31, "#2563eb", "review 修复 / CI 修绿 / 文档刷新"),
+        ("Claude Haiku 4.5 (隐性)", 0, "#94a3b8", "/pre-commit-scan + tdd-scaffolder 调用"),
+        ("ChatGPT Codex (review only)", 2, "#16a34a", "跨 vendor 审查 · 34 finding · 1 P0 真 bug"),
+    ]
+    max_count = max(c for _, c, _, _ in data) or 1
+    bar_max_w = 360
+    out = ['<svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="AI 模型版本分布">']
+    out.append('<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">AI 写的 commit — 按模型版本（from AI-Assisted-By 字段）</text>')
+    for i, (label, count, color, role) in enumerate(data):
+        y = 60 + i * 56
+        out.append(f'<g transform="translate(20 {y})">')
+        out.append(f'  <text x="0" y="14" font-size="13" font-weight="600" fill="#111827">{label}</text>')
+        w = (count / max_count) * bar_max_w if count > 0 else 0
+        if count > 0:
+            out.append(f'  <rect x="280" y="0" width="{w:.0f}" height="22" rx="3" fill="{color}"/>')
+            out.append(f'  <text x="{280 + w + 8:.0f}" y="16" font-size="13" font-weight="700" fill="#111827">{count} commit</text>')
+        else:
+            out.append(f'  <rect x="280" y="0" width="6" height="22" rx="3" fill="{color}" opacity="0.4"/>')
+            out.append(f'  <text x="294" y="16" font-size="13" font-style="italic" fill="#94a3b8">不直接产 commit</text>')
+        out.append(f'  <text x="0" y="36" font-size="11" fill="#475569">{role}</text>')
+        out.append('</g>')
+    out.append('</svg>')
+    return '\n'.join(out)
+
+
+def svg_4gates() -> str:
+    """4 关 PR 流程泳道图。"""
+    gates = [
+        ("Gate 1\nCI",        "机器自动",  "tdd-gate · detekt · tests · JaCoCo · dep-scan", "#fef3c7", "#a16207"),
+        ("Gate 2\nCodex Bot", "AI · 跨 vendor", "ChatGPT Codex · 34 finding · 0 误报 · 抓 BCrypt SIOOBE", "#dcfce7", "#16a34a"),
+        ("Gate 3\n/review-pr", "AI · 同 vendor 新会话", "Claude Opus 4.7 (pr-reviewer subagent · 独立 context)", "#dbeafe", "#2563eb"),
+        ("Gate 4\n真机验证",   "人工 · 不可替代", "happy path + 1 个边界 · 唯一必须人工的关", "#fee2e2", "#dc2626"),
+    ]
+    out = ['<svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="4 关 PR 流程">']
+    out.append('<defs><marker id="arr_g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/></marker></defs>')
+    out.append('<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">PR 流程 4 关 · 3 关 AI + 1 关人工</text>')
+    box_w = 195
+    gap = 20
+    for i, (title, who, body, fill, stroke) in enumerate(gates):
+        x = 30 + i * (box_w + gap)
+        y = 60
+        out.append(f'<g transform="translate({x} {y})">')
+        out.append(f'  <rect width="{box_w}" height="170" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="1.8"/>')
+        # multi-line title
+        for j, line in enumerate(title.split("\n")):
+            out.append(f'  <text x="{box_w/2}" y="{30 + j*22}" text-anchor="middle" font-size="15" font-weight="700" fill="{stroke}">{line}</text>')
+        out.append(f'  <text x="{box_w/2}" y="86" text-anchor="middle" font-size="12" font-weight="600" fill="#1f2937">{who}</text>')
+        # body wraps every ~22 chars
+        chunks = []
+        rest = body
+        while rest:
+            chunks.append(rest[:22])
+            rest = rest[22:]
+        for j, c in enumerate(chunks[:4]):
+            out.append(f'  <text x="{box_w/2}" y="{110 + j*16}" text-anchor="middle" font-size="11" fill="#1f2937">{c}</text>')
+        out.append('</g>')
+        if i < len(gates) - 1:
+            ax = x + box_w
+            ax2 = ax + gap
+            out.append(f'<line x1="{ax}" y1="145" x2="{ax2}" y2="145" stroke="#1f2937" stroke-width="1.8" marker-end="url(#arr_g)"/>')
+    out.append('</svg>')
+    return '\n'.join(out)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 主转换
 # ─────────────────────────────────────────────────────────────────────────────
@@ -394,6 +513,15 @@ DIAGRAM_REPLACEMENTS: list[tuple[re.Pattern, str]] = [
     # L0-L4 五层架构
     (re.compile(r"```\nL0 记忆层      CLAUDE\.md.*?```", re.DOTALL),
      svg_harness_l0_l4()),
+    # §5.0 Commit 授权饼图
+    (re.compile(r"```\nAUTHORSHIP_PIE.*?```", re.DOTALL),
+     svg_authorship_pie()),
+    # §5.0 模型分布条形图
+    (re.compile(r"```\nMODEL_BAR.*?```", re.DOTALL),
+     svg_model_bar()),
+    # §5.0 4 关 PR 泳道
+    (re.compile(r"```\nLANE_4GATES.*?```", re.DOTALL),
+     svg_4gates()),
 ]
 
 

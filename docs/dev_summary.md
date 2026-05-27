@@ -32,25 +32,26 @@
 | 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x / Node 20 + Vite（admin 子项目独立 npm）|
 | CI | GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution + admin-build（Vite 打包 + dist 5 MB 阈值）|
 
-### 代码规模（PR #62 后）
+### 代码规模（PR #85 后）
 
 | 模块 | 文件数 | 行数 |
 |------|-------|-----|
 | `:apps:android`（Android UI + 网络层）| 20 个 .kt | ~6,440 |
-| `:apps:web`（Compose MP / wasmJs）| 25 个 .kt | ~4,320 |
+| `:apps:web`（Compose MP / wasmJs）| 27 个 .kt | ~4,800 |
 | `:shared`（KMP 公共逻辑，commonMain）| 9 个 .kt | ~2,670 |
-| `:server`（Ktor 服务端 + admin 模块）| 25 个 .kt | ~4,840 |
-| `apps/admin/`（Vue 3 + Element Plus SPA）| 19 个 .vue/.ts | ~1,470 |
-| 测试（commonTest + serverTest + admin tests）| 14 个 .kt | ~3,620 |
+| `:server`（Ktor 服务端 + admin 模块）| 25 个 .kt | ~5,040 |
+| `apps/admin/`（Vue 3 + Element Plus SPA）| 19 个 .vue/.ts | ~1,490 |
+| 测试（commonTest + serverTest，含 PR #74 fuzz 基础设施）| 17 个 .kt | ~4,560 |
 | Android XML 布局 | 20 个 | ~3,320 |
-| **合计**（Kotlin + Vue/TS main）| **98 个文件** | **约 23,360 行** |
-| **总测试 LOC 增长** | PR #54 ~1,530 | → **PR #62 ~3,620（×2.4）** |
+| **合计**（Kotlin + Vue/TS main）| **102 个文件** | **约 25,000 行** |
+| **总测试 LOC 增长** | PR #54 ~1,530 → PR #62 ~3,620 → **PR #74 ~4,560（×3.0 vs #54）** |
 
 关键大文件：
 - `OnlineGameActivity.kt` ~1,050 行（Android 联网游戏 UI）
 - `ServerGameManager.kt` ~1,100 行（PR #62 +listener / lastActionAt / withRoomLock）
 - `AppViewModel.kt` ~660 行（Web 状态机，PR #62 +连接幂等防御）
-- `Application.kt` ~550 行（PR #61 提取 gameModule + 装 admin）
+- `Application.kt` ~610 行（PR #61 提取 gameModule + 装 admin；PR #68-70 admin 模块隔离）
+- `AdminAuthService.kt` ~380 行（PR #61 引入；PR #74 catch 扩到 Exception，修 BCrypt SIOOBE 真 bug）
 - `GameHistoryStore.kt` ~280 行（admin 异步入库 + game_events drain）
 
 ---
@@ -471,7 +472,7 @@ PR / regressions.md 跟进。
 | 5 | #62 | gameEventListener 锁外调致并发 seq race | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
 
 **关键观察**：
-- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，PR #29-#62 共 **实际 25 条**；PR #70-#71 补录 3 条，累计 **28 条**
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，PR #29-#62 共 **实际 25 条**；PR #70-#71 补录 3 条；PR #74 / #84 / #85 / #86 新增 6 条（BCrypt SIOOBE 真 bug、benchmark KMP 关联、`apiValidation.ignoredProjects` 误配、CI workflow permissions、运行时错误未流入查看器、`gh pr comment` fork 致命退出），累计 **34 条**
 - **0 业务级遗漏**：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
 - **0 误报**：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
 - 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
@@ -482,6 +483,82 @@ PR / regressions.md 跟进。
 ---
 
 ## 第五章：人工与 AI 协同模式深度解析
+
+### 5.0 实际授权分布（commit 级别真实数据，PR #1–#86）
+
+> 本节数据来自 `git log` 实测 + commit message 中的 `AI-Assisted-By:` 行（CLAUDE.md
+> §八 强制规范的署名）。**不是估算**——是按每条 commit 精确归口的统计结果。
+
+#### Commit author 分布
+
+```
+AUTHORSHIP_PIE
+total: 285 commits
+  Claude (AI 直接产出):   224 commits   79%
+  berming (人工合并 PR):   58 merge     20%   ← 仅点 merge 按钮，不含代码改动
+  berming (人工写代码):     2 commits   <1%   ← LobbyActivity URL 更新 + dev_summary 错字
+  bermin (legacy):          1 commit    <1%
+```
+
+**结论**：除 2 个 trivial 改动（合计 ~5 行），本仓所有 Kotlin / Vue / TS / XML / YAML 代码
+**都是 AI 写的**。人工角色 ≈ **产品经理 + 测试员 + 合并按钮**：报 bug、选方向、跑真机、点 merge。
+
+#### AI 写的部分——按模型版本（从 `AI-Assisted-By:` 字段精确统计）
+
+```
+MODEL_BAR
+Claude Opus 4.7 (1M context):    114 commits   ████████████████████████  架构 / 协议 / harness / 质量体系 / Admin SPA
+Claude Opus 4.7 (200K):            32 commits   ███████                   review 修复 / 小特性
+Claude Sonnet 4.6:                 31 commits   ███████                   review 修复 / CI 修绿 / 文档刷新
+Claude Haiku 4.5:                  隐性          (/pre-commit-scan 调用)    静态扫描 / 测试用例生成
+ChatGPT Codex:                      2 直接 + 34 finding                    跨 vendor 审查（不写主代码）
+```
+
+#### 按模块的实际承担
+
+| 模块 | 行数 | AI 占比 | 主要产出模型 | 协同 agent / 命令 |
+|------|------|--------|------------|------------------|
+| `:apps:android` | ~10.3K | 100% | Opus 4.7 (1M) 主写 + Sonnet 4.6 修补 | 主会话 + Codex review |
+| `:apps:web`（Compose MP / wasmJs）| ~4.3K | 100% | Opus 4.7 (1M)（PR #35 KMP 重构）| 主会话 |
+| `:shared`（KMP commonMain）| ~3.7K | 100% | Opus 4.7 (1M) 抽取 + 协议 DTO 设计 | 主会话 + `protocol-syncer` subagent |
+| `:server`（Ktor + admin）| ~8.6K | 100% | Opus 4.7 (1M)（架构）+ Sonnet 4.6（细节）| 主会话 + `pr-reviewer` |
+| `apps/admin`（Vue 3 SPA）| ~1.5K | 100% | Opus 4.7 (1M)（PR #61–62 一次成型）| 主会话 |
+| 测试（17 文件 / 195+ 用例）| ~4.6K | 100% | Haiku 4.5（红测试）→ Sonnet 4.6（实现）→ Opus 4.7（审查覆盖）| `tdd-scaffolder` + `/pre-commit-scan` |
+| Fuzz 测试（PR #74）| ~940 | 100% | Opus 4.7 (1M) | `software-quality-agent` |
+| CI / 部署 / playbook | — | 100% | Opus 4.7 (1M) | 主会话 |
+| **人工 commit** | ~5 行 | — | — | `LobbyActivity` SERVER_URL 字符串 + dev_summary 错字 |
+
+#### AI Agent 角色分工（`.claude/agents/` + `.claude/commands/` 实际配置）
+
+| Agent / 命令 | 模型 | 触发方式 | 职责 |
+|------------|------|---------|------|
+| **主会话** | Opus 4.7 (1M) / Sonnet 4.6 | 默认 | 全局开发，跨文件改动 |
+| **`pr-reviewer`** | Opus 4.7（独立 context）| `/review-pr <#>` | PR 对抗审查（4 关之第 3 关）|
+| **`protocol-syncer`** | Sonnet 4.6 | GameMessage 改动时自动 | 校验 `PROTOCOL_VERSION` bump |
+| **`tdd-scaffolder`** | Haiku 4.5 | 被 `/trace-bug` 调用 | 关键路径函数 → 失败测试骨架 |
+| **`software-quality-agent`** | Opus 4.7 (1M) | UC9 双仓评估 | v1.26/v1.27 质量计划 + fuzz backlog |
+| **`/pre-commit-scan`** | Haiku 4.5 | 提交前 | 批量扫 null safety / 异常路径 / 共享逻辑一致 |
+| **Codex Bot**（外部 vendor）| ChatGPT Codex | 每个 PR 自动 | 跨 vendor 审查（4 关之第 4 关）|
+
+#### 4 关 PR 流程里的 AI 分工（再次强调）
+
+```
+LANE_4GATES
+gate 1: CI                     机器（tdd-gate + detekt + tests + JaCoCo + dep-scan）
+gate 2: Codex Bot              ChatGPT Codex（跨 vendor，34 条 finding，0 误报）
+gate 3: Claude /review-pr      Claude Opus 4.7（pr-reviewer subagent，独立 context）
+gate 4: 真机验证 (manual)      ← 唯一必须人工的关
+```
+
+#### 量化推论
+
+- **224 / 285 ≈ 79% commit 由 AI 完成**；人工的 2 个非 merge commit 加起来 < 10 行
+- **Opus 4.7 是主力**（146 / 177 ≈ 83% AI commit）；Sonnet 处理碎活 / 修红 CI；
+  Haiku 不直接产出 commit，但通过 `/pre-commit-scan` + `tdd-scaffolder` 隐性贡献
+- **跨 vendor 不可省**：Codex 的 34 条 finding 里有 **1 条 P0 真 bug**（BCrypt SIOOBE），
+  同 vendor 的 Claude 自查（pr-reviewer）没发现——印证 "再强的 AI 也存在系统性盲区"
+
+---
 
 ### 协同的四个层次
 
@@ -736,7 +813,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 | 共享模块 | `:shared` KMP（消灭约束 1/4） |
 | 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
 | Harness 基础设施 | L0–L4 五层，PR-H1~H5 落地 |
-| 自动化测试 | **186 个 @Test**（跨 14 个 *Test.kt；详见 §八 8.2 后段）|
+| 自动化测试 | **195+ 个 @Test**（跨 17 个 *Test.kt，含 PR #74 fuzz；详见 §八 8.2 后段）|
 | 部署 | Caddy（80/443 + 自动 HTTPS）+ `/admin/` 子路径 + systemd + GitHub Actions auto-deploy |
 
 ### 后续建议行动
@@ -750,7 +827,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md` 路径扩展，目前无规划
 8. ⚪ **逐手出牌 step-through 回放 UI**：PR #62 / 5d 已铺 `game_events` 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件
 9. ⚪ **玩家账号系统**：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做
-10. ⚪ **DT FUZZ 测试**：高风险模块（CardRules / SettlementCalculator / ServerGameManager 类型转换链）引入属性不变量测试 + 差分测试；方案已规划（`/root/.claude/plans/pr-piped-parrot.md`），零新 Gradle 依赖（纯 `kotlin.random.Random + repeat(N)`），4 个新测试文件，待实施
+10. 🟡 **DT FUZZ 测试**：Sprint A P0 已落地（PR #74）— `FuzzTestBase` + `AdminAuthServiceFuzzTest` + `AdminAuthPluginFuzzTest`，首跑抓 BCrypt SIOOBE 真 bug；Sprint B（shared CardRules / SettlementCalculator + ServerGameManager DT 差分）待排期（详见 §9.21）
 
 ---
 
@@ -814,7 +891,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 > reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这条对比
 > 直接推动了 **PR-H2 关键路径强制 TDD + CI tdd-gate**（CLAUDE.md 第三章）。
 >
-> **当前状态（PR #62 后）**：全项目共 **186 个 `@Test`**（跨 14 个 *Test.kt 文件），
+> **当前状态（PR #74 后）**：全项目共 **195+ 个 `@Test`**（跨 17 个 *Test.kt 文件），
 > 其中：
 > - `:shared` 59 个：CardRulesTest 33 + SettlementCalculatorTest 18 +
 >   GameMessageSerializationTest 8
@@ -822,6 +899,8 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 >   admin/ 76（AdminAuthService 13 / AdminAuthRoutes 8 / AdminApiRoutes 11 /
 >   AdminDb 5 / GameHistoryStore 9 / SnapshotBuilder 7 / AlertRule 9 /
 >   AlertStore 9 / AlertEngine 5）
+> - `:server` fuzz（PR #74）9+：AdminAuthServiceFuzzTest + AdminAuthPluginFuzzTest
+>   （共用 `FuzzTestBase`，seeded Random，200 iter/CI，5000 iter/local soak）
 > - **CI `tdd-gate` 硬关**：CardRules / SettlementCalculator / ServerGameManager
 >   任一改动**必须**同 PR 改对应 `*Test.kt`（机制是 `git diff --name-only` 校验），
 >   未同改直接红
@@ -1376,7 +1455,7 @@ PR #58-62 阶段稳定下来的可量化质量指标：
 | PR 合并前 P0/P1 数 | 0（全部被 5 层之一抓到并修）| 保持 0 |
 | 用户报的 bug → 进 regressions.md 的延迟 | < 2 小时（#15 当天进）| < 1 天 |
 | CI 修复回路平均次数 | 4 次（PR #61-62）| 长期看希望 < 2 次（plan 越精细越少）|
-| 测试用例数随代码增长比 | 186 用例 / 23k LOC ≈ 8 / 1k LOC | 保持 > 7 / 1k LOC |
+| 测试用例数随代码增长比 | 195+ 用例 / 25k LOC ≈ 7.8 / 1k LOC | 保持 > 7 / 1k LOC |
 
 **核心洞察**：质量不是"修出来的"，是**多层约束的合力**——单独看每一层都有盲区，
 组合起来才接近"绝大多数 bug 在用户看到前就被消灭"。这五层每一层都可以独立度量
@@ -1507,7 +1586,7 @@ if (enableAdmin) {
 
 ---
 
-### 9.21 DT FUZZ 高风险模块测试方案（已规划，待实施）
+### 9.21 DT FUZZ 高风险模块测试方案（Sprint A P0 已落地，PR #74）
 
 **背景**：当前 186 个测试全部使用硬编码输入，边界覆盖依赖人工猜测。
 CardRules / SettlementCalculator / ServerGameManager 的类型转换链（ServerCard ↔ shared Card）
@@ -1521,14 +1600,88 @@ CardRules / SettlementCalculator / ServerGameManager 的类型转换链（Server
 
 **方案摘要**（完整见 `/root/.claude/plans/pr-piped-parrot.md`）：
 
-| 文件（新建）| 测试目标 |
-|------------|---------|
-| `shared/.../CardFuzzGenerators.kt` | 随机输入生成器（供所有 fuzz 测试共用）|
-| `shared/.../CardRulesFuzzTest.kt` | P1–P6：无崩 / 炸弹单调 / 炸弹压非炸弹 / 类型守恒 / findValidPlays 子集 |
-| `shared/.../SettlementCalculatorFuzzTest.kt` | P7–P10：无崩 / 分数守恒 / 赢家得分 ≥ 输家 / null 条件 |
-| `server/.../ServerDifferentialFuzzTest.kt` | DT-1/2/3：类型转换往返保真 / canBeat 两路径一致 / computeAllFinishedScores 公式一致 |
+| 文件 | 测试目标 | 状态 |
+|------|---------|------|
+| `server/.../FuzzTestBase.kt` | 共用 seeded Random + `FUZZ_ITERATIONS` 环境变量挂钩 | ✅ PR #74 |
+| `server/.../AdminAuthServiceFuzzTest.kt` | login 永不抛 / BCrypt 路径边界 | ✅ PR #74 |
+| `server/.../AdminAuthPluginFuzzTest.kt` | 非 ASCII UA / Cookie 不致 500 / 无效 cookie 不绕权 | ✅ PR #74 |
+| `shared/.../CardFuzzGenerators.kt` | 随机输入生成器（供所有 fuzz 测试共用）| ⏳ Sprint B |
+| `shared/.../CardRulesFuzzTest.kt` | P1–P6：无崩 / 炸弹单调 / 炸弹压非炸弹 / 类型守恒 / findValidPlays 子集 | ⏳ Sprint B |
+| `shared/.../SettlementCalculatorFuzzTest.kt` | P7–P10：无崩 / 分数守恒 / 赢家得分 ≥ 输家 / null 条件 | ⏳ Sprint B |
+| `server/.../ServerDifferentialFuzzTest.kt` | DT-1/2/3：类型转换往返保真 / canBeat 两路径一致 / computeAllFinishedScores 公式一致 | ⏳ Sprint B |
 
 **技术约束**：纯 `kotlin.random.Random`；固定种子 42 保证 CI 可重现；
 CI 迭代 200 次（< 2 秒/测试），本地 soak 覆写 `FUZZ_ITERATIONS=5000`。
 
-**当前状态**：规划完成，暂未实施。实施后测试用例数将从 **186 → ~220**。
+**Sprint A P0 战果**（PR #74，2026-05）：
+- 新增 3 个 fuzz 测试文件 + JUnit XML failure 解析器（CI workflow），测试 LOC 从 ~3,620 → ~4,560（+25%）
+- **首跑即抓真 bug**：`AdminAuthService.login()` catch 只接 `IllegalArgumentException`，
+  jbcrypt 0.4 在空 / 截断 hash 上抛 `StringIndexOutOfBoundsException` → 服务端 500。
+  修复：catch 扩到 `Exception`（保留 `CancellationException` 重抛）。这是 fuzz
+  基础设施的 **ROI 标杆**——单 PR 就抓出一条业务级生产 bug，性价比超过预期
+- 教训：早期版本断言"任意 UA/Cookie 必 200"忽略 Ktor 拒绝非 ASCII header 是 HTTP 规范行为；
+  放宽到"status < 500"才是正确的 fuzz invariant。`bypass_invalid_cookie` 也从随机
+  ASCII 改为确定性测试用例，消除 RFC 字符随机性带来的 flake
+
+**当前状态**：Sprint A P0（server 高风险面）已合入主干。Sprint B（shared 卡牌/结算 fuzz + DT）
+待排期。测试用例数从 **186 → 195+**（仅 P0 阶段；Sprint B 落地后预计 ~220）。
+
+---
+
+### 9.22 质量体系 v1.27 + 6 个工具链插件落地（PR #78-#85 实战）
+
+**背景**：UC9 双仓评估在 v1.26 揭示主仓在 "fuzz / 复杂度阈值 / 依赖漏扫 / 二进制兼容
+验证 / 基准回归" 五条线上欠缺工具化抓手。v1.27 Quality Plan 落地 SWD 高风险模块的
+4 项过期保护，同步以 6 个 Gradle 插件配齐工具底座。
+
+**§8.8 late-binding 实战**：v1.26 dispatch 给出的 high_risk_modules 与主仓实际目录
+不匹配（dispatch 假设 monolith，实际是 :apps:android + :apps:web + :server 多模块）。
+按 §8.8 协议在 **checkpoint scope_resolution** 反馈到 quality-planning-agent，
+重生成 v1.27 dispatch（DISP-QP-v1.27-SWD-001，26 个 SWD 实例）。证明 §8.8 不是文档
+摆设——真实工作流就是会跑出"计划误判 → 反馈纠偏"循环。
+
+**6 个工具插件**（PR #78–#83，"安装但延迟强制"模式，避免一次性破 CI）：
+
+| PR | 插件 | 作用 | 强制时机 |
+|----|------|------|---------|
+| #78 | `detekt-formatting` | 格式 + 命名 lint | 立即（warning） |
+| #79 | `org.owasp.dependencycheck` 9.2.0 | OWASP 依赖漏扫 + 自定义 suppressions | cron workflow（dependency-scan.yml）|
+| #80 | `kotlinx-binary-compatibility-validator` 0.14.0 | API surface dump 防破坏性变更 | 任何 publishable 模块自动 |
+| #81 | `org.jetbrains.kotlinx.benchmark` 0.4.10 + `kotlin.plugin.allopen` | KMP JVM 基准 | label-triggered workflow（benchmark.yml）|
+| #82 | `config/detekt-high-risk.yml` | 高复杂度阈值文件级覆盖 | SWD 模块立即生效 |
+| #83 | `JaCoCo coverage report` aggregation | 跨模块汇总覆盖率 | PR 评论上传 |
+
+**踩坑总账**（5 条 CI 红，全部根因可追溯）：
+1. **`apiValidation.ignoredProjects = ["admin"]`** → "Cannot find excluded project"。
+   `apps/admin/` 是 Vue 子项目不是 Gradle subproject，从列表移除
+2. **`kotlinx-benchmark` 找不到源集**：KMP 下需显式 `jvm { compilations.create("benchmark") { associateWith(compilations.getByName("main")) } }`，不能依赖默认
+3. **基准任务名**：插件加 `Benchmark` 后缀，文档误写 `:shared:jvmBenchmark`，
+   实际是 `:shared:jvmBenchmarkBenchmark`
+4. **`gh pr comment` 在 fork PR 致命退出**：需加 `permissions: pull-requests: write`
+   + `|| echo "..."` 兜底
+5. **`@JsFun` Unicode body** 被 wasmJs 编译拒：所有 N6 JS 桥都改 ASCII-only
+   （Main.kt 既有约定）
+
+---
+
+### 9.23 N6 Web 调试日志（PR #86 实战）
+
+**背景**：Android 端早有 `DebugLogManager` + `LogViewerActivity`，Web 端缺失，用户
+在 wasmJs 真机出问题只能开 Chrome DevTools——移动端 PWA 无法做到。feature_spec N6
+要求 Web 对齐：500 条环形 in-memory + localStorage 持久（256 KB）+ `D/I/W/E` 四级 +
+全局 `window.onerror` / `unhandledrejection` 捕获 + 查看器界面 + 复制按钮。
+
+**核心约束**：
+- wasmJs 单线程：不需要 `CopyOnWriteArrayList` / `Mutex`，普通 `ArrayList` 即可
+- `@JsFun` 函数体 ASCII-only（Main.kt 既定约定，避免 wasmJs 编译器对 Unicode 的边界）
+- localStorage 作为 **跨初始化期数据通道**：JS 全局错误 handler 在 Compose 初始化前
+  就可能触发（Kotlin object 还没构造），需先写入 `debug_log_pending_errors` 中转 key，
+  等 `DebugLogManager.init()` 起来后排空
+
+**Codex P2 实战修正**：初版 `drainPendingErrors()` 仅在 `init()` 阶段调用一次。
+Codex 指出运行时（init 之后）的 `window.onerror` 仍走 `pending_errors` 中转 key，
+但永远没有第二次 drain → 用户在查看器里看不到运行时错误。修复：在 `getLogs()` /
+`getLogsAsString()` 入口同步调用 `drainPendingErrors()`（无 pending 时 no-op，开销
+~微秒），用户点"刷新"或"复制"就立即可见。
+
+**收益**：移动端 PWA 真机调试链路打通，与 Android `LogViewerActivity` 体验对齐。
