@@ -73,16 +73,16 @@ style: |
 | 反代部署 | Caddy 80/443 + 自动 HTTPS → `127.0.0.1:8080` + `/admin/` 子路径 |
 | 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x + Node 20 |
 
-### 代码规模（PR #62 后）：约 **23,360 行 / 98 文件**
+### 代码规模（PR #85 后）：约 **25,000 行 / 102 文件**
 
 | 模块 | 规模 |
 |----|----|
 | `:apps:android` | 20 文件 · ~6,440 行 |
-| `:apps:web` (Compose MP) | 25 文件 · ~4,320 行 |
+| `:apps:web` (Compose MP) | 27 文件 · ~4,800 行 |
 | `:shared` (KMP commonMain) | 9 文件 · ~2,670 行 |
-| `:server`（含 admin 模块）| 25 文件 · ~4,840 行 |
-| `apps/admin/`（Vue 3 SPA）| 19 文件 · ~1,470 行 |
-| 测试 | **14 文件 · 186 用例 · ~3,620 行** |
+| `:server`（含 admin 模块）| 25 文件 · ~5,040 行 |
+| `apps/admin/`（Vue 3 SPA）| 19 文件 · ~1,490 行 |
+| 测试（含 PR #74 fuzz）| **17 文件 · 195+ 用例 · ~4,560 行** |
 
 ---
 
@@ -109,7 +109,7 @@ style: |
 2026-05-13     Admin 优化 (#62)         PR 5a-d：SSE/趋势图/JSON 日志/事件回放
 ```
 
-**总计：62 PR · ~250 commit · ~162 问题（5 层审查）· 186 测试用例**
+**总计：86 PR · ~280 commit · ~168 问题（5 层审查）· 195+ 测试用例**
 
 ---
 
@@ -532,16 +532,17 @@ canBeat → 还卡（无 AI 回退）→ 还卡（并发）→ 偶发（无兜�
 
 | 指标 | 数值 |
 |------|------|
-| 全程 PR / commit | **62 个 / ~250 次** |
-| 发现问题总数 | **~162 个**（5 层审查；Codex 精确 25） |
-| 开发量 | **有效开发 19 天** |
+| 全程 PR / commit | **86 个 / ~280 次** |
+| 发现问题总数 | **~168 个**（5 层审查；Codex 精确 34） |
+| 开发量 | **有效开发 22 天** |
 | 终端覆盖 | Android + Web + **Admin SPA (Vue 3 / Element Plus)** |
 | 共享逻辑 | `:shared` KMP（编译期保证一致） |
 | 服务端 | Ktor + 内置 Admin（SQLite + bcrypt + SSE + 告警 + 历史回放）|
-| **自动化测试** | **186 个 @Test / 14 个 *Test.kt**（覆盖关键路径） |
+| **自动化测试** | **195+ 个 @Test / 17 个 *Test.kt**（含 PR #74 fuzz）|
 | 部署 | Caddy 自动 HTTPS + `/admin/` 子路径 + GitHub Actions auto-deploy |
+| **质量工具链** | detekt-formatting / OWASP dep-scan / API surface / kotlinx.benchmark / JaCoCo（PR #78–#83）|
 
-### 后续建议行动（PR #62 已落地的标 ✅）
+### 后续建议行动（PR #85 已落地的标 ✅）
 
 | 状态 | 行动 |
 |------|------|
@@ -550,6 +551,10 @@ canBeat → 还卡（无 AI 回退）→ 还卡（并发）→ 偶发（无兜�
 | ✅ 已实现 | tdd-gate CI 硬关（PR-H2）/ pr-reviewer subagent（PR-H5）|
 | ✅ 已实现 | **监控告警**（PR #61/3：AlertEngine 3 内置规则 + PR #62/5a SSE 推送）|
 | ✅ 已实现 | **历史游戏回放**（PR #62/5d：game_events 表 + 逐手出牌持久化）|
+| ✅ 已实现 | **DT FUZZ Sprint A**（PR #74：抓 BCrypt SIOOBE 真 bug）|
+| ✅ 已实现 | **质量体系 v1.27 + 6 工具链**（PR #78–#83，§8.8 late-binding 实战）|
+| ✅ 已实现 | **N6 Web 调试日志**（PR #86：localStorage 镜像 Android DebugLogManager）|
+| 🟡 进行中 | DT FUZZ Sprint B（shared CardRules / SettlementCalculator + DT 差分）|
 | ⚪ 待规划 | step-through 回放 UI / 玩家账号系统（模块 4）/ 弱网 e2e |
 
 ---
