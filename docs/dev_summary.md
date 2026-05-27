@@ -32,25 +32,26 @@
 | 构建 | AGP 8.5 / KMP 1.9.24 / Compose MP 1.6.10 / Gradle 8.x / Node 20 + Vite（admin 子项目独立 npm）|
 | CI | GitHub Actions：jvmTest + tdd-gate + detekt + assembleDebug + wasmJsBrowserDistribution + admin-build（Vite 打包 + dist 5 MB 阈值）|
 
-### 代码规模（PR #62 后）
+### 代码规模（PR #85 后）
 
 | 模块 | 文件数 | 行数 |
 |------|-------|-----|
 | `:apps:android`（Android UI + 网络层）| 20 个 .kt | ~6,440 |
-| `:apps:web`（Compose MP / wasmJs）| 25 个 .kt | ~4,320 |
+| `:apps:web`（Compose MP / wasmJs）| 27 个 .kt | ~4,800 |
 | `:shared`（KMP 公共逻辑，commonMain）| 9 个 .kt | ~2,670 |
-| `:server`（Ktor 服务端 + admin 模块）| 25 个 .kt | ~4,840 |
-| `apps/admin/`（Vue 3 + Element Plus SPA）| 19 个 .vue/.ts | ~1,470 |
-| 测试（commonTest + serverTest + admin tests）| 14 个 .kt | ~3,620 |
+| `:server`（Ktor 服务端 + admin 模块）| 25 个 .kt | ~5,040 |
+| `apps/admin/`（Vue 3 + Element Plus SPA）| 19 个 .vue/.ts | ~1,490 |
+| 测试（commonTest + serverTest，含 PR #74 fuzz 基础设施）| 17 个 .kt | ~4,560 |
 | Android XML 布局 | 20 个 | ~3,320 |
-| **合计**（Kotlin + Vue/TS main）| **98 个文件** | **约 23,360 行** |
-| **总测试 LOC 增长** | PR #54 ~1,530 | → **PR #62 ~3,620（×2.4）** |
+| **合计**（Kotlin + Vue/TS main）| **102 个文件** | **约 25,000 行** |
+| **总测试 LOC 增长** | PR #54 ~1,530 → PR #62 ~3,620 → **PR #74 ~4,560（×3.0 vs #54）** |
 
 关键大文件：
 - `OnlineGameActivity.kt` ~1,050 行（Android 联网游戏 UI）
 - `ServerGameManager.kt` ~1,100 行（PR #62 +listener / lastActionAt / withRoomLock）
 - `AppViewModel.kt` ~660 行（Web 状态机，PR #62 +连接幂等防御）
-- `Application.kt` ~550 行（PR #61 提取 gameModule + 装 admin）
+- `Application.kt` ~610 行（PR #61 提取 gameModule + 装 admin；PR #68-70 admin 模块隔离）
+- `AdminAuthService.kt` ~380 行（PR #61 引入；PR #74 catch 扩到 Exception，修 BCrypt SIOOBE 真 bug）
 - `GameHistoryStore.kt` ~280 行（admin 异步入库 + game_events drain）
 
 ---
@@ -463,7 +464,7 @@ PR / regressions.md 跟进。
 | 5 | #62 | gameEventListener 锁外调致并发 seq race | 移到 `mutexFor(room).withLock` 内 + 新增回归测试 |
 
 **关键观察**：
-- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，PR #29-#62 共 **实际 25 条**；PR #70-#71 补录 3 条，累计 **28 条**
+- 早期 dev_summary 估算"~13 条"低估了一半；本次按 MCP 工具拉全量数据，PR #29-#62 共 **实际 25 条**；PR #70-#71 补录 3 条；PR #74 / #84 / #85 / #86 新增 6 条（BCrypt SIOOBE 真 bug、benchmark KMP 关联、`apiValidation.ignoredProjects` 误配、CI workflow permissions、运行时错误未流入查看器、`gh pr comment` fork 致命退出），累计 **34 条**
 - **0 业务级遗漏**：所有 thread 级 skipped 的核心问题最终都在 regressions.md / 后续 PR 中被处理
 - **0 误报**：Codex 在本项目精度 100%。在另外 43 个 PR 上 silent（docs-only / 无问题）
 - 与 pr-reviewer 互补：Codex 抓"语句级边界 / entropy / 偏移量 / 并发 race"，pr-reviewer
@@ -728,7 +729,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 | 共享模块 | `:shared` KMP（消灭约束 1/4） |
 | 服务端 | Ktor + 内置 Admin 模块（SQLite + bcrypt + SSE + 告警 + 历史回放）|
 | Harness 基础设施 | L0–L4 五层，PR-H1~H5 落地 |
-| 自动化测试 | **186 个 @Test**（跨 14 个 *Test.kt；详见 §八 8.2 后段）|
+| 自动化测试 | **195+ 个 @Test**（跨 17 个 *Test.kt，含 PR #74 fuzz；详见 §八 8.2 后段）|
 | 部署 | Caddy（80/443 + 自动 HTTPS）+ `/admin/` 子路径 + systemd + GitHub Actions auto-deploy |
 
 ### 后续建议行动
@@ -742,6 +743,7 @@ override fun onOpen(ws: WebSocket, response: Response) {
 7. ⚪ **iOS / Desktop targets**：KMP 骨架已就绪，按 `docs/client_implementation_guide.md` 路径扩展，目前无规划
 8. ⚪ **逐手出牌 step-through 回放 UI**：PR #62 / 5d 已铺 `game_events` 表 + events API；待补 admin SPA 上的"按 seq 步进重放"组件
 9. ⚪ **玩家账号系统**：MVP 决策推后；模块 4（玩家纪律 / 封禁）启动时一起做
+10. 🟡 **DT FUZZ 测试**：Sprint A P0 已落地（PR #74）— `FuzzTestBase` + `AdminAuthServiceFuzzTest` + `AdminAuthPluginFuzzTest`，首跑抓 BCrypt SIOOBE 真 bug；Sprint B（shared CardRules / SettlementCalculator + ServerGameManager DT 差分）待排期（详见 §9.21）
 
 ---
 
@@ -805,7 +807,7 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 > reconnect 时序、6 人下限 vs maxPlayers……见 §四问题清单）。这条对比
 > 直接推动了 **PR-H2 关键路径强制 TDD + CI tdd-gate**（CLAUDE.md 第三章）。
 >
-> **当前状态（PR #62 后）**：全项目共 **186 个 `@Test`**（跨 14 个 *Test.kt 文件），
+> **当前状态（PR #74 后）**：全项目共 **195+ 个 `@Test`**（跨 17 个 *Test.kt 文件），
 > 其中：
 > - `:shared` 59 个：CardRulesTest 33 + SettlementCalculatorTest 18 +
 >   GameMessageSerializationTest 8
@@ -813,6 +815,8 @@ Opus（新会话）：审查"测试覆盖够吗"→ 补测试 → 循环
 >   admin/ 76（AdminAuthService 13 / AdminAuthRoutes 8 / AdminApiRoutes 11 /
 >   AdminDb 5 / GameHistoryStore 9 / SnapshotBuilder 7 / AlertRule 9 /
 >   AlertStore 9 / AlertEngine 5）
+> - `:server` fuzz（PR #74）9+：AdminAuthServiceFuzzTest + AdminAuthPluginFuzzTest
+>   （共用 `FuzzTestBase`，seeded Random，200 iter/CI，5000 iter/local soak）
 > - **CI `tdd-gate` 硬关**：CardRules / SettlementCalculator / ServerGameManager
 >   任一改动**必须**同 PR 改对应 `*Test.kt`（机制是 `git diff --name-only` 校验），
 >   未同改直接红
@@ -1367,7 +1371,7 @@ PR #58-62 阶段稳定下来的可量化质量指标：
 | PR 合并前 P0/P1 数 | 0（全部被 5 层之一抓到并修）| 保持 0 |
 | 用户报的 bug → 进 regressions.md 的延迟 | < 2 小时（#15 当天进）| < 1 天 |
 | CI 修复回路平均次数 | 4 次（PR #61-62）| 长期看希望 < 2 次（plan 越精细越少）|
-| 测试用例数随代码增长比 | 186 用例 / 23k LOC ≈ 8 / 1k LOC | 保持 > 7 / 1k LOC |
+| 测试用例数随代码增长比 | 195+ 用例 / 25k LOC ≈ 7.8 / 1k LOC | 保持 > 7 / 1k LOC |
 
 **核心洞察**：质量不是"修出来的"，是**多层约束的合力**——单独看每一层都有盲区，
 组合起来才接近"绝大多数 bug 在用户看到前就被消灭"。这五层每一层都可以独立度量
@@ -1448,3 +1452,152 @@ suspend fun ApplicationCall.requireAdmin(ctx: AdminContext): AdminUser? {
 
 **Codex review（PR #71）**：
 - P2：regressions.md #16 错误将 `requireAdmin` hybrid bypass 描述为 `POST /admin-auth/login` HTTP 500 的修复。Codex 正确指出：`handleLogin` 在调用 `call.response.cookies.append()` 时崩溃，该路由从不调用 `requireAdmin`，因此 bypass 对 login 路由完全无效，login 仍返回 500。→ 修正 regressions.md #16 的"根因"字段（删除对 bypass 的提及）和"修复"字段（明确 login 端点仍返回 500，bypass 仅对调用了 requireAdmin 的其他端点暂时关闭鉴权）
+
+---
+
+### 9.20 Android/Web 客户端连接根因：installAdmin before routing（regressions #18）
+
+**症状**：Android 无法连接服务器（WebSocket 握手持续报失败）；Web 版要连点 5+ 次
+才进入 Connected（每次均 Connecting → Error → Disconnected）。
+
+**排查路径**：
+
+| 步骤 | 检查点 | 结论 |
+|------|--------|------|
+| 1 | 客户端 URL、TLS、Caddy 配置 | 正确；`curl wss://bermin.cn/game` 握手也失败 |
+| 2 | Web `AppViewModel.connectServer()` 幂等保护 | 正确（PR #62 / regressions #15 已修）|
+| 3 | Android `NetworkManager` 幂等保护 | 正确 |
+| 4 | **服务端启动顺序**（关键）| `Application.kt`：`installAdmin(serverContext)` 在 `routing{}` 之前；admin 初始化抛异常时 `routing{}` 永不执行，`/game` 未注册 |
+
+**根因**：
+
+```kotlin
+// ❌ 修复前：admin 初始化失败 → routing{} 不执行 → /game 从未注册
+if (enableAdmin) installAdmin(serverContext)   // 可能抛异常
+routing {
+    webSocket("/game") { ... }                 // 永不执行
+}
+
+// ✅ 修复后：game WebSocket 无论 admin 是否成功都先注册
+routing {
+    webSocket("/game") { ... }                 // 必先注册
+}
+if (enableAdmin) {
+    try { installAdmin(serverContext) }
+    catch (e: Exception) { application.log.error("Admin init failed", e) }
+}
+```
+
+**Web 端 "5+ 次点击" 行为解释**：客户端的幂等保护本身正确。
+"5+ 次"是因为每次握手被服务端拒绝（`/game` 未注册），连接回到 Disconnected 后
+用户继续点击。服务端修复部署后，首次点击即可连上。**无需修改客户端代码**。
+
+**修复 commit**：`519a65b` | **regressions #18** | 修复文件：`server/src/main/kotlin/.../Application.kt`
+
+**教训**：
+- 游戏关键路径（WebSocket /game）的注册**不得依赖**运维模块（admin）的成功初始化
+- 运维层故障必须与业务层严格隔离；启动顺序是隐性的依赖关系，比代码 bug 更难察觉
+- 部署后应先用 `curl wss://<host>/game` 验证 WebSocket 握手，再开 admin 测试；
+  这一步加入 `docs/playbooks/feature-development.md` 的"部署验证"检查项
+
+---
+
+### 9.21 DT FUZZ 高风险模块测试方案（Sprint A P0 已落地，PR #74）
+
+**背景**：当前 186 个测试全部使用硬编码输入，边界覆盖依赖人工猜测。
+CardRules / SettlementCalculator / ServerGameManager 的类型转换链（ServerCard ↔ shared Card）
+无系统化往返验证。方案已规划，零新 Gradle 依赖。
+
+**两大测试方向**：
+- **属性不变量（Fuzz）**：对随机生成输入断言数学不变量，而非对比参考输出
+  （炸弹单调性 / 分数守恒 / 类型守恒 / 无崩保证）
+- **差分测试（DT）**：验证 shared 路径与 server 路径对同一逻辑输入给出相同结果
+  （`canBeat` shared vs server 委托 / `computeAllFinishedScores` vs 手算公式）
+
+**方案摘要**（完整见 `/root/.claude/plans/pr-piped-parrot.md`）：
+
+| 文件 | 测试目标 | 状态 |
+|------|---------|------|
+| `server/.../FuzzTestBase.kt` | 共用 seeded Random + `FUZZ_ITERATIONS` 环境变量挂钩 | ✅ PR #74 |
+| `server/.../AdminAuthServiceFuzzTest.kt` | login 永不抛 / BCrypt 路径边界 | ✅ PR #74 |
+| `server/.../AdminAuthPluginFuzzTest.kt` | 非 ASCII UA / Cookie 不致 500 / 无效 cookie 不绕权 | ✅ PR #74 |
+| `shared/.../CardFuzzGenerators.kt` | 随机输入生成器（供所有 fuzz 测试共用）| ⏳ Sprint B |
+| `shared/.../CardRulesFuzzTest.kt` | P1–P6：无崩 / 炸弹单调 / 炸弹压非炸弹 / 类型守恒 / findValidPlays 子集 | ⏳ Sprint B |
+| `shared/.../SettlementCalculatorFuzzTest.kt` | P7–P10：无崩 / 分数守恒 / 赢家得分 ≥ 输家 / null 条件 | ⏳ Sprint B |
+| `server/.../ServerDifferentialFuzzTest.kt` | DT-1/2/3：类型转换往返保真 / canBeat 两路径一致 / computeAllFinishedScores 公式一致 | ⏳ Sprint B |
+
+**技术约束**：纯 `kotlin.random.Random`；固定种子 42 保证 CI 可重现；
+CI 迭代 200 次（< 2 秒/测试），本地 soak 覆写 `FUZZ_ITERATIONS=5000`。
+
+**Sprint A P0 战果**（PR #74，2026-05）：
+- 新增 3 个 fuzz 测试文件 + JUnit XML failure 解析器（CI workflow），测试 LOC 从 ~3,620 → ~4,560（+25%）
+- **首跑即抓真 bug**：`AdminAuthService.login()` catch 只接 `IllegalArgumentException`，
+  jbcrypt 0.4 在空 / 截断 hash 上抛 `StringIndexOutOfBoundsException` → 服务端 500。
+  修复：catch 扩到 `Exception`（保留 `CancellationException` 重抛）。这是 fuzz
+  基础设施的 **ROI 标杆**——单 PR 就抓出一条业务级生产 bug，性价比超过预期
+- 教训：早期版本断言"任意 UA/Cookie 必 200"忽略 Ktor 拒绝非 ASCII header 是 HTTP 规范行为；
+  放宽到"status < 500"才是正确的 fuzz invariant。`bypass_invalid_cookie` 也从随机
+  ASCII 改为确定性测试用例，消除 RFC 字符随机性带来的 flake
+
+**当前状态**：Sprint A P0（server 高风险面）已合入主干。Sprint B（shared 卡牌/结算 fuzz + DT）
+待排期。测试用例数从 **186 → 195+**（仅 P0 阶段；Sprint B 落地后预计 ~220）。
+
+---
+
+### 9.22 质量体系 v1.27 + 6 个工具链插件落地（PR #78-#85 实战）
+
+**背景**：UC9 双仓评估在 v1.26 揭示主仓在 "fuzz / 复杂度阈值 / 依赖漏扫 / 二进制兼容
+验证 / 基准回归" 五条线上欠缺工具化抓手。v1.27 Quality Plan 落地 SWD 高风险模块的
+4 项过期保护，同步以 6 个 Gradle 插件配齐工具底座。
+
+**§8.8 late-binding 实战**：v1.26 dispatch 给出的 high_risk_modules 与主仓实际目录
+不匹配（dispatch 假设 monolith，实际是 :apps:android + :apps:web + :server 多模块）。
+按 §8.8 协议在 **checkpoint scope_resolution** 反馈到 quality-planning-agent，
+重生成 v1.27 dispatch（DISP-QP-v1.27-SWD-001，26 个 SWD 实例）。证明 §8.8 不是文档
+摆设——真实工作流就是会跑出"计划误判 → 反馈纠偏"循环。
+
+**6 个工具插件**（PR #78–#83，"安装但延迟强制"模式，避免一次性破 CI）：
+
+| PR | 插件 | 作用 | 强制时机 |
+|----|------|------|---------|
+| #78 | `detekt-formatting` | 格式 + 命名 lint | 立即（warning） |
+| #79 | `org.owasp.dependencycheck` 9.2.0 | OWASP 依赖漏扫 + 自定义 suppressions | cron workflow（dependency-scan.yml）|
+| #80 | `kotlinx-binary-compatibility-validator` 0.14.0 | API surface dump 防破坏性变更 | 任何 publishable 模块自动 |
+| #81 | `org.jetbrains.kotlinx.benchmark` 0.4.10 + `kotlin.plugin.allopen` | KMP JVM 基准 | label-triggered workflow（benchmark.yml）|
+| #82 | `config/detekt-high-risk.yml` | 高复杂度阈值文件级覆盖 | SWD 模块立即生效 |
+| #83 | `JaCoCo coverage report` aggregation | 跨模块汇总覆盖率 | PR 评论上传 |
+
+**踩坑总账**（5 条 CI 红，全部根因可追溯）：
+1. **`apiValidation.ignoredProjects = ["admin"]`** → "Cannot find excluded project"。
+   `apps/admin/` 是 Vue 子项目不是 Gradle subproject，从列表移除
+2. **`kotlinx-benchmark` 找不到源集**：KMP 下需显式 `jvm { compilations.create("benchmark") { associateWith(compilations.getByName("main")) } }`，不能依赖默认
+3. **基准任务名**：插件加 `Benchmark` 后缀，文档误写 `:shared:jvmBenchmark`，
+   实际是 `:shared:jvmBenchmarkBenchmark`
+4. **`gh pr comment` 在 fork PR 致命退出**：需加 `permissions: pull-requests: write`
+   + `|| echo "..."` 兜底
+5. **`@JsFun` Unicode body** 被 wasmJs 编译拒：所有 N6 JS 桥都改 ASCII-only
+   （Main.kt 既有约定）
+
+---
+
+### 9.23 N6 Web 调试日志（PR #86 实战）
+
+**背景**：Android 端早有 `DebugLogManager` + `LogViewerActivity`，Web 端缺失，用户
+在 wasmJs 真机出问题只能开 Chrome DevTools——移动端 PWA 无法做到。feature_spec N6
+要求 Web 对齐：500 条环形 in-memory + localStorage 持久（256 KB）+ `D/I/W/E` 四级 +
+全局 `window.onerror` / `unhandledrejection` 捕获 + 查看器界面 + 复制按钮。
+
+**核心约束**：
+- wasmJs 单线程：不需要 `CopyOnWriteArrayList` / `Mutex`，普通 `ArrayList` 即可
+- `@JsFun` 函数体 ASCII-only（Main.kt 既定约定，避免 wasmJs 编译器对 Unicode 的边界）
+- localStorage 作为 **跨初始化期数据通道**：JS 全局错误 handler 在 Compose 初始化前
+  就可能触发（Kotlin object 还没构造），需先写入 `debug_log_pending_errors` 中转 key，
+  等 `DebugLogManager.init()` 起来后排空
+
+**Codex P2 实战修正**：初版 `drainPendingErrors()` 仅在 `init()` 阶段调用一次。
+Codex 指出运行时（init 之后）的 `window.onerror` 仍走 `pending_errors` 中转 key，
+但永远没有第二次 drain → 用户在查看器里看不到运行时错误。修复：在 `getLogs()` /
+`getLogsAsString()` 入口同步调用 `drainPendingErrors()`（无 pending 时 no-op，开销
+~微秒），用户点"刷新"或"复制"就立即可见。
+
+**收益**：移动端 PWA 真机调试链路打通，与 Android `LogViewerActivity` 体验对齐。
