@@ -339,7 +339,7 @@ def svg_authorship_pie() -> str:
     # data: (label, count, color)
     data = [
         ("Claude（AI 直接产出 commit）", 224, "#2563eb"),
-        ("berming（仅 PR merge 按钮）", 56, "#94a3b8"),
+        ("berming（仅 PR merge 按钮）", 58, "#94a3b8"),
         ("berming（人工写代码 commit）", 2, "#dc2626"),
         ("bermin（legacy）", 1, "#94a3b8"),
     ]
@@ -349,7 +349,7 @@ def svg_authorship_pie() -> str:
     cx, cy, r = 220, 200, 150
     out = ['<svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" class="diagram" role="img" aria-label="Commit 授权分布">']
     # Title
-    out.append('<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Commit author 分布（PR #1–#86 全程，共 285 commit）</text>')
+    out.append(f'<text x="440" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Commit author 分布（PR #1–#88 全程，共 {total} commit）</text>')
     # Pie
     angle_start = -math.pi / 2  # start at top
     for label, count, color in data:

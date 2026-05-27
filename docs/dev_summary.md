@@ -495,7 +495,7 @@ PR / regressions.md 跟进。
 AUTHORSHIP_PIE
 total: 285 commits
   Claude (AI 直接产出):   224 commits   79%
-  berming (人工合并 PR):   56 merge     20%   ← 仅点 merge 按钮，不含代码改动
+  berming (人工合并 PR):   58 merge     20%   ← 仅点 merge 按钮，不含代码改动
   berming (人工写代码):     2 commits   <1%   ← LobbyActivity URL 更新 + dev_summary 错字
   bermin (legacy):          1 commit    <1%
 ```
