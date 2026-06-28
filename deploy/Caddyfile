@@ -41,6 +41,19 @@ bermin.cn {
         file_server
     }
 
+    # Huigu-AI 股票报告（独立项目，berming/Huigu-AI 仓库经 GitHub Actions rsync
+    # 到 /var/www/huigu-stocks）。与游戏路由互不重叠：/ 游戏、/admin/ 后台、
+    # /stocks/ 股票报告。Caddy 按 path specificity 自动排序，/stocks/* 比根
+    # handle{} 更具体，不会被兜底吞掉。
+    # /stocks（无尾斜杠）→ /stocks/，确保 handle_path 能命中首页
+    @stocksBare path /stocks
+    redir @stocksBare /stocks/ 301
+    handle_path /stocks/* {
+        root * /var/www/huigu-stocks
+        encode gzip zstd
+        file_server
+    }
+
     handle {
         root * /var/www/communication-card-web
         encode gzip zstd
