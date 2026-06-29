@@ -45,14 +45,22 @@ apt-get install -y openjdk-17-jre-headless
 step "2/7 创建部署用户与目录"
 id -u "$DEPLOY_USER" >/dev/null 2>&1 || \
     useradd --system --create-home --shell /bin/bash "$DEPLOY_USER"
-mkdir -p "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
-chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR"
+# CADDY_STAGE_DIR：CI 把 Caddyfile rsync 到这里（cards 可写），再由 root helper 落盘
+CADDY_STAGE_DIR="/opt/communication-card/caddy"
+mkdir -p "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR" "$CADDY_STAGE_DIR"
+chown -R "$DEPLOY_USER:$DEPLOY_USER" "$WEB_DIR" "$ADMIN_WEB_DIR" "$SERVER_DIR" "$LOG_DIR" "$LIB_DIR" "$CADDY_STAGE_DIR"
 chmod 750 "$LIB_DIR"
 
 step "3/7 部署 Caddyfile"
 curl -fsSL "$REPO_RAW/deploy/Caddyfile" -o /etc/caddy/Caddyfile
 echo "    !!! 编辑 /etc/caddy/Caddyfile：选 A（IP 直连）或 B（域名 + HTTPS）方案，"
 echo "        删掉不需要那段，然后 systemctl reload caddy"
+
+# Caddyfile 自动部署 helper：CI 经 sudo 调用，校验暂存 Caddyfile 通过后落盘 + reload。
+# 让今后改 deploy/Caddyfile 随 deploy.yml 自动上线，无需手动上服务器。
+curl -fsSL "$REPO_RAW/deploy/cc-deploy-caddyfile.sh" -o /usr/local/sbin/cc-deploy-caddyfile
+chown root:root /usr/local/sbin/cc-deploy-caddyfile
+chmod 755 /usr/local/sbin/cc-deploy-caddyfile
 
 step "4/7 部署 systemd unit"
 curl -fsSL "$REPO_RAW/deploy/communication-card-server.service" \
@@ -133,7 +141,7 @@ fi
 SUDOERS_FILE=/etc/sudoers.d/communication-card-deploy
 cat > "$SUDOERS_FILE" <<EOF
 # 由 deploy/install.sh 生成；只允许 cards 重启自己的 service
-$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL daemon-reload, $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server
+$DEPLOY_USER ALL=(root) NOPASSWD: $SYSCTL daemon-reload, $SYSCTL restart communication-card-server, $SYSCTL reload caddy, $SYSCTL status communication-card-server, /usr/local/sbin/cc-deploy-caddyfile
 EOF
 chmod 440 "$SUDOERS_FILE"
 # 校验语法 —— 错误的 sudoers 会让整台机的 sudo 失效，必须 visudo -c

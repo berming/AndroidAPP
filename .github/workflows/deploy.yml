@@ -168,6 +168,25 @@ jobs:
             server/build/install/server/ \
             "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST:/opt/communication-card/server/"
 
+      - name: Deploy Caddyfile (validated, if server supports it)
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+        run: |
+          # 把仓库里的 deploy/Caddyfile 推上服务器并热加载——之前 deploy.yml 只
+          # reload caddy、从不更新 Caddyfile，导致路由改动（如 /stocks/）合并后
+          # 仍不生效。helper 内部 caddy validate 通过才落盘 + reload，坏配置不会打挂 Caddy。
+          #
+          # 向后兼容：只有重跑过新版 install.sh 的服务器才有 helper + 暂存目录；
+          # 老服务器自动跳过，由下一步的 reload caddy 兜底（Caddyfile 维持现状）。
+          if ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'test -x /usr/local/sbin/cc-deploy-caddyfile && test -d /opt/communication-card/caddy'; then
+            rsync -avz deploy/Caddyfile \
+              "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST:/opt/communication-card/caddy/Caddyfile"
+            ssh "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" 'sudo /usr/local/sbin/cc-deploy-caddyfile'
+          else
+            echo "ℹ️ 服务器未启用 Caddyfile 自动部署（需重跑 deploy/install.sh）。跳过，Caddyfile 维持现状。"
+          fi
+
       - name: Restart server + reload Caddy
         env:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
