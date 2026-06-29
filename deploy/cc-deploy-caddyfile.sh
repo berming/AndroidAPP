@@ -26,8 +26,20 @@ if [[ -f "$DEST" ]] && cmp -s "$STAGED" "$DEST"; then
     exit 0
 fi
 
-# 3) 备份 → 安装 → reload
-cp -f "$DEST" "$DEST.bak.$(date +%s)" 2>/dev/null || true
+# 3) 备份 → 安装 → reload；reload 失败则回滚到备份，保证现网始终是「上次可用」配置。
+#    （validate 只能保证语法/静态可读；reload 仍可能因运行期 cert/key/log 路径权限失败。）
+BACKUP=""
+if [[ -f "$DEST" ]]; then
+    BACKUP="$DEST.bak.$(date +%s)"
+    cp -f "$DEST" "$BACKUP"
+fi
 install -m 644 -o root -g root "$STAGED" "$DEST"
-systemctl reload caddy
+if ! systemctl reload caddy; then
+    echo "❌ systemctl reload caddy 失败，回滚 /etc/caddy/Caddyfile" >&2
+    if [[ -n "$BACKUP" && -f "$BACKUP" ]]; then
+        install -m 644 -o root -g root "$BACKUP" "$DEST"
+        systemctl reload caddy || echo "⚠️ 回滚后 reload 仍失败，请人工检查 caddy 状态" >&2
+    fi
+    exit 1
+fi
 echo "✅ Caddyfile 已更新并 reload"

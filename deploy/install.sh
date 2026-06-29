@@ -53,8 +53,9 @@ chmod 750 "$LIB_DIR"
 
 step "3/7 部署 Caddyfile"
 curl -fsSL "$REPO_RAW/deploy/Caddyfile" -o /etc/caddy/Caddyfile
-echo "    !!! 编辑 /etc/caddy/Caddyfile：选 A（IP 直连）或 B（域名 + HTTPS）方案，"
-echo "        删掉不需要那段，然后 systemctl reload caddy"
+echo "    ℹ️ /etc/caddy/Caddyfile 由仓库 deploy/Caddyfile 统一管理：deploy.yml 每次部署"
+echo "       会 caddy validate 通过后覆盖它（仓库为唯一真相源）。要改配置请改仓库里的"
+echo "       deploy/Caddyfile，不要在服务器手改——手改会在下次部署被覆盖。"
 
 # Caddyfile 自动部署 helper：CI 经 sudo 调用，校验暂存 Caddyfile 通过后落盘 + reload。
 # 让今后改 deploy/Caddyfile 随 deploy.yml 自动上线，无需手动上服务器。
